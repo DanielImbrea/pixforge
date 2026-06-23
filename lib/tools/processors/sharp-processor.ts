@@ -4,11 +4,13 @@ import { classifyImageContent } from '@/lib/image/classify-content';
 import {
   applyContentAwareEncode,
   applyResize,
+  computeFitInsideDimensions,
   formatLabel,
   prepareForJpeg,
   readImageDimensions,
   selectSmartOutputFormat,
   type OutputFormat,
+  type SharpOperation,
   type SmartFormatChoice,
 } from '@/lib/image/sharp-encode';
 
@@ -28,23 +30,28 @@ async function fetchAsBuffer(url: string): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
-function resolveFormatChoice(
-  profile: Awaited<ReturnType<typeof classifyImageContent>>,
-  userFormat?: string
-): SmartFormatChoice {
-  return selectSmartOutputFormat(profile, userFormat);
-}
-
 function finalizePipeline(
   pipeline: sharp.Sharp,
-  format: OutputFormat,
+  formatChoice: SmartFormatChoice,
   profile: Awaited<ReturnType<typeof classifyImageContent>>,
-  quality?: number
+  operation: SharpOperation,
+  outputWidth: number,
+  outputHeight: number,
+  qualityOverride?: number
 ): sharp.Sharp {
-  if (format === 'jpeg') {
-    pipeline = prepareForJpeg(pipeline, profile);
+  let pipelineOut = pipeline;
+
+  if (formatChoice.format === 'jpeg') {
+    pipelineOut = prepareForJpeg(pipelineOut, profile);
   }
-  return applyContentAwareEncode(pipeline, format, profile, quality);
+
+  return applyContentAwareEncode(pipelineOut, formatChoice.format, profile, {
+    qualityOverride,
+    operation,
+    outputWidth,
+    outputHeight,
+    lossless: formatChoice.lossless,
+  });
 }
 
 export const sharpProcessor: ToolProcessor = {
@@ -56,6 +63,7 @@ export const sharpProcessor: ToolProcessor = {
       let pipeline = sharp(buffer, { failOn: 'error' }).rotate();
       const params = job.params || {};
       const defaults = tool.processorConfig.sharpDefaults || {};
+      const operation = tool.processorConfig.sharpOperation as SharpOperation;
 
       const maxDim = tool.limits.maxDimensionPx;
       if (maxDim && inputMeta.width && inputMeta.height) {
@@ -65,9 +73,11 @@ export const sharpProcessor: ToolProcessor = {
       }
 
       let formatChoice: SmartFormatChoice;
-      let quality: number | undefined;
+      let qualityOverride: number | undefined;
+      let outputWidth = inputMeta.width;
+      let outputHeight = inputMeta.height;
 
-      switch (tool.processorConfig.sharpOperation) {
+      switch (operation) {
         case 'resize': {
           let width = typeof params.width === 'number' && params.width > 0 ? params.width : undefined;
           let height = typeof params.height === 'number' && params.height > 0 ? params.height : undefined;
@@ -76,6 +86,10 @@ export const sharpProcessor: ToolProcessor = {
             width = inputMeta.width ? Math.max(1, Math.round(inputMeta.width / 2)) : undefined;
             height = inputMeta.height ? Math.max(1, Math.round(inputMeta.height / 2)) : undefined;
           }
+
+          const projected = computeFitInsideDimensions(inputMeta.width, inputMeta.height, width, height);
+          outputWidth = projected.width;
+          outputHeight = projected.height;
 
           pipeline = applyResize(pipeline, {
             width,
@@ -87,20 +101,35 @@ export const sharpProcessor: ToolProcessor = {
             inputHeight: inputMeta.height,
           });
 
-          formatChoice = resolveFormatChoice(profile);
-          pipeline = finalizePipeline(pipeline, formatChoice.format, profile);
+          formatChoice = selectSmartOutputFormat(profile, { operation: 'resize' });
+          pipeline = finalizePipeline(
+            pipeline,
+            formatChoice,
+            profile,
+            'resize',
+            outputWidth,
+            outputHeight
+          );
           break;
         }
         case 'compress': {
-          quality =
+          qualityOverride =
             typeof params.quality === 'number'
               ? params.quality
               : typeof defaults.quality === 'number'
                 ? defaults.quality
                 : undefined;
 
-          formatChoice = resolveFormatChoice(profile);
-          pipeline = finalizePipeline(pipeline, formatChoice.format, profile, quality);
+          formatChoice = selectSmartOutputFormat(profile, { operation: 'compress' });
+          pipeline = finalizePipeline(
+            pipeline,
+            formatChoice,
+            profile,
+            'compress',
+            outputWidth,
+            outputHeight,
+            qualityOverride
+          );
           break;
         }
         case 'convert': {
@@ -111,8 +140,18 @@ export const sharpProcessor: ToolProcessor = {
                 ? defaults.targetFormat
                 : 'auto';
 
-          formatChoice = resolveFormatChoice(profile, target);
-          pipeline = finalizePipeline(pipeline, formatChoice.format, profile);
+          formatChoice = selectSmartOutputFormat(profile, {
+            userFormat: target,
+            operation: 'convert',
+          });
+          pipeline = finalizePipeline(
+            pipeline,
+            formatChoice,
+            profile,
+            'convert',
+            outputWidth,
+            outputHeight
+          );
           break;
         }
         default:
@@ -130,7 +169,7 @@ export const sharpProcessor: ToolProcessor = {
         outputHeight: outputMeta.height,
         outputSizeBytes: outputBuffer.byteLength,
         outputFormat: formatChoice.format,
-        outputFormatLabel: formatLabel(formatChoice.format),
+        outputFormatLabel: formatLabel(formatChoice.format, formatChoice.lossless),
         smartFormatSelected: formatChoice.automatic,
         contentKind: profile.kind,
       };

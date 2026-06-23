@@ -23,7 +23,7 @@ export const compressTool: ToolDefinition = {
   },
   limits: {
     maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 100 },
-    acceptedFormats: ['image/png', 'image/jpeg', 'image/webp'],
+    acceptedFormats: ['image/png', 'image/jpeg', 'image/webp', 'image/avif'],
   },
   seo: {
     translations: {
@@ -35,10 +35,10 @@ export const compressTool: ToolDefinition = {
         intro:
           'Drop in a photo and we will shrink its file size using smart compression that picks the best format and quality for your image type.',
         benefits: [
-          'Cuts file size while keeping images sharp',
-          'Adjustable quality level for fine control',
-          'Supports JPG, PNG, and WEBP',
-          'Processes entirely server-side, fast and reliable',
+          'Detects photos vs screenshots and picks the best format automatically',
+          'Photos → AVIF (smaller than JPEG at equal visual quality)',
+          'UI/screenshots → lossless WebP (no text blur)',
+          'Quality scales with image size — not one-size-fits-all',
           'Free tier available for everyday use',
         ],
         faq: [
@@ -66,10 +66,10 @@ export const compressTool: ToolDefinition = {
         intro:
           'Încarcă o poză și îi reducem dimensiunea fișierului cu compresie inteligentă care alege automat formatul și calitatea potrivite tipului de imagine.',
         benefits: [
-          'Reduce dimensiunea fișierului păstrând claritatea',
-          'Nivel de calitate ajustabil pentru control fin',
-          'Suportă JPG, PNG și WEBP',
-          'Procesare integrală server-side, rapidă și fiabilă',
+          'Detectează automat fotografii vs screenshot-uri și alege formatul optim',
+          'Fotografii → AVIF (fișier mai mic decât JPEG la aceeași calitate vizuală)',
+          'UI/screenshot-uri → WebP lossless (fără blur pe text)',
+          'Calitatea se adaptează la dimensiunea imaginii',
           'Plan gratuit disponibil pentru uz zilnic',
         ],
         faq: [

@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 
-export type ImageContentKind = 'photo' | 'screenshot' | 'graphic';
+export type ImageContentKind = 'photo' | 'screenshot' | 'graphic' | 'logo';
 
 export interface ImageContentProfile {
   kind: ImageContentKind;
@@ -8,6 +8,7 @@ export interface ImageContentProfile {
   hasAlpha: boolean;
   inputFormat: string | undefined;
   edgeScore: number;
+  flatColorRatio: number;
 }
 
 const DISPLAY_DIMENSIONS = new Set([
@@ -35,9 +36,32 @@ async function computeEdgeScore(buffer: Buffer): Promise<number> {
   return sum / data.length;
 }
 
+/** Share of pixels that fall into coarse color buckets — high values suggest logos/flat UI. */
+async function computeFlatColorRatio(buffer: Buffer): Promise<number> {
+  const { data, info } = await sharp(buffer)
+    .resize(96, 96, { fit: 'inside', withoutEnlargement: true })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const pixelCount = info.width * info.height;
+  if (pixelCount === 0 || data.length < pixelCount * 3) return 0;
+
+  const buckets = new Set<string>();
+  for (let i = 0; i < data.length; i += 3) {
+    const r = (data[i] ?? 0) >> 4;
+    const g = (data[i + 1] ?? 0) >> 4;
+    const b = (data[i + 2] ?? 0) >> 4;
+    buckets.add(`${r},${g},${b}`);
+  }
+
+  const uniqueColors = buckets.size;
+  return Math.max(0, Math.min(1, 1 - uniqueColors / pixelCount));
+}
+
 /**
  * Lightweight heuristic classifier — no ML, runs in milliseconds on a downsampled pass.
- * Separates photos (natural imagery) from screenshots/UI (sharp edges, flat regions).
+ * Classify first, encode second (industry pattern).
  */
 export async function classifyImageContent(buffer: Buffer): Promise<ImageContentProfile> {
   const meta = await sharp(buffer).metadata();
@@ -51,6 +75,7 @@ export async function classifyImageContent(buffer: Buffer): Promise<ImageContent
   const width = meta.width || 0;
   const height = meta.height || 0;
   const edgeScore = await computeEdgeScore(buffer);
+  const flatColorRatio = await computeFlatColorRatio(buffer);
   const colorVariance =
     stats.channels.slice(0, 3).reduce((sum, channel) => sum + channel.stdev, 0) /
     Math.max(1, Math.min(3, stats.channels.length));
@@ -62,10 +87,19 @@ export async function classifyImageContent(buffer: Buffer): Promise<ImageContent
     hasAlpha,
     inputFormat: format,
     edgeScore,
+    flatColorRatio,
   };
+
+  if (hasTransparency && flatColorRatio > 0.45 && edgeScore < 14) {
+    return { kind: 'logo', ...base };
+  }
 
   if (hasTransparency) {
     return { kind: 'screenshot', ...base };
+  }
+
+  if (flatColorRatio > 0.55 && edgeScore < 12 && !hasExif) {
+    return { kind: 'logo', ...base };
   }
 
   if (hasExif && format !== 'png') {
@@ -73,6 +107,9 @@ export async function classifyImageContent(buffer: Buffer): Promise<ImageContent
   }
 
   if (format === 'png') {
+    if (flatColorRatio > 0.5 && edgeScore < 12) {
+      return { kind: 'logo', ...base };
+    }
     if (edgeScore >= 14 || matchesDisplaySize) {
       return { kind: 'screenshot', ...base };
     }
