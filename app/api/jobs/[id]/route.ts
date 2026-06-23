@@ -65,6 +65,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     600
   );
 
+  const delivery = (jobRow.params as Record<string, unknown> | undefined)?._delivery as
+    | {
+        outputFormat?: string;
+        outputFormatLabel?: string;
+        smartFormatSelected?: boolean;
+        contentKind?: string;
+      }
+    | undefined;
+
   return NextResponse.json({
     status: 'done',
     previewUrl,
@@ -72,5 +81,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     outputWidth: previewAsset.storage_files.width_px,
     outputHeight: previewAsset.storage_files.height_px,
     outputSizeBytes: previewAsset.storage_files.size_bytes,
+    outputFormat: delivery?.outputFormat,
+    outputFormatLabel: delivery?.outputFormatLabel,
+    smartFormatSelected: delivery?.smartFormatSelected,
+    contentKind: delivery?.contentKind,
   });
 }

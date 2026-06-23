@@ -13,6 +13,13 @@ export interface FinalizeJobOutputInput {
   isFreePlan: boolean;
   toolType: ToolType;
   toolCategory: ToolCategory;
+  existingParams?: Record<string, unknown>;
+  deliveryMeta?: {
+    outputFormat?: string;
+    outputFormatLabel?: string;
+    smartFormatSelected?: boolean;
+    contentKind?: string;
+  };
 }
 
 export interface FinalizeJobOutputResult {
@@ -127,6 +134,10 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
       output_asset_id: outputAsset.id,
       preview_asset_id: previewAsset.id,
       completed_at: new Date().toISOString(),
+      params: {
+        ...(opts.existingParams || {}),
+        ...(opts.deliveryMeta ? { _delivery: opts.deliveryMeta } : {}),
+      },
     })
     .eq('id', opts.jobId);
 

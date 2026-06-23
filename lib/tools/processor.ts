@@ -13,6 +13,10 @@ export interface ProcessResult {
   outputWidth?: number;
   outputHeight?: number;
   outputSizeBytes?: number;
+  outputFormat?: string;
+  outputFormatLabel?: string;
+  smartFormatSelected?: boolean;
+  contentKind?: string;
   providerJobId?: string;
   error?: string;
 }

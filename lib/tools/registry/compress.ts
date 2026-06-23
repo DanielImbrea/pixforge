@@ -33,7 +33,7 @@ export const compressTool: ToolDefinition = {
           'Shrink JPG, PNG, and WEBP file sizes in seconds while keeping visual quality high. Free online image compressor, no signup required.',
         h1: 'Compress your images',
         intro:
-          'Drop in a photo and we will shrink its file size using smart compression, ideal for faster websites, quicker uploads, and lower storage costs.',
+          'Drop in a photo and we will shrink its file size using smart compression that picks the best format and quality for your image type.',
         benefits: [
           'Cuts file size while keeping images sharp',
           'Adjustable quality level for fine control',
@@ -64,7 +64,7 @@ export const compressTool: ToolDefinition = {
           'Micșorează dimensiunea fișierelor JPG, PNG și WEBP în câteva secunde, păstrând calitatea vizuală. Compresor de imagini gratuit, fără înregistrare.',
         h1: 'Comprimă-ți imaginile',
         intro:
-          'Încarcă o poză și îi reducem dimensiunea fișierului folosind compresie inteligentă, ideal pentru site-uri mai rapide, încărcări mai rapide și costuri de stocare mai mici.',
+          'Încarcă o poză și îi reducem dimensiunea fișierului cu compresie inteligentă care alege automat formatul și calitatea potrivite tipului de imagine.',
         benefits: [
           'Reduce dimensiunea fișierului păstrând claritatea',
           'Nivel de calitate ajustabil pentru control fin',

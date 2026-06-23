@@ -18,7 +18,7 @@ export const convertTool: ToolDefinition = {
   processorConfig: {
     sharpOperation: 'convert',
     sharpDefaults: {
-      targetFormat: 'webp',
+      targetFormat: 'auto',
     },
   },
   limits: {
@@ -33,7 +33,7 @@ export const convertTool: ToolDefinition = {
           'Convert images between PNG, JPG, WEBP, and AVIF instantly in your browser. Free, fast, and no software to install.',
         h1: 'Convert image formats instantly',
         intro:
-          'Upload your image and choose a target format. We handle transparency, color profiles, and quality automatically so the result looks right.',
+          'Upload your image and we pick the best output format automatically — PNG for screenshots, JPEG for photos, WebP for graphics.',
         benefits: [
           'Convert between PNG, JPG, WEBP, and AVIF',
           'Transparent PNGs get a clean white background when converting to JPG',
@@ -63,7 +63,7 @@ export const convertTool: ToolDefinition = {
           'Convertește imagini între PNG, JPG, WEBP și AVIF instant, direct din browser. Gratuit, rapid, fără software de instalat.',
         h1: 'Convertește formatul imaginii instant',
         intro:
-          'Încarcă imaginea și alege formatul țintă. Gestionăm automat transparența, profilurile de culoare și calitatea pentru un rezultat corect.',
+          'Încarcă imaginea și alegem automat formatul optim — PNG pentru screenshot-uri, JPEG pentru fotografii, WebP pentru grafică.',
         benefits: [
           'Convertește între PNG, JPG, WEBP și AVIF',
           'PNG-urile transparente primesc fundal alb curat la conversia în JPG',

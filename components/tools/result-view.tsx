@@ -10,6 +10,8 @@ interface ResultViewProps {
   outputWidth?: number | null;
   outputHeight?: number | null;
   outputSizeBytes?: number | null;
+  outputFormatLabel?: string | null;
+  smartFormatSelected?: boolean;
   onDownload: () => void;
   onUpgradeClick: () => void;
   onReset: () => void;
@@ -30,6 +32,8 @@ export function ResultView({
   outputWidth,
   outputHeight,
   outputSizeBytes,
+  outputFormatLabel,
+  smartFormatSelected = false,
   onDownload,
   onUpgradeClick,
   onReset,
@@ -63,10 +67,15 @@ export function ResultView({
         />
       </div>
 
-      {(dimensionsLabel || sizeLabel) && (
-        <p className="text-xs text-text-tertiary text-center">
-          {[dimensionsLabel, sizeLabel].filter(Boolean).join(' · ')}
-        </p>
+      {(dimensionsLabel || sizeLabel || smartFormatSelected) && (
+        <div className="text-xs text-text-tertiary text-center space-y-1">
+          {(dimensionsLabel || sizeLabel) && (
+            <p>{[dimensionsLabel, sizeLabel].filter(Boolean).join(' · ')}</p>
+          )}
+          {smartFormatSelected && outputFormatLabel && (
+            <p className="text-text-secondary">{t('smartFormatBadge', { format: outputFormatLabel })}</p>
+          )}
+        </div>
       )}
 
       <div className="flex items-center gap-3">

@@ -41,6 +41,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [outputWidth, setOutputWidth] = useState<number | null>(null);
   const [outputHeight, setOutputHeight] = useState<number | null>(null);
   const [outputSizeBytes, setOutputSizeBytes] = useState<number | null>(null);
+  const [outputFormatLabel, setOutputFormatLabel] = useState<string | null>(null);
+  const [smartFormatSelected, setSmartFormatSelected] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [batchResults, setBatchResults] = useState<BatchResultItem[]>([]);
@@ -129,6 +131,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       outputWidth: number | null;
       outputHeight: number | null;
       outputSizeBytes: number | null;
+      outputFormatLabel: string | null;
+      smartFormatSelected: boolean;
     }> =>
       new Promise((resolve, reject) => {
         let attempts = 0;
@@ -152,6 +156,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 outputWidth: data.outputWidth ?? null,
                 outputHeight: data.outputHeight ?? null,
                 outputSizeBytes: data.outputSizeBytes ?? null,
+                outputFormatLabel: data.outputFormatLabel ?? null,
+                smartFormatSelected: Boolean(data.smartFormatSelected),
               });
               return;
             }
@@ -216,6 +222,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
           outputWidth: (processData.outputWidth as number | null | undefined) ?? null,
           outputHeight: (processData.outputHeight as number | null | undefined) ?? null,
           outputSizeBytes: (processData.outputSizeBytes as number | null | undefined) ?? null,
+          outputFormatLabel: (processData.outputFormatLabel as string | null | undefined) ?? null,
+          smartFormatSelected: Boolean(processData.smartFormatSelected),
         };
       }
 
@@ -256,6 +264,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       setOutputWidth(result.outputWidth);
       setOutputHeight(result.outputHeight);
       setOutputSizeBytes(result.outputSizeBytes);
+      setOutputFormatLabel(result.outputFormatLabel);
+      setSmartFormatSelected(result.smartFormatSelected);
       setStage('result');
     } catch (err) {
       stopProgressSimulation();
@@ -376,6 +386,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setOutputWidth(null);
     setOutputHeight(null);
     setOutputSizeBytes(null);
+    setOutputFormatLabel(null);
+    setSmartFormatSelected(false);
     setErrorMessage(null);
     setValidationErrorKey(null);
     setProgress(0);
@@ -522,6 +534,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               outputWidth={outputWidth}
               outputHeight={outputHeight}
               outputSizeBytes={outputSizeBytes}
+              outputFormatLabel={outputFormatLabel}
+              smartFormatSelected={smartFormatSelected}
               onDownload={() => void handleDownload()}
               onUpgradeClick={handleUpgradeClick}
               onReset={handleReset}

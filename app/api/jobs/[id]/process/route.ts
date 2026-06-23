@@ -97,6 +97,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     isFreePlan: user.plan === 'free',
     toolType: tool.type,
     toolCategory: tool.category,
+    existingParams: (jobRow.params || {}) as Record<string, unknown>,
+    deliveryMeta: {
+      outputFormat: result.outputFormat,
+      outputFormatLabel: result.outputFormatLabel,
+      smartFormatSelected: result.smartFormatSelected,
+      contentKind: result.contentKind,
+    },
   });
 
   await chargeJobOnCompletion(user, jobRow);
@@ -108,5 +115,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     outputWidth: finalized.outputWidth,
     outputHeight: finalized.outputHeight,
     outputSizeBytes: finalized.outputSizeBytes,
+    outputFormat: result.outputFormat,
+    outputFormatLabel: result.outputFormatLabel,
+    smartFormatSelected: result.smartFormatSelected,
+    contentKind: result.contentKind,
   });
 }

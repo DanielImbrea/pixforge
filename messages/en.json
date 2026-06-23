@@ -98,6 +98,7 @@
     "batchComplete": "{done} of {total} images processed",
     "batchProcessAnother": "Process another batch",
     "commercialLicenseBadge": "Commercial usage license included with your Pro plan.",
+    "smartFormatBadge": "Best format selected automatically · {format}",
     "processorSharp": "Instant · Sharp",
     "processorAi": "AI-powered",
     "creditCost": "{count, plural, one {# credit} other {# credits}}"

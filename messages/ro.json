@@ -98,6 +98,7 @@
     "batchComplete": "{done} din {total} imagini procesate",
     "batchProcessAnother": "Procesează alt lot",
     "commercialLicenseBadge": "Licență de utilizare comercială inclusă în planul Pro.",
+    "smartFormatBadge": "Format optim selectat automat · {format}",
     "processorSharp": "Instant · Sharp",
     "processorAi": "Cu AI",
     "creditCost": "{count, plural, one {# credit} few {# credite} other {# credite}}"
