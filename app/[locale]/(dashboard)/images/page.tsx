@@ -23,7 +23,11 @@ export default async function MyImagesPage({ params }: { params: Promise<{ local
   const storagePaths: { id: string; bucket: Bucket; path: string }[] = [];
 
   for (const asset of assets || []) {
-    const storageFile = asset.storage_files as { bucket: Bucket; storage_path: string } | null;
+    const raw = asset.storage_files as
+      | { bucket: Bucket; storage_path: string }
+      | { bucket: Bucket; storage_path: string }[]
+      | null;
+    const storageFile = Array.isArray(raw) ? raw[0] : raw;
     if (storageFile?.storage_path) {
       storagePaths.push({
         id: asset.id,

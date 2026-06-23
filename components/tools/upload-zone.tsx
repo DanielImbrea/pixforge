@@ -15,7 +15,7 @@ export function UploadZone({ onFileSelected, acceptedFormats, disabled }: Upload
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
+    (e: DragEvent<HTMLLabelElement>) => {
       e.preventDefault();
       setIsDragging(false);
       if (disabled) return;

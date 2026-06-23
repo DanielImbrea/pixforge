@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { stripe } from '@/lib/stripe/client';
+import { getStripe } from '@/lib/stripe/client';
 import { priceIdFromPlan } from '@/lib/stripe/plan-mapping';
 import { checkoutRequestSchema } from '@/lib/validation/schemas';
 
@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
   }
 
   let customerId = profile.stripe_customer_id as string | null;
+
+  const stripe = getStripe();
 
   if (!customerId) {
     const customer = await stripe.customers.create({

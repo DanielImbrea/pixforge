@@ -1,6 +1,19 @@
 import Stripe from 'stripe';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-10-28.acacia',
-  typescript: true,
-});
+let stripeClient: Stripe | null = null;
+
+export function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY is not configured.');
+  }
+
+  if (!stripeClient) {
+    stripeClient = new Stripe(key, {
+      apiVersion: '2025-02-24.acacia',
+      typescript: true,
+    });
+  }
+
+  return stripeClient;
+}

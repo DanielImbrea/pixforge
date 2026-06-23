@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import type { UserRow } from '@/types';
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -34,5 +35,5 @@ export const getCurrentUser = cache(async () => {
   if (!user) return null;
 
   const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
-  return profile;
+  return profile as UserRow | null;
 });
