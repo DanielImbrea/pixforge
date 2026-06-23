@@ -5,7 +5,7 @@ import { getToolById } from '@/lib/tools/registry';
 import { getProcessor } from '@/lib/tools/get-processor';
 import { finalizeJobOutput } from '@/lib/tools/finalize-job-output';
 import { createSignedUrl } from '@/lib/supabase/storage';
-import { incrementUsage, canDownloadHd } from '@/lib/billing/entitlements';
+import { chargeJobOnCompletion, canDownloadHd, refundFailedJob } from '@/lib/billing/entitlements';
 import type { ImageJobRow, UserRow } from '@/types';
 
 export const runtime = 'nodejs';
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .from('image_jobs')
       .update({ status: 'failed', error_message: result.error || 'Processing failed.' })
       .eq('id', jobRow.id);
+    await refundFailedJob(user, jobRow);
     return NextResponse.json({ error: result.error || 'Processing failed.' }, { status: 500 });
   }
 
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .from('image_jobs')
       .update({ status: 'failed', error_message: 'Processor returned no output.' })
       .eq('id', jobRow.id);
+    await refundFailedJob(user, jobRow);
     return NextResponse.json({ error: 'Processor returned no output.' }, { status: 500 });
   }
 
@@ -97,7 +99,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     toolCategory: tool.category,
   });
 
-  await incrementUsage(user, jobRow.units_cost);
+  await chargeJobOnCompletion(user, jobRow);
 
   return NextResponse.json({
     status: 'done',

@@ -13,6 +13,7 @@ interface UsageMeterProps {
 export function UsageMeter({ plan, creditsUsed }: UsageMeterProps) {
   const t = useTranslations('dashboard');
   const config = PLAN_LIMITS[plan];
+  const isOverLimit = creditsUsed > config.creditsPerPeriod;
   const percentage = Math.min(100, Math.round((creditsUsed / config.creditsPerPeriod) * 100));
   const periodLabel = config.periodType === 'daily' ? t('usageThisDay') : t('usageThisMonth');
 
@@ -24,7 +25,10 @@ export function UsageMeter({ plan, creditsUsed }: UsageMeterProps) {
         <span className="text-text-tertiary text-base">/ {config.creditsPerPeriod} {t('credits')}</span>
       </p>
       <div className="h-2 w-full rounded-full bg-background-tertiary overflow-hidden">
-        <div className="h-full bg-accent transition-all duration-300" style={{ width: `${percentage}%` }} />
+        <div
+          className={`h-full transition-all duration-300 ${isOverLimit ? 'bg-red-500' : 'bg-accent'}`}
+          style={{ width: `${percentage}%` }}
+        />
       </div>
       <p className="text-xs text-text-tertiary mt-3">{t('maxUploadPerFile', { mb: config.maxUploadMB })}</p>
     </Card>

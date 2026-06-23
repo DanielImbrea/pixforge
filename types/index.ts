@@ -70,6 +70,7 @@ export interface ImageJobRow {
   status: JobStatus;
   params: Record<string, unknown>;
   units_cost: number;
+  credits_charged: boolean;
   error_message: string | null;
   provider_job_id: string | null;
   created_at: string;

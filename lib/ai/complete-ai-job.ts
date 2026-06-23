@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { incrementUsage } from '@/lib/billing/entitlements';
+import { chargeJobOnCompletion, refundFailedJob } from '@/lib/billing/entitlements';
 import { finalizeJobOutput } from '@/lib/tools/finalize-job-output';
 import { getToolById } from '@/lib/tools/registry';
 import { fetchImageBuffer } from '@/lib/ai/fetch-image';
@@ -13,14 +13,21 @@ import type { ImageJobRow, UserRow } from '@/types';
 
 export async function failAiJob(jobId: string, errorMessage: string): Promise<void> {
   const admin = createAdminClient();
-  const { data: job } = await admin.from('image_jobs').select('status').eq('id', jobId).maybeSingle();
+  const { data: job } = await admin.from('image_jobs').select('*').eq('id', jobId).maybeSingle();
   if (!job || job.status === 'done' || job.status === 'failed') {
     return;
   }
+
+  const jobRow = job as ImageJobRow;
   await admin
     .from('image_jobs')
     .update({ status: 'failed', error_message: errorMessage })
     .eq('id', jobId);
+
+  const { data: userRow } = await admin.from('users').select('*').eq('id', jobRow.user_id).single();
+  if (userRow) {
+    await refundFailedJob(userRow as UserRow, jobRow);
+  }
 }
 
 export async function completeAiJobFromOutputBuffer(
@@ -59,7 +66,7 @@ export async function completeAiJobFromOutputBuffer(
     toolCategory: tool.category,
   });
 
-  await incrementUsage(user, jobRow.units_cost);
+  await chargeJobOnCompletion(user, jobRow);
   console.log(`[ai-job] completed job=${jobId} tool=${tool.id} user=${user.id}`);
   return true;
 }

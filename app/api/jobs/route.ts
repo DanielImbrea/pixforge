@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getToolById } from '@/lib/tools/registry';
-import { checkQuota, QuotaExceededError, PlanRestrictedError } from '@/lib/billing/entitlements';
+import { reserveCredits, QuotaExceededError, PlanRestrictedError, refundCredits } from '@/lib/billing/entitlements';
 import { planHasFeature } from '@/lib/billing/plan-features';
 import { jobCreateRequestSchema } from '@/lib/validation/schemas';
 import type { UserRow } from '@/types';
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await checkQuota(user, tool);
+    await reserveCredits(user, tool);
   } catch (err) {
     if (err instanceof QuotaExceededError) {
       return NextResponse.json({ error: 'You have reached your plan quota.' }, { status: 402 });
@@ -97,20 +97,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Input asset not found.' }, { status: 404 });
   }
 
-  const { data: job, error: jobError } = await supabase
-    .from('image_jobs')
-    .insert({
-      user_id: authUser.id,
-      tool_id: tool.id,
-      input_asset_id: inputAsset.id,
-      status: 'pending',
-      params: jobParams,
-      units_cost: tool.creditsCost,
-    })
-    .select('*')
-    .single();
+  let job;
+  try {
+    const { data: createdJob, error: jobError } = await supabase
+      .from('image_jobs')
+      .insert({
+        user_id: authUser.id,
+        tool_id: tool.id,
+        input_asset_id: inputAsset.id,
+        status: 'pending',
+        params: jobParams,
+        units_cost: tool.creditsCost,
+        credits_charged: true,
+      })
+      .select('*')
+      .single();
 
-  if (jobError || !job) {
+    if (jobError || !createdJob) {
+      throw new Error(jobError?.message || 'Failed to create job.');
+    }
+    job = createdJob;
+  } catch (err) {
+    await refundCredits(user, tool.creditsCost);
     return NextResponse.json({ error: 'Failed to create job.' }, { status: 500 });
   }
 

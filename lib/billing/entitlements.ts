@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { PLAN_LIMITS } from '@/lib/billing/plans';
-import type { ToolDefinition, ToolUsageRow, UserRow } from '@/types';
+import type { ToolDefinition, ToolUsageRow, UserRow, ImageJobRow } from '@/types';
 
 export class QuotaExceededError extends Error {
   readonly needed: number;
@@ -30,6 +30,11 @@ function todayDateString(): string {
 function currentMonthStart(): string {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+function periodStartForPlan(plan: UserRow['plan']): string {
+  const planConfig = PLAN_LIMITS[plan];
+  return planConfig.periodType === 'daily' ? todayDateString() : currentMonthStart();
 }
 
 export function canDownloadHd(user: UserRow): boolean {
@@ -79,13 +84,13 @@ async function getOrCreateUsage(userId: string, periodStart: string): Promise<To
   return created as ToolUsageRow;
 }
 
+/** Read-only quota check (e.g. UI hints). Job creation should use reserveCredits. */
 export async function checkQuota(user: UserRow, tool: ToolDefinition): Promise<void> {
   if (!tool.enabledOnPlans.includes(user.plan)) {
     throw new PlanRestrictedError(tool.id, user.plan);
   }
 
-  const planConfig = PLAN_LIMITS[user.plan];
-  const periodStart = planConfig.periodType === 'daily' ? todayDateString() : currentMonthStart();
+  const periodStart = periodStartForPlan(user.plan);
   const usage = await getOrCreateUsage(user.id, periodStart);
   const remaining = getRemainingCredits(user.plan, usage);
 
@@ -94,10 +99,29 @@ export async function checkQuota(user: UserRow, tool: ToolDefinition): Promise<v
   }
 }
 
+/** Reserve credits when a job is created so pending jobs count against the quota. */
+export async function reserveCredits(user: UserRow, tool: ToolDefinition): Promise<void> {
+  if (!tool.enabledOnPlans.includes(user.plan)) {
+    throw new PlanRestrictedError(tool.id, user.plan);
+  }
+
+  const periodStart = periodStartForPlan(user.plan);
+  const usage = await getOrCreateUsage(user.id, periodStart);
+  const remaining = getRemainingCredits(user.plan, usage);
+
+  if (tool.creditsCost > remaining) {
+    throw new QuotaExceededError(user.plan, tool.creditsCost, remaining);
+  }
+
+  await incrementUsage(user, tool.creditsCost);
+}
+
+/** Legacy jobs charged on completion; new jobs refund reserved credits on failure. */
 export async function incrementUsage(user: UserRow, unitsCost: number): Promise<void> {
+  if (unitsCost <= 0) return;
+
   const supabase = createAdminClient();
-  const planConfig = PLAN_LIMITS[user.plan];
-  const periodStart = planConfig.periodType === 'daily' ? todayDateString() : currentMonthStart();
+  const periodStart = periodStartForPlan(user.plan);
   const usage = await getOrCreateUsage(user.id, periodStart);
 
   await supabase
@@ -107,4 +131,32 @@ export async function incrementUsage(user: UserRow, unitsCost: number): Promise<
       unit_count: usage.unit_count + unitsCost,
     })
     .eq('id', usage.id);
+}
+
+export async function refundCredits(user: UserRow, unitsCost: number): Promise<void> {
+  if (unitsCost <= 0) return;
+
+  const supabase = createAdminClient();
+  const periodStart = periodStartForPlan(user.plan);
+  const usage = await getOrCreateUsage(user.id, periodStart);
+
+  await supabase
+    .from('tool_usage')
+    .update({
+      process_count: Math.max(0, usage.process_count - 1),
+      unit_count: Math.max(0, usage.unit_count - unitsCost),
+    })
+    .eq('id', usage.id);
+}
+
+/** Charge legacy jobs (credits_charged=false) when processing completes. */
+export async function chargeJobOnCompletion(user: UserRow, job: Pick<ImageJobRow, 'credits_charged' | 'units_cost'>): Promise<void> {
+  if (job.credits_charged) return;
+  await incrementUsage(user, job.units_cost);
+}
+
+/** Refund reserved credits when a job fails after credits_charged=true at creation. */
+export async function refundFailedJob(user: UserRow, job: Pick<ImageJobRow, 'credits_charged' | 'units_cost'>): Promise<void> {
+  if (!job.credits_charged) return;
+  await refundCredits(user, job.units_cost);
 }

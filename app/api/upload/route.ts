@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getToolById } from '@/lib/tools/registry';
 import { validateUploadBuffer, normalizeImageBuffer, ValidationError } from '@/lib/validation/upload';
-import { checkQuota, QuotaExceededError, PlanRestrictedError } from '@/lib/billing/entitlements';
+import { reserveCredits, QuotaExceededError, PlanRestrictedError, refundCredits } from '@/lib/billing/entitlements';
 import { uploadBufferToStorage } from '@/lib/supabase/storage';
 import { checkRateLimit, getClientIp, maybeCleanupRateLimitStore } from '@/lib/security/rate-limit';
 import { resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please sign in to use this tool.' }, { status: 401 });
     }
 
-    await checkQuota(user, tool);
+    await reserveCredits(user, tool);
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -151,21 +151,29 @@ export async function POST(req: NextRequest) {
 
     const parsedParams = parseToolParams(tool, formData.get('params'));
 
-    const { data: job, error: jobError } = await supabase
-      .from('image_jobs')
-      .insert({
-        user_id: user.id,
-        tool_id: tool.id,
-        input_asset_id: imageAsset.id,
-        status: 'pending',
-        params: parsedParams,
-        units_cost: tool.creditsCost,
-      })
-      .select('*')
-      .single();
+    let job;
+    try {
+      const { data: createdJob, error: jobError } = await supabase
+        .from('image_jobs')
+        .insert({
+          user_id: user.id,
+          tool_id: tool.id,
+          input_asset_id: imageAsset.id,
+          status: 'pending',
+          params: parsedParams,
+          units_cost: tool.creditsCost,
+          credits_charged: true,
+        })
+        .select('*')
+        .single();
 
-    if (jobError || !job) {
-      return NextResponse.json({ error: 'Failed to create job.' }, { status: 500 });
+      if (jobError || !createdJob) {
+        throw new Error(jobError?.message || 'Failed to create job.');
+      }
+      job = createdJob;
+    } catch (jobErr) {
+      await refundCredits(user, tool.creditsCost);
+      throw jobErr;
     }
 
     return NextResponse.json({ jobId: job.id });

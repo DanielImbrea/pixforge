@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getProcessor } from '@/lib/tools/get-processor';
 import { getToolById } from '@/lib/tools/registry';
 import { finalizeJobOutput } from '@/lib/tools/finalize-job-output';
-import { incrementUsage } from '@/lib/billing/entitlements';
+import { chargeJobOnCompletion, refundFailedJob } from '@/lib/billing/entitlements';
 import { planHasFeature } from '@/lib/billing/plan-features';
 import { syncReplicateJobIfComplete } from '@/lib/ai/complete-ai-job';
 import { createSignedUrl } from '@/lib/supabase/storage';
@@ -117,6 +117,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .from('image_jobs')
       .update({ status: 'failed', error_message: result.error || 'Processing failed.' })
       .eq('id', jobRow.id);
+    await refundFailedJob(user, jobRow);
     return NextResponse.json({ status: 'failed', error: result.error }, { status: 500 });
   }
 
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       toolType: tool.type,
       toolCategory: tool.category,
     });
-    await incrementUsage(user, jobRow.units_cost);
+    await chargeJobOnCompletion(user, jobRow);
     return NextResponse.json({
       status: 'done',
       previewUrl: finalized.previewUrl,

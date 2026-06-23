@@ -2,38 +2,77 @@ import { cache } from 'react';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { UserRow } from '@/types';
-import { requireSupabasePublicEnv } from '@/lib/supabase/env';
+import { getSupabasePublicEnv, requireSupabasePublicEnv } from '@/lib/supabase/env';
 import type { SupabaseCookiesToSet } from '@/lib/supabase/cookie-types';
 
-export async function createClient() {
-  const cookieStore = await cookies();
-  const { url, anonKey } = requireSupabasePublicEnv();
-
-  return createServerClient(url, anonKey, {
+function createServerClientFromCookies() {
+  const cookieStore = cookies();
+  return cookieStore.then((store) => {
+    const { url, anonKey } = requireSupabasePublicEnv();
+    return createServerClient(url, anonKey, {
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          return store.getAll();
         },
         setAll(cookiesToSet: SupabaseCookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
+              store.set(name, value, options);
             });
           } catch {
-            // Called from a Server Component without write access — safe to ignore
-            // because middleware refreshes the session cookie on every request.
+            // Server Component without write access — middleware refreshes session.
           }
         },
       },
-    }
-  );
+    });
+  });
 }
 
-export const getCurrentUser = cache(async () => {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function createClient() {
+  return createServerClientFromCookies();
+}
 
-  const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
-  return profile as UserRow | null;
+export const getCurrentUser = cache(async (): Promise<UserRow | null> => {
+  const env = getSupabasePublicEnv();
+  if (!env) {
+    return null;
+  }
+
+  try {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(env.url, env.anonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll() {
+          // Read-only in this code path; middleware handles session refresh.
+        },
+      },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return null;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return null;
+    }
+
+    return profile as UserRow;
+  } catch (error) {
+    console.error('[getCurrentUser] failed:', error);
+    return null;
+  }
 });
