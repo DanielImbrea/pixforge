@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createSignedUrl } from '@/lib/supabase/storage';
 import { canDownloadHd } from '@/lib/billing/entitlements';
-import { syncReplicateJobIfComplete } from '@/lib/ai/complete-ai-job';
+import { syncMockJobIfComplete, syncReplicateJobIfComplete } from '@/lib/ai/complete-ai-job';
 import type { ImageJobRow, UserRow } from '@/types';
 
 export const runtime = 'nodejs';
@@ -30,6 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   if (jobRow.status === 'processing') {
     await syncReplicateJobIfComplete(jobRow);
+    await syncMockJobIfComplete(jobRow);
     const { data: refreshed } = await admin.from('image_jobs').select('*').eq('id', id).single();
     if (refreshed) {
       jobRow = refreshed as ImageJobRow;
@@ -68,5 +69,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     status: 'done',
     previewUrl,
     canDownloadHd: canDownloadHd(user),
+    outputWidth: previewAsset.storage_files.width_px,
+    outputHeight: previewAsset.storage_files.height_px,
+    outputSizeBytes: previewAsset.storage_files.size_bytes,
   });
 }

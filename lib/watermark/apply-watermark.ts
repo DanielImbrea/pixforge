@@ -43,5 +43,5 @@ export async function applyWatermark(buffer: Buffer, mimeType: string): Promise<
   if (mimeType === 'image/webp') {
     return sharp(composited).webp({ quality: 85 }).toBuffer();
   }
-  return sharp(composited).jpeg({ quality: 85 }).toBuffer();
+  return sharp(composited).jpeg({ quality: 92, mozjpeg: true, chromaSubsampling: '4:4:4' }).toBuffer();
 }

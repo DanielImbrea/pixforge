@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { uploadBufferToStorage, createSignedUrl } from '@/lib/supabase/storage';
 import { applyWatermark } from '@/lib/watermark/apply-watermark';
 import { postProcessOutput } from '@/lib/tools/post-process-output';
+import { readImageDimensions } from '@/lib/image/sharp-encode';
 import type { ToolCategory, ToolType } from '@/types';
 
 export interface FinalizeJobOutputInput {
@@ -17,6 +18,9 @@ export interface FinalizeJobOutputInput {
 export interface FinalizeJobOutputResult {
   previewUrl: string;
   outputAssetId: string;
+  outputWidth: number;
+  outputHeight: number;
+  outputSizeBytes: number;
 }
 
 export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<FinalizeJobOutputResult> {
@@ -29,6 +33,7 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
     opts.toolCategory,
     { jobId: opts.jobId, toolCategory: opts.toolCategory }
   );
+  const outputMeta = await readImageDimensions(optimizedBuffer);
 
   const { storagePath: outputPath } = await uploadBufferToStorage(
     optimizedBuffer,
@@ -45,6 +50,8 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
       storage_path: outputPath,
       mime_type: optimizedMimeType,
       size_bytes: optimizedBuffer.byteLength,
+      width_px: outputMeta.width,
+      height_px: outputMeta.height,
     })
     .select('*')
     .single();
@@ -87,6 +94,8 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
       storage_path: previewPath,
       mime_type: optimizedMimeType,
       size_bytes: previewBuffer.byteLength,
+      width_px: outputMeta.width,
+      height_px: outputMeta.height,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     })
     .select('*')
@@ -123,5 +132,11 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
 
   const previewUrl = await createSignedUrl('previews', previewPath, 600);
 
-  return { previewUrl, outputAssetId: outputAsset.id };
+  return {
+    previewUrl,
+    outputAssetId: outputAsset.id,
+    outputWidth: outputMeta.width,
+    outputHeight: outputMeta.height,
+    outputSizeBytes: optimizedBuffer.byteLength,
+  };
 }

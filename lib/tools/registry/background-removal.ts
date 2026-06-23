@@ -17,7 +17,7 @@ export const backgroundRemovalTool: ToolDefinition = {
   enabledOnPlans: ['free', 'basic', 'starter', 'pro'],
   processorConfig: {
     aiProvider: 'replicate',
-    aiModelId: '851-labs/background-removal',
+    aiModelId: '851-labs/background-remover',
     aiWebhookPath: '/api/webhooks/ai-provider',
   },
   limits: {

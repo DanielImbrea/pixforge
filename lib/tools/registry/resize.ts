@@ -47,7 +47,7 @@ export const resizeTool: ToolDefinition = {
           {
             question: 'Will resizing reduce my image quality?',
             answer:
-              'Shrinking an image rarely causes visible quality loss. Enlarging beyond the original size can introduce softness, so we cap free enlargement and recommend our AI upscaler for that case.',
+              'Downscaling keeps clarity when target dimensions are reasonable. We use Lanczos3 resampling and high-fidelity encoding. To enlarge beyond the original, use our AI Upscaler.',
           },
           {
             question: 'What file formats can I resize?',
@@ -84,7 +84,7 @@ export const resizeTool: ToolDefinition = {
           {
             question: 'Redimensionarea reduce calitatea imaginii?',
             answer:
-              'Micșorarea unei imagini rareori afectează vizibil calitatea. Mărirea peste dimensiunea originală poate introduce neclaritate, de aceea limităm mărirea gratuită și recomandăm unealta noastră de upscalare AI pentru acest caz.',
+              'Micșorarea unei imagini păstrează claritatea dacă alegi dimensiuni rezonabile. Folosim Lanczos3 și encodare fără pierderi vizibile. Pentru mărire peste original, folosește Upscaler AI.',
           },
           {
             question: 'Ce formate de fișiere pot redimensiona?',

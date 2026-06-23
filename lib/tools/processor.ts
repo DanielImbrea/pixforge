@@ -10,6 +10,9 @@ export interface ProcessResult {
   status: 'done' | 'processing' | 'failed';
   outputBuffer?: Buffer;
   outputMimeType?: string;
+  outputWidth?: number;
+  outputHeight?: number;
+  outputSizeBytes?: number;
   providerJobId?: string;
   error?: string;
 }

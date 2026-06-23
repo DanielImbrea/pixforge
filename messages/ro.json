@@ -84,6 +84,7 @@
     "errorGeneric": "A apărut o eroare. Te rugăm să încerci din nou.",
     "errorUploadFailed": "Încărcarea a eșuat. Verifică dimensiunea și formatul fișierului.",
     "errorProcessingFailed": "Procesarea nu a putut fi pornită.",
+    "errorProcessingTimeout": "Procesarea a durat prea mult. Te rugăm să încerci din nou.",
     "errorJobStatus": "Nu s-a putut verifica statusul procesării.",
     "errorTooLarge": "Imaginea este prea mare. Încarcă un fișier sub limita planului tău.",
     "errorInsufficientCredits": "Nu ai suficiente credite pentru această unealtă. Fă upgrade sau așteaptă resetarea creditelor.",

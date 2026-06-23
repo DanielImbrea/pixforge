@@ -105,5 +105,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     status: 'done',
     previewUrl: finalized.previewUrl,
     canDownloadHd: canDownloadHd(user),
+    outputWidth: finalized.outputWidth,
+    outputHeight: finalized.outputHeight,
+    outputSizeBytes: finalized.outputSizeBytes,
   });
 }

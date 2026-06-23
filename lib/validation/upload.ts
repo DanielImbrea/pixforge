@@ -56,14 +56,12 @@ export async function validateUploadBuffer(
 }
 
 export async function normalizeImageBuffer(buffer: Buffer): Promise<Buffer> {
-  // Re-encode through Sharp to strip any embedded scripts/exploits in
-  // malformed or polyglot image files before storing or forwarding the
-  // bytes anywhere else in the pipeline.
-  const metadata = await sharp(buffer).metadata();
-  const format = metadata.format;
-
-  if (format === 'png') return sharp(buffer).png().toBuffer();
-  if (format === 'webp') return sharp(buffer).webp().toBuffer();
-  if (format === 'avif') return sharp(buffer).avif().toBuffer();
-  return sharp(buffer).jpeg({ quality: 95 }).toBuffer();
+  // Validate the file decodes cleanly. Avoid re-encoding on upload — a second
+  // lossy JPEG pass before processing visibly softens text and UI screenshots.
+  try {
+    await sharp(buffer, { failOn: 'error' }).metadata();
+  } catch {
+    throw new ValidationError('Unable to read image metadata. The file may be corrupted.');
+  }
+  return buffer;
 }

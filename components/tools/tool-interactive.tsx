@@ -38,6 +38,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [canDownloadHd, setCanDownloadHd] = useState(false);
+  const [outputWidth, setOutputWidth] = useState<number | null>(null);
+  const [outputHeight, setOutputHeight] = useState<number | null>(null);
+  const [outputSizeBytes, setOutputSizeBytes] = useState<number | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [batchResults, setBatchResults] = useState<BatchResultItem[]>([]);
@@ -117,16 +120,39 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   );
 
   const waitForJobDone = useCallback(
-    (id: string): Promise<{ previewUrl: string; canDownloadHd: boolean }> =>
+    (
+      id: string,
+      maxAttempts = 90
+    ): Promise<{
+      previewUrl: string;
+      canDownloadHd: boolean;
+      outputWidth: number | null;
+      outputHeight: number | null;
+      outputSizeBytes: number | null;
+    }> =>
       new Promise((resolve, reject) => {
+        let attempts = 0;
+
         const poll = async () => {
+          attempts += 1;
+          if (attempts > maxAttempts) {
+            reject(new Error(t('errorProcessingTimeout')));
+            return;
+          }
+
           try {
             const res = await fetch(`/api/jobs/${id}`);
             if (!res.ok) throw new Error(t('errorJobStatus'));
             const data = await res.json();
 
             if (data.status === 'done') {
-              resolve({ previewUrl: data.previewUrl, canDownloadHd: data.canDownloadHd });
+              resolve({
+                previewUrl: data.previewUrl,
+                canDownloadHd: data.canDownloadHd,
+                outputWidth: data.outputWidth ?? null,
+                outputHeight: data.outputHeight ?? null,
+                outputSizeBytes: data.outputSizeBytes ?? null,
+              });
               return;
             }
 
@@ -187,6 +213,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
           jobId: createdJobId,
           previewUrl: processData.previewUrl as string,
           canDownloadHd: processData.canDownloadHd as boolean,
+          outputWidth: (processData.outputWidth as number | null | undefined) ?? null,
+          outputHeight: (processData.outputHeight as number | null | undefined) ?? null,
+          outputSizeBytes: (processData.outputSizeBytes as number | null | undefined) ?? null,
         };
       }
 
@@ -224,6 +253,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       setProgress(100);
       setPreviewUrl(result.previewUrl);
       setCanDownloadHd(result.canDownloadHd);
+      setOutputWidth(result.outputWidth);
+      setOutputHeight(result.outputHeight);
+      setOutputSizeBytes(result.outputSizeBytes);
       setStage('result');
     } catch (err) {
       stopProgressSimulation();
@@ -341,6 +373,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setStage('configure');
     setJobId(null);
     setPreviewUrl(null);
+    setOutputWidth(null);
+    setOutputHeight(null);
+    setOutputSizeBytes(null);
     setErrorMessage(null);
     setValidationErrorKey(null);
     setProgress(0);
@@ -484,6 +519,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               previewUrl={previewUrl}
               canDownloadHd={canDownloadHd}
               hasCommercialLicense={hasCommercialLicense}
+              outputWidth={outputWidth}
+              outputHeight={outputHeight}
+              outputSizeBytes={outputSizeBytes}
               onDownload={() => void handleDownload()}
               onUpgradeClick={handleUpgradeClick}
               onReset={handleReset}

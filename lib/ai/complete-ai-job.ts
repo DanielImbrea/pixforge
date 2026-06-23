@@ -2,7 +2,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { chargeJobOnCompletion, refundFailedJob } from '@/lib/billing/entitlements';
 import { finalizeJobOutput } from '@/lib/tools/finalize-job-output';
 import { getToolById } from '@/lib/tools/registry';
-import { fetchImageBuffer } from '@/lib/ai/fetch-image';
+import { fetchAsBuffer, fetchImageBuffer } from '@/lib/ai/fetch-image';
+import { applyMockAiTransform } from '@/lib/ai/mock-provider';
+import { createSignedUrl } from '@/lib/supabase/storage';
 import {
   extractReplicateOutputUrl,
   getReplicatePrediction,
@@ -130,6 +132,57 @@ export async function syncReplicateJobIfComplete(jobRow: ImageJobRow): Promise<v
     }
     await handleReplicatePrediction(jobRow.id, prediction);
   } catch (err) {
-    console.error(`[replicate] sync failed job=${jobRow.id}`, err);
+    const message = err instanceof Error ? err.message : 'Replicate sync failed';
+    console.error(`[replicate] sync failed job=${jobRow.id}`, message);
+    await failAiJob(jobRow.id, message);
+  }
+}
+
+/** Recover mock jobs stuck in processing from the old async webhook flow. */
+export async function syncMockJobIfComplete(jobRow: ImageJobRow): Promise<void> {
+  if (getAiProvider() !== 'mock') {
+    return;
+  }
+  if (jobRow.status !== 'processing') {
+    return;
+  }
+
+  const tool = getToolById(jobRow.tool_id);
+  if (!tool) {
+    await failAiJob(jobRow.id, 'Tool not found.');
+    return;
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: inputAsset } = await admin
+      .from('image_assets')
+      .select('*, storage_files(*)')
+      .eq('id', jobRow.input_asset_id)
+      .single();
+
+    if (!inputAsset?.storage_files) {
+      await failAiJob(jobRow.id, 'Input asset missing.');
+      return;
+    }
+
+    const inputUrl = await createSignedUrl(
+      inputAsset.storage_files.bucket,
+      inputAsset.storage_files.storage_path,
+      600
+    );
+    const inputBuffer = await fetchAsBuffer(inputUrl);
+    const modelId = tool.category === 'background' ? 'mock-bg-removal' : 'mock-upscale';
+    const { buffer, mimeType } = await applyMockAiTransform(
+      inputBuffer,
+      modelId,
+      (jobRow.params || {}) as Record<string, unknown>
+    );
+
+    await completeAiJobFromOutputBuffer(jobRow.id, buffer, mimeType);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Mock AI sync failed';
+    console.error(`[mock-ai] sync failed job=${jobRow.id}`, message);
+    await failAiJob(jobRow.id, message);
   }
 }

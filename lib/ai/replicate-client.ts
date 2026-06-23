@@ -39,7 +39,11 @@ function buildReplicateInput(
   }
 
   if (tool.category === 'background') {
-    return { image: inputAssetUrl };
+    return {
+      image: inputAssetUrl,
+      format: 'png',
+      background_type: 'rgba',
+    };
   }
 
   throw new Error(`Replicate input not defined for category ${tool.category}`);
@@ -102,8 +106,16 @@ export function extractReplicateOutputUrl(output: unknown): string | null {
   }
   if (Array.isArray(output)) {
     for (const item of output) {
-      if (typeof item === 'string' && item.startsWith('http')) {
-        return item;
+      const url = extractReplicateOutputUrl(item);
+      if (url) return url;
+    }
+  }
+  if (output && typeof output === 'object') {
+    const record = output as Record<string, unknown>;
+    for (const key of ['url', 'image', 'output', 'result']) {
+      const value = record[key];
+      if (typeof value === 'string' && value.startsWith('http')) {
+        return value;
       }
     }
   }

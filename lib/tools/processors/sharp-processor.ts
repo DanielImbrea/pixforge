@@ -1,5 +1,11 @@
 import sharp from 'sharp';
 import type { ProcessInput, ProcessResult, ToolProcessor } from '../processor';
+import {
+  applyFormatEncode,
+  applyResize,
+  readImageDimensions,
+  resolveOutputFormat,
+} from '@/lib/image/sharp-encode';
 
 const MIME_BY_FORMAT: Record<string, string> = {
   jpeg: 'image/jpeg',
@@ -22,15 +28,15 @@ export const sharpProcessor: ToolProcessor = {
   async process({ job, tool, inputAssetUrl }: ProcessInput): Promise<ProcessResult> {
     try {
       const buffer = await fetchAsBuffer(inputAssetUrl);
-      let pipeline = sharp(buffer, { failOn: 'error' });
+      const inputMeta = await readImageDimensions(buffer);
+      let pipeline = sharp(buffer, { failOn: 'error' }).rotate();
       const params = job.params || {};
       const defaults = tool.processorConfig.sharpDefaults || {};
-      let outputFormat = 'jpeg';
+      let outputFormat = resolveOutputFormat(inputMeta.format);
 
-      const metadata = await sharp(buffer).metadata();
       const maxDim = tool.limits.maxDimensionPx;
-      if (maxDim && metadata.width && metadata.height) {
-        if (metadata.width > maxDim || metadata.height > maxDim) {
+      if (maxDim && inputMeta.width && inputMeta.height) {
+        if (inputMeta.width > maxDim || inputMeta.height > maxDim) {
           return { status: 'failed', error: 'Image dimensions exceed the allowed maximum.' };
         }
       }
@@ -41,22 +47,27 @@ export const sharpProcessor: ToolProcessor = {
           let height = typeof params.height === 'number' && params.height > 0 ? params.height : undefined;
 
           if (!width && !height) {
-            // No explicit target given — default to half the original size
-            // rather than calling sharp.resize() with no dimensions, which
-            // throws. This keeps the tool functional with zero input.
-            width = metadata.width ? Math.max(1, Math.round(metadata.width / 2)) : undefined;
-            height = metadata.height ? Math.max(1, Math.round(metadata.height / 2)) : undefined;
+            width = inputMeta.width ? Math.max(1, Math.round(inputMeta.width / 2)) : undefined;
+            height = inputMeta.height ? Math.max(1, Math.round(inputMeta.height / 2)) : undefined;
           }
 
-          pipeline = pipeline.resize({
+          pipeline = applyResize(pipeline, {
             width,
             height,
             fit: (defaults.fit as keyof sharp.FitEnum) || 'inside',
             withoutEnlargement:
               defaults.withoutEnlargement !== undefined ? Boolean(defaults.withoutEnlargement) : true,
           });
-          outputFormat = metadata.format === 'png' ? 'png' : 'jpeg';
-          pipeline = outputFormat === 'png' ? pipeline.png() : pipeline.jpeg({ quality: 90 });
+
+          if (outputFormat === 'jpeg' && inputMeta.format === 'png') {
+            outputFormat = 'png';
+          }
+
+          if (outputFormat === 'jpeg') {
+            pipeline = pipeline.flatten({ background: { r: 255, g: 255, b: 255 } });
+          }
+
+          pipeline = applyFormatEncode(pipeline, outputFormat);
           break;
         }
         case 'compress': {
@@ -65,12 +76,17 @@ export const sharpProcessor: ToolProcessor = {
               ? params.quality
               : typeof defaults.quality === 'number'
                 ? defaults.quality
-                : 80;
-          outputFormat = metadata.format === 'png' ? 'png' : 'jpeg';
-          pipeline =
-            outputFormat === 'png'
-              ? pipeline.png({ quality, compressionLevel: 9 })
-              : pipeline.jpeg({ quality, mozjpeg: true });
+                : 85;
+
+          if (outputFormat === 'jpeg') {
+            pipeline = applyFormatEncode(pipeline, 'jpeg', quality);
+          } else if (outputFormat === 'png') {
+            pipeline = pipeline.png({ compressionLevel: 9, adaptiveFiltering: true, effort: 8 });
+          } else if (outputFormat === 'webp') {
+            pipeline = applyFormatEncode(pipeline, 'webp', quality);
+          } else if (outputFormat === 'avif') {
+            pipeline = applyFormatEncode(pipeline, 'avif', quality);
+          }
           break;
         }
         case 'convert': {
@@ -80,17 +96,13 @@ export const sharpProcessor: ToolProcessor = {
               : typeof defaults.targetFormat === 'string'
                 ? defaults.targetFormat
                 : 'jpeg';
-          outputFormat = target;
-          if (target === 'jpeg' || target === 'jpg') {
-            pipeline = pipeline.flatten({ background: { r: 255, g: 255, b: 255 } }).jpeg({ quality: 90 });
-            outputFormat = 'jpeg';
-          } else if (target === 'png') {
-            pipeline = pipeline.png();
-          } else if (target === 'webp') {
-            pipeline = pipeline.webp({ quality: 90 });
-          } else if (target === 'avif') {
-            pipeline = pipeline.avif({ quality: 80 });
+          outputFormat = resolveOutputFormat(target === 'jpg' ? 'jpeg' : target);
+
+          if (outputFormat === 'jpeg') {
+            pipeline = pipeline.flatten({ background: { r: 255, g: 255, b: 255 } });
           }
+
+          pipeline = applyFormatEncode(pipeline, outputFormat);
           break;
         }
         default:
@@ -98,11 +110,15 @@ export const sharpProcessor: ToolProcessor = {
       }
 
       const outputBuffer = await pipeline.toBuffer();
+      const outputMeta = await readImageDimensions(outputBuffer);
 
       return {
         status: 'done',
         outputBuffer,
         outputMimeType: MIME_BY_FORMAT[outputFormat] || 'image/jpeg',
+        outputWidth: outputMeta.width,
+        outputHeight: outputMeta.height,
+        outputSizeBytes: outputBuffer.byteLength,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown processing error';

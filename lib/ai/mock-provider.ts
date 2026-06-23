@@ -2,7 +2,14 @@ import sharp from 'sharp';
 import crypto from 'crypto';
 import type { ImageJobRow, ToolDefinition } from '@/types';
 import type { ProcessResult } from '@/lib/tools/processor';
+import { fetchAsBuffer } from '@/lib/ai/fetch-image';
 import { getAppUrl } from '@/lib/ai/config';
+
+function resolveMockModelId(tool: ToolDefinition): string {
+  if (tool.category === 'background') return 'mock-bg-removal';
+  if (tool.category === 'upscale') return 'mock-upscale';
+  return tool.processorConfig.aiModelId || 'mock-default';
+}
 
 async function submitToMockProvider(params: {
   jobId: string;
@@ -49,7 +56,7 @@ export async function applyMockAiTransform(
   modelId: string,
   params?: Record<string, unknown>
 ): Promise<{ buffer: Buffer; mimeType: string }> {
-  if (modelId === 'mock-bg-removal') {
+  if (modelId === 'mock-bg-removal' || modelId.includes('background')) {
     const buffer = await sharp(inputBuffer).ensureAlpha().png().toBuffer();
     return { buffer, mimeType: 'image/png' };
   }
@@ -65,13 +72,39 @@ export async function applyMockAiTransform(
   return { buffer, mimeType: 'image/jpeg' };
 }
 
+/**
+ * Mock AI runs synchronously so jobs complete on Vercel/serverless.
+ * setTimeout webhooks do not survive after the HTTP response ends.
+ */
 export async function submitMockJob(
   job: ImageJobRow,
   tool: ToolDefinition,
   inputAssetUrl: string
 ): Promise<ProcessResult> {
   try {
-    const modelId = tool.processorConfig.aiModelId || 'mock-default';
+    const modelId = resolveMockModelId(tool);
+    const inputBuffer = await fetchAsBuffer(inputAssetUrl);
+    const { buffer, mimeType } = await applyMockAiTransform(
+      inputBuffer,
+      modelId,
+      (job.params || {}) as Record<string, unknown>
+    );
+
+    return { status: 'done', outputBuffer: buffer, outputMimeType: mimeType };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown mock AI submission error';
+    return { status: 'failed', error: message };
+  }
+}
+
+/** Legacy async mock path for local webhook testing only. */
+export async function submitMockJobAsync(
+  job: ImageJobRow,
+  tool: ToolDefinition,
+  inputAssetUrl: string
+): Promise<ProcessResult> {
+  try {
+    const modelId = resolveMockModelId(tool);
     const webhookPath = tool.processorConfig.aiWebhookPath || '/api/webhooks/ai-provider';
 
     const { providerJobId } = await submitToMockProvider({

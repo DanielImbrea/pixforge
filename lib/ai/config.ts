@@ -21,7 +21,7 @@ export function getReplicateModel(category: ToolCategory): string {
     return process.env.REPLICATE_UPSCALE_MODEL?.trim() || 'nightmareai/real-esrgan';
   }
   if (category === 'background') {
-    return process.env.REPLICATE_BG_REMOVAL_MODEL?.trim() || '851-labs/background-removal';
+    return process.env.REPLICATE_BG_REMOVAL_MODEL?.trim() || '851-labs/background-remover';
   }
   throw new Error(`No Replicate model configured for tool category: ${category}`);
 }
