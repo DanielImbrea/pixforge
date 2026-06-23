@@ -1,0 +1,24 @@
+-- Optional seed data for local development.
+-- This does NOT create auth users (Supabase Auth must do that via signup),
+-- it only documents the expected shape of a fully seeded dev account once
+-- you have signed up at least one user through the app's /auth/signup page.
+--
+-- Usage:
+--   1. Sign up normally through the app with e.g. dev@example.com
+--   2. Find that user's id in the Supabase dashboard (Authentication > Users)
+--   3. Replace YOUR_USER_ID_HERE below and run this file's statements
+
+-- Example: bump a dev account straight to Pro without going through Stripe,
+-- useful for testing Pro-gated features locally.
+--
+-- update public.users
+-- set plan = 'pro'
+-- where id = 'YOUR_USER_ID_HERE';
+
+-- Example: seed a tool_usage row so the dashboard usage meter has data
+-- without needing to process real images first.
+--
+-- insert into public.tool_usage (user_id, period_start, process_count, unit_count)
+-- values ('YOUR_USER_ID_HERE', date_trunc('month', now())::date, 5, 9)
+-- on conflict (user_id, period_start) do update
+--   set process_count = excluded.process_count, unit_count = excluded.unit_count;

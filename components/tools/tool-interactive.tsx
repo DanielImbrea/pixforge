@@ -1,0 +1,509 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import type { PlanTier, ToolDefinition } from '@/types';
+import { Button } from '@/components/ui/button';
+import { planHasFeature } from '@/lib/billing/plan-features';
+import { BatchUploadZone } from './batch-upload-zone';
+import { BatchResultsView, type BatchResultItem } from './batch-results-view';
+import { ImagePreview } from './image-preview';
+import { ProcessingState } from './processing-state';
+import { ResultView } from './result-view';
+import { ResizeOptions } from './resize-options';
+import { UpscaleOptions, type UpscaleOptionsValue } from './upscale-options';
+import { ToolConfigureLayout, ToolLayout } from './tool-layout';
+import { buildToolParams, validateToolParams } from '@/lib/tools/validate-params';
+
+type Stage = 'configure' | 'processing' | 'result' | 'error';
+
+interface ToolInteractiveProps {
+  tool: ToolDefinition;
+  userPlan: PlanTier | null;
+}
+
+export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
+  const t = useTranslations('tool');
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
+
+  const canBatch = Boolean(userPlan && planHasFeature(userPlan, 'batchProcessing'));
+  const hasCommercialLicense = Boolean(userPlan && planHasFeature(userPlan, 'commercialLicense'));
+
+  const [stage, setStage] = useState<Stage>('configure');
+  const [batchMode, setBatchMode] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [validationErrorKey, setValidationErrorKey] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [canDownloadHd, setCanDownloadHd] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchResults, setBatchResults] = useState<BatchResultItem[]>([]);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [resizeParams, setResizeParams] = useState<{ width?: number; height?: number }>({});
+  const [upscaleParams, setUpscaleParams] = useState<UpscaleOptionsValue>({ scale: 2 });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isResizeTool = tool.category === 'resize';
+  const isUpscaleTool = tool.category === 'upscale';
+  const hasOptions = isResizeTool || isUpscaleTool;
+
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }, []);
+
+  const stopProgressSimulation = useCallback(() => {
+    if (progressTimer.current) {
+      clearInterval(progressTimer.current);
+      progressTimer.current = null;
+    }
+  }, []);
+
+  const startProgressSimulation = useCallback(() => {
+    stopProgressSimulation();
+    setProgress(8);
+    progressTimer.current = setInterval(() => {
+      setProgress((current) => {
+        if (current >= 92) return current;
+        const step = current < 40 ? 6 : current < 70 ? 3 : 1;
+        return Math.min(92, current + step);
+      });
+    }, 400);
+  }, [stopProgressSimulation]);
+
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      stopProgressSimulation();
+      if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    };
+  }, [filePreviewUrl, stopPolling, stopProgressSimulation]);
+
+  useEffect(() => {
+    if (stage !== 'processing') return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [stage]);
+
+  const clearSelectedFile = useCallback(() => {
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    setValidationErrorKey(null);
+  }, [filePreviewUrl]);
+
+  const handleFileSelected = useCallback(
+    (file: File) => {
+      if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+      setSelectedFile(file);
+      setFilePreviewUrl(URL.createObjectURL(file));
+      setValidationErrorKey(null);
+      setErrorMessage(null);
+    },
+    [filePreviewUrl]
+  );
+
+  const waitForJobDone = useCallback(
+    (id: string): Promise<{ previewUrl: string; canDownloadHd: boolean }> =>
+      new Promise((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const res = await fetch(`/api/jobs/${id}`);
+            if (!res.ok) throw new Error(t('errorJobStatus'));
+            const data = await res.json();
+
+            if (data.status === 'done') {
+              resolve({ previewUrl: data.previewUrl, canDownloadHd: data.canDownloadHd });
+              return;
+            }
+
+            if (data.status === 'failed') {
+              reject(new Error(data.errorMessage || t('errorProcessingFailed')));
+              return;
+            }
+
+            pollTimer.current = setTimeout(poll, 2000);
+          } catch (err) {
+            reject(err instanceof Error ? err : new Error(t('errorJobStatus')));
+          }
+        };
+
+        void poll();
+      }),
+    [t]
+  );
+
+  const parseApiError = useCallback(
+    (body: { error?: string }, fallback: string) => {
+      const msg = body.error || fallback;
+      if (msg.toLowerCase().includes('not enough credits') || msg.toLowerCase().includes('credite')) {
+        return t('errorInsufficientCredits');
+      }
+      return msg;
+    },
+    [t]
+  );
+
+  const processSingleFile = useCallback(
+    async (file: File, params: Record<string, unknown>) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('toolId', tool.id);
+      if (Object.keys(params).length > 0) {
+        formData.append('params', JSON.stringify(params));
+      }
+
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!uploadRes.ok) {
+        const body = await uploadRes.json().catch(() => ({}));
+        throw new Error(parseApiError(body, t('errorUploadFailed')));
+      }
+
+      const { jobId: createdJobId } = await uploadRes.json();
+
+      const processRes = await fetch(`/api/jobs/${createdJobId}/process`, { method: 'POST' });
+      if (!processRes.ok) {
+        const body = await processRes.json().catch(() => ({}));
+        throw new Error(body.error || t('errorProcessingFailed'));
+      }
+
+      const processData = await processRes.json();
+
+      if (processData.status === 'done') {
+        return {
+          jobId: createdJobId,
+          previewUrl: processData.previewUrl as string,
+          canDownloadHd: processData.canDownloadHd as boolean,
+        };
+      }
+
+      const done = await waitForJobDone(createdJobId);
+      return { jobId: createdJobId, ...done };
+    },
+    [tool.id, t, waitForJobDone, parseApiError]
+  );
+
+  const handleProcess = useCallback(async () => {
+    if (isSubmitting) return;
+    if (!selectedFile) {
+      setValidationErrorKey('validationFileRequired');
+      return;
+    }
+
+    const rawParams = buildToolParams(tool, resizeParams, upscaleParams);
+    const validation = validateToolParams(tool, rawParams);
+
+    if (!validation.valid) {
+      setValidationErrorKey(validation.errorKey || 'validationGeneric');
+      return;
+    }
+
+    setValidationErrorKey(null);
+    setErrorMessage(null);
+    setIsSubmitting(true);
+    setStage('processing');
+    startProgressSimulation();
+
+    try {
+      const result = await processSingleFile(selectedFile, validation.params);
+      setJobId(result.jobId);
+      stopProgressSimulation();
+      setProgress(100);
+      setPreviewUrl(result.previewUrl);
+      setCanDownloadHd(result.canDownloadHd);
+      setStage('result');
+    } catch (err) {
+      stopProgressSimulation();
+      setErrorMessage(err instanceof Error ? err.message : t('errorGeneric'));
+      setStage('error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    isSubmitting,
+    selectedFile,
+    tool,
+    resizeParams,
+    upscaleParams,
+    startProgressSimulation,
+    stopProgressSimulation,
+    processSingleFile,
+    t,
+  ]);
+
+  const handleBatchProcess = useCallback(async () => {
+    if (isSubmitting) return;
+    if (batchFiles.length === 0) {
+      setValidationErrorKey('validationFileRequired');
+      return;
+    }
+
+    const rawParams = buildToolParams(tool, resizeParams, upscaleParams);
+    const validation = validateToolParams(tool, rawParams);
+
+    if (!validation.valid) {
+      setValidationErrorKey(validation.errorKey || 'validationGeneric');
+      return;
+    }
+
+    setValidationErrorKey(null);
+    setErrorMessage(null);
+    setIsSubmitting(true);
+    setStage('processing');
+    setBatchProgress({ current: 0, total: batchFiles.length });
+    startProgressSimulation();
+
+    const results: BatchResultItem[] = [];
+
+    try {
+      for (let i = 0; i < batchFiles.length; i++) {
+        setBatchProgress({ current: i + 1, total: batchFiles.length });
+        setProgress(Math.round(((i + 0.5) / batchFiles.length) * 90));
+
+        const file = batchFiles[i];
+        try {
+          const result = await processSingleFile(file, validation.params);
+          results.push({
+            fileName: file.name,
+            jobId: result.jobId,
+            previewUrl: result.previewUrl,
+            canDownloadHd: result.canDownloadHd,
+            status: 'done',
+          });
+        } catch (err) {
+          results.push({
+            fileName: file.name,
+            jobId: '',
+            previewUrl: '',
+            canDownloadHd: false,
+            status: 'failed',
+            errorMessage: err instanceof Error ? err.message : t('errorGeneric'),
+          });
+        }
+      }
+
+      stopProgressSimulation();
+      setProgress(100);
+      setBatchResults(results);
+      setStage('result');
+    } catch (err) {
+      stopProgressSimulation();
+      setErrorMessage(err instanceof Error ? err.message : t('errorGeneric'));
+      setStage('error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    isSubmitting,
+    batchFiles,
+    tool,
+    resizeParams,
+    upscaleParams,
+    startProgressSimulation,
+    stopProgressSimulation,
+    processSingleFile,
+    t,
+  ]);
+
+  const handleDownload = useCallback(async (targetJobId?: string) => {
+    const id = targetJobId || jobId;
+    if (!id) return;
+    const res = await fetch(`/api/assets/${id}/download`);
+    if (!res.ok) return;
+    const { url } = await res.json();
+    window.open(url, '_blank');
+  }, [jobId]);
+
+  const handleUpgradeClick = useCallback(() => {
+    window.location.href = `/${locale}/pricing`;
+  }, [locale]);
+
+  const handleReset = useCallback(() => {
+    stopPolling();
+    stopProgressSimulation();
+    clearSelectedFile();
+    setBatchFiles([]);
+    setBatchResults([]);
+    setBatchMode(false);
+    setStage('configure');
+    setJobId(null);
+    setPreviewUrl(null);
+    setErrorMessage(null);
+    setValidationErrorKey(null);
+    setProgress(0);
+    setBatchProgress({ current: 0, total: 0 });
+    setIsSubmitting(false);
+    setResizeParams({});
+    setUpscaleParams({ scale: 2 });
+  }, [stopPolling, stopProgressSimulation, clearSelectedFile]);
+
+  const validationMessage = validationErrorKey ? t(validationErrorKey) : null;
+
+  const isCreditsError = errorMessage === t('errorInsufficientCredits');
+
+  const processingLabel =
+    batchMode && batchProgress.total > 0
+      ? t('batchProcessing', { current: batchProgress.current, total: batchProgress.total })
+      : undefined;
+
+  return (
+    <ToolLayout
+      stage={stage}
+      configure={
+        <ToolConfigureLayout
+          preview={
+            batchMode ? (
+              <div className="space-y-4">
+                <BatchUploadZone
+                  acceptedFormats={tool.limits.acceptedFormats}
+                  onFilesSelected={(files) => {
+                    setBatchFiles(files);
+                    setValidationErrorKey(null);
+                  }}
+                />
+                {batchFiles.length > 0 && (
+                  <ul className="space-y-1 text-xs text-text-secondary">
+                    {batchFiles.map((file) => (
+                      <li key={`${file.name}-${file.size}`} className="truncate">
+                        {file.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <ImagePreview
+                file={selectedFile}
+                previewUrl={filePreviewUrl}
+                acceptedFormats={tool.limits.acceptedFormats}
+                onFileSelected={handleFileSelected}
+                onClear={clearSelectedFile}
+              />
+            )
+          }
+          options={
+            <>
+              {canBatch && (
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    className={`text-xs px-3 py-1 rounded-full border ${
+                      !batchMode
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-border-default text-text-tertiary'
+                    }`}
+                    onClick={() => setBatchMode(false)}
+                  >
+                    {t('singleMode')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`text-xs px-3 py-1 rounded-full border ${
+                      batchMode
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-border-default text-text-tertiary'
+                    }`}
+                    onClick={() => setBatchMode(true)}
+                  >
+                    {t('batchMode')}
+                  </button>
+                </div>
+              )}
+              {isResizeTool && (
+                <ResizeOptions
+                  value={resizeParams}
+                  onChange={setResizeParams}
+                  error={isResizeTool && validationErrorKey?.startsWith('validationResize') ? validationMessage : null}
+                />
+              )}
+              {isUpscaleTool && <UpscaleOptions value={upscaleParams} onChange={setUpscaleParams} />}
+              {!hasOptions && (
+                <div className="rounded-lg border border-border-default bg-background-secondary p-4">
+                  <p className="text-sm font-medium text-text-primary">{t('readyToProcess')}</p>
+                  <p className="mt-1 text-xs text-text-tertiary">{t('readyToProcessHint')}</p>
+                </div>
+              )}
+              {validationErrorKey === 'validationFileRequired' && (
+                <p className="text-xs text-danger">{validationMessage}</p>
+              )}
+              {validationErrorKey === 'validationUpscaleInvalid' && (
+                <p className="text-xs text-danger">{validationMessage}</p>
+              )}
+            </>
+          }
+          actions={
+            <Button
+              variant="primary"
+              className="w-full"
+              disabled={
+                isSubmitting ||
+                (batchMode ? batchFiles.length === 0 : !selectedFile)
+              }
+              onClick={() => void (batchMode ? handleBatchProcess() : handleProcess())}
+            >
+              {isSubmitting
+                ? t('processingButton')
+                : batchMode
+                  ? t('batchProcessButton', { count: batchFiles.length || 0 })
+                  : t('processButton')}
+            </Button>
+          }
+        />
+      }
+      processing={
+        <ProcessingState
+          progress={progress}
+          label={processingLabel}
+          isAiTool={tool.type === 'ai'}
+        />
+      }
+      result={
+        batchMode && batchResults.length > 0 ? (
+          <BatchResultsView
+            results={batchResults}
+            hasCommercialLicense={hasCommercialLicense}
+            onDownload={(id) => void handleDownload(id)}
+            onReset={handleReset}
+          />
+        ) : previewUrl ? (
+          <div className="p-6">
+            <ResultView
+              previewUrl={previewUrl}
+              canDownloadHd={canDownloadHd}
+              hasCommercialLicense={hasCommercialLicense}
+              onDownload={() => void handleDownload()}
+              onUpgradeClick={handleUpgradeClick}
+              onReset={handleReset}
+            />
+          </div>
+        ) : null
+      }
+      error={
+        <div className="flex flex-col items-center gap-3 p-12 text-center">
+          <p className="text-sm text-danger">{errorMessage || t('errorGeneric')}</p>
+          {isCreditsError && (
+            <Button variant="primary" size="sm" onClick={handleUpgradeClick}>
+              {t('upgradeForCredits')}
+            </Button>
+          )}
+          <Button variant="ghost" onClick={handleReset}>
+            {t('tryAgain')}
+          </Button>
+        </div>
+      }
+    />
+  );
+}
