@@ -2,6 +2,7 @@ import createMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { locales, defaultLocale, type Locale } from './i18n';
+import { getSupabasePublicEnv } from '@/lib/supabase/env';
 import type { SupabaseCookiesToSet } from '@/lib/supabase/cookie-types';
 
 const intlMiddleware = createMiddleware({
@@ -41,15 +42,26 @@ function copyCookies(from: NextResponse, to: NextResponse) {
   });
 }
 
+function isRedirectResponse(response: NextResponse): boolean {
+  return response.status >= 300 && response.status < 400;
+}
+
 export async function middleware(request: NextRequest) {
   const intlResponse = intlMiddleware(request);
 
-  let response = intlResponse ?? NextResponse.next();
+  if (intlResponse && isRedirectResponse(intlResponse)) {
+    return intlResponse;
+  }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  let response = intlResponse ?? NextResponse.next();
+  const supabaseEnv = getSupabasePublicEnv();
+
+  if (!supabaseEnv) {
+    return response;
+  }
+
+  try {
+    const supabase = createServerClient(supabaseEnv.url, supabaseEnv.anonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -62,26 +74,30 @@ export async function middleware(request: NextRequest) {
           });
         },
       },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const pathname = request.nextUrl.pathname;
+
+    if (!user && isProtectedPath(pathname)) {
+      const locale = getLocaleFromPath(pathname);
+      const redirectUrl = new URL(`/${locale}/auth/login`, request.url);
+      redirectUrl.searchParams.set('redirectTo', pathname);
+      const redirect = NextResponse.redirect(redirectUrl);
+      copyCookies(response, redirect);
+      return redirect;
     }
-  );
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const pathname = request.nextUrl.pathname;
-
-  if (!user && isProtectedPath(pathname)) {
-    const locale = getLocaleFromPath(pathname);
-    const redirectUrl = new URL(`/${locale}/auth/login`, request.url);
-    redirectUrl.searchParams.set('redirectTo', pathname);
-    const redirect = NextResponse.redirect(redirectUrl);
-    copyCookies(response, redirect);
-    return redirect;
-  }
-
-  if (user && (isHomePath(pathname) || isGuestOnlyPath(pathname))) {
-    const locale = getLocaleFromPath(pathname);
-    const redirect = NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
-    copyCookies(response, redirect);
-    return redirect;
+    if (user && (isHomePath(pathname) || isGuestOnlyPath(pathname))) {
+      const locale = getLocaleFromPath(pathname);
+      const redirect = NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+      copyCookies(response, redirect);
+      return redirect;
+    }
+  } catch (error) {
+    console.error('[middleware] Supabase auth check failed:', error);
   }
 
   return response;

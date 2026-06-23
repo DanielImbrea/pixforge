@@ -2,15 +2,14 @@ import { cache } from 'react';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { UserRow } from '@/types';
+import { requireSupabasePublicEnv } from '@/lib/supabase/env';
 import type { SupabaseCookiesToSet } from '@/lib/supabase/cookie-types';
 
 export async function createClient() {
   const cookieStore = await cookies();
+  const { url, anonKey } = requireSupabasePublicEnv();
 
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  return createServerClient(url, anonKey, {
       cookies: {
         getAll() {
           return cookieStore.getAll();
