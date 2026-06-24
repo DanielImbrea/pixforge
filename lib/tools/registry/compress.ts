@@ -28,7 +28,7 @@ export const compressTool: ToolDefinition = {
   seo: {
     translations: {
       en: {
-        title: 'Image Compressor Online – Reduce Image Size Without Losing Quality | PixelForge',
+        title: 'Image Compressor Online – Reduce Image Size Without Losing Quality | PixiqueAi',
         metaDescription:
           'Compress images instantly with smart AI optimization. Reduce file size for JPG, PNG and WebP while preserving quality.',
         h1: 'Image Compressor Online',

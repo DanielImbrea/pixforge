@@ -21,6 +21,9 @@ export interface FinalizeJobOutputInput {
     contentKind?: string;
     formatReasonKey?: string;
     sizeReductionPercent?: number | null;
+    inputSizeBytes?: number | null;
+    outputSizeBytes?: number | null;
+    keptOriginal?: boolean;
     upscaleReasonKey?: string;
     upscaleWarningKey?: string;
     upscaleModelLabel?: string;
@@ -94,9 +97,12 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
     throw new Error('Failed to record output asset.');
   }
 
-  const previewBuffer = opts.isFreePlan
-    ? await applyWatermark(optimizedBuffer, optimizedMimeType)
-    : optimizedBuffer;
+  const keptOriginal = Boolean(opts.deliveryMeta?.keptOriginal);
+  const previewBuffer =
+    opts.isFreePlan && !keptOriginal
+      ? await applyWatermark(optimizedBuffer, optimizedMimeType)
+      : optimizedBuffer;
+  const deliverableSizeBytes = opts.isFreePlan ? previewBuffer.byteLength : optimizedBuffer.byteLength;
 
   const { storagePath: previewPath } = await uploadBufferToStorage(
     previewBuffer,
@@ -130,7 +136,7 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
       user_id: opts.userId,
       storage_file_id: previewStorageFile.id,
       asset_type: 'preview',
-      is_watermarked: opts.isFreePlan,
+      is_watermarked: opts.isFreePlan && !keptOriginal,
     })
     .select('*')
     .single();
@@ -148,7 +154,14 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
       completed_at: new Date().toISOString(),
       params: {
         ...(opts.existingParams || {}),
-        ...(opts.deliveryMeta ? { _delivery: opts.deliveryMeta } : {}),
+        ...(opts.deliveryMeta
+          ? {
+              _delivery: {
+                ...opts.deliveryMeta,
+                outputSizeBytes: deliverableSizeBytes,
+              },
+            }
+          : {}),
       },
     })
     .eq('id', opts.jobId);
@@ -160,6 +173,6 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
     outputAssetId: outputAsset.id,
     outputWidth: outputMeta.width,
     outputHeight: outputMeta.height,
-    outputSizeBytes: optimizedBuffer.byteLength,
+    outputSizeBytes: deliverableSizeBytes,
   };
 }

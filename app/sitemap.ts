@@ -5,7 +5,17 @@ import { SITE_URL } from '@/lib/seo/constants';
 import { BLOG_POSTS } from '@/lib/content/blog-posts';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const staticPaths = ['', '/pricing', '/tools', '/about', '/blog'];
+  const staticPaths = [
+    '',
+    '/pricing',
+    '/tools',
+    '/about',
+    '/blog',
+    '/contact',
+    '/legal/terms',
+    '/legal/privacy',
+    '/legal/cookies',
+  ];
 
   const staticEntries: MetadataRoute.Sitemap = staticPaths.flatMap((path) =>
     locales.map((locale) => ({

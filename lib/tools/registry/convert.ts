@@ -5,7 +5,7 @@ export const convertTool: ToolDefinition = {
   id: 'tool_convert',
   slug: {
     en: 'image-converter',
-    ro: 'png-in-jpg',
+    ro: 'convertor-jpg-png',
   },
   name: {
     en: 'Smart Format Optimizer',

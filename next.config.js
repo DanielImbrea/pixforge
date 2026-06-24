@@ -22,6 +22,16 @@ const nextConfig = {
         destination: '/:locale/image-converter',
         permanent: true,
       },
+      {
+        source: '/:locale(ro)/png-in-jpg',
+        destination: '/:locale/convertor-jpg-png',
+        permanent: true,
+      },
+      {
+        source: '/:locale(ro)/upscalare-poze',
+        destination: '/:locale/upscale-ai',
+        permanent: true,
+      },
     ];
   },
   images: {
@@ -29,6 +39,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: '**.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
       },
     ],
   },

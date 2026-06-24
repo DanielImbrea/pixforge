@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { CompressionStats, computeSavedPercent } from './compression-stats';
 
 interface ResultViewProps {
   previewUrl: string;
@@ -10,6 +11,7 @@ interface ResultViewProps {
   outputWidth?: number | null;
   outputHeight?: number | null;
   outputSizeBytes?: number | null;
+  inputSizeBytes?: number | null;
   outputFormatLabel?: string | null;
   smartFormatSelected?: boolean;
   formatReasonKey?: string | null;
@@ -37,6 +39,24 @@ function formatFileSize(bytes: number | null | undefined): string | null {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function resolveInputBytes(
+  inputSizeBytes: number | null | undefined,
+  outputSizeBytes: number | null | undefined,
+  sizeReductionPercent: number | null | undefined
+): number | null {
+  if (inputSizeBytes && inputSizeBytes > 0) return inputSizeBytes;
+  if (
+    outputSizeBytes &&
+    outputSizeBytes > 0 &&
+    sizeReductionPercent &&
+    sizeReductionPercent > 0 &&
+    sizeReductionPercent < 100
+  ) {
+    return Math.round(outputSizeBytes / (1 - sizeReductionPercent / 100));
+  }
+  return null;
+}
+
 export function ResultView({
   previewUrl,
   canDownloadHd,
@@ -44,6 +64,7 @@ export function ResultView({
   outputWidth,
   outputHeight,
   outputSizeBytes,
+  inputSizeBytes,
   outputFormatLabel,
   smartFormatSelected = false,
   formatReasonKey,
@@ -65,6 +86,19 @@ export function ResultView({
   const sizeLabel = formatFileSize(outputSizeBytes);
   const dimensionsLabel =
     outputWidth && outputHeight ? `${outputWidth} × ${outputHeight} px` : null;
+  const resolvedInputBytes = resolveInputBytes(inputSizeBytes, outputSizeBytes, sizeReductionPercent);
+  const isCompressOrConvertResult =
+    Boolean(outputFormatLabel || formatReasonKey || smartFormatSelected) &&
+    !upscaleReasonKey &&
+    !bgRemovalReasonKey;
+  const showCompressionStats =
+    isCompressOrConvertResult &&
+    outputSizeBytes != null &&
+    outputSizeBytes > 0 &&
+    resolvedInputBytes != null &&
+    resolvedInputBytes > 0;
+  const savedPercent = computeSavedPercent(resolvedInputBytes ?? 0, outputSizeBytes ?? 0);
+  const alreadyOptimized = formatReasonKey === 'formatReasonAlreadyOptimized';
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,6 +124,15 @@ export function ResultView({
         />
       </div>
 
+      {showCompressionStats && (
+        <CompressionStats
+          savedPercent={savedPercent}
+          alreadyOptimized={alreadyOptimized}
+          inputBytes={resolvedInputBytes!}
+          outputBytes={outputSizeBytes!}
+        />
+      )}
+
       {(dimensionsLabel || sizeLabel || outputFormatLabel || upscaleReasonKey || bgRemovalReasonKey) && (
         <div className="text-xs text-text-tertiary text-center space-y-2">
           {(dimensionsLabel || sizeLabel) && (
@@ -102,9 +145,6 @@ export function ResultView({
               </p>
               {formatReasonKey && (
                 <p className="text-text-secondary">{t(formatReasonKey as 'formatReasonPhotoAvif')}</p>
-              )}
-              {sizeReductionPercent != null && sizeReductionPercent > 0 && (
-                <p className="text-success">{t('sizeReduction', { percent: sizeReductionPercent })}</p>
               )}
             </div>
           )}

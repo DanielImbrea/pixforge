@@ -20,6 +20,7 @@ import { BgRemovalOptions } from './bg-removal-options';
 import { DEFAULT_BG_REMOVAL_PARAMS } from '@/lib/tools/bg-removal-params';
 import { ToolConfigureLayout, ToolLayout } from './tool-layout';
 import { buildToolParams, validateToolParams } from '@/lib/tools/validate-params';
+import { buildDownloadFallbackFilename, triggerBrowserDownload, triggerBrowserDownloadPost } from '@/lib/utils/trigger-download';
 
 type JobResultPayload = {
   previewUrl: string;
@@ -31,6 +32,7 @@ type JobResultPayload = {
   smartFormatSelected: boolean;
   formatReasonKey: string | null;
   sizeReductionPercent: number | null;
+  inputSizeBytes: number | null;
   upscaleReasonKey: string | null;
   upscaleWarningKey: string | null;
   upscaleModelLabel: string | null;
@@ -55,6 +57,7 @@ function parseJobResultPayload(data: Record<string, unknown>): JobResultPayload 
     formatReasonKey: (data.formatReasonKey as string | null | undefined) ?? null,
     sizeReductionPercent:
       typeof data.sizeReductionPercent === 'number' ? data.sizeReductionPercent : null,
+    inputSizeBytes: typeof data.inputSizeBytes === 'number' ? data.inputSizeBytes : null,
     upscaleReasonKey: (data.upscaleReasonKey as string | null | undefined) ?? null,
     upscaleWarningKey: (data.upscaleWarningKey as string | null | undefined) ?? null,
     upscaleModelLabel: (data.upscaleModelLabel as string | null | undefined) ?? null,
@@ -83,6 +86,7 @@ function applyJobResultToState(
     setSmartFormatSelected: (v: boolean) => void;
     setFormatReasonKey: (v: string | null) => void;
     setSizeReductionPercent: (v: number | null) => void;
+    setInputSizeBytes: (v: number | null) => void;
     setUpscaleReasonKey: (v: string | null) => void;
     setUpscaleWarningKey: (v: string | null) => void;
     setUpscaleModelLabel: (v: string | null) => void;
@@ -104,6 +108,7 @@ function applyJobResultToState(
   setters.setSmartFormatSelected(result.smartFormatSelected);
   setters.setFormatReasonKey(result.formatReasonKey);
   setters.setSizeReductionPercent(result.sizeReductionPercent);
+  setters.setInputSizeBytes(result.inputSizeBytes);
   setters.setUpscaleReasonKey(result.upscaleReasonKey);
   setters.setUpscaleWarningKey(result.upscaleWarningKey);
   setters.setUpscaleModelLabel(result.upscaleModelLabel);
@@ -145,6 +150,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [smartFormatSelected, setSmartFormatSelected] = useState(false);
   const [formatReasonKey, setFormatReasonKey] = useState<string | null>(null);
   const [sizeReductionPercent, setSizeReductionPercent] = useState<number | null>(null);
+  const [inputSizeBytes, setInputSizeBytes] = useState<number | null>(null);
   const [upscaleReasonKey, setUpscaleReasonKey] = useState<string | null>(null);
   const [upscaleWarningKey, setUpscaleWarningKey] = useState<string | null>(null);
   const [upscaleModelLabel, setUpscaleModelLabel] = useState<string | null>(null);
@@ -363,6 +369,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
         setSmartFormatSelected,
         setFormatReasonKey,
         setSizeReductionPercent,
+        setInputSizeBytes,
         setUpscaleReasonKey,
         setUpscaleWarningKey,
         setUpscaleModelLabel,
@@ -434,6 +441,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
             previewUrl: result.previewUrl,
             canDownloadHd: result.canDownloadHd,
             status: 'done',
+            inputSizeBytes: result.inputSizeBytes,
+            outputSizeBytes: result.outputSizeBytes,
+            formatReasonKey: result.formatReasonKey,
           });
         } catch (err) {
           results.push({
@@ -475,11 +485,36 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const handleDownload = useCallback(async (targetJobId?: string) => {
     const id = targetJobId || jobId;
     if (!id) return;
-    const res = await fetch(`/api/assets/${id}/download`);
-    if (!res.ok) return;
-    const { url } = await res.json();
-    window.open(url, '_blank');
+
+    try {
+      await triggerBrowserDownload(
+        `/api/assets/${id}/download`,
+        buildDownloadFallbackFilename('image/webp', id)
+      );
+    } catch {
+      // Keep the result visible; browser may block popups or network failed.
+    }
   }, [jobId]);
+
+  const handleDownloadAll = useCallback(async () => {
+    const doneItems = batchResults.filter((item) => item.status === 'done' && item.jobId);
+    if (doneItems.length === 0) return;
+
+    try {
+      await triggerBrowserDownloadPost(
+        '/api/jobs/batch-download',
+        {
+          items: doneItems.map((item) => ({
+            jobId: item.jobId,
+            fileName: item.fileName,
+          })),
+        },
+        `pixiqueai-batch-${new Date().toISOString().slice(0, 10)}.zip`
+      );
+    } catch {
+      // Keep results visible if download fails.
+    }
+  }, [batchResults]);
 
   const handleUpgradeClick = useCallback(() => {
     window.location.href = `/${locale}/pricing`;
@@ -502,6 +537,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setSmartFormatSelected(false);
     setFormatReasonKey(null);
     setSizeReductionPercent(null);
+    setInputSizeBytes(null);
     setUpscaleReasonKey(null);
     setUpscaleWarningKey(null);
     setUpscaleModelLabel(null);
@@ -625,21 +661,41 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
             </>
           }
           actions={
-            <Button
-              variant="primary"
-              className="w-full"
-              disabled={
-                isSubmitting ||
-                (batchMode ? batchFiles.length === 0 : !selectedFile)
-              }
-              onClick={() => void (batchMode ? handleBatchProcess() : handleProcess())}
-            >
-              {isSubmitting
-                ? t('processingButton')
-                : batchMode
-                  ? t('batchProcessButton', { count: batchFiles.length || 0 })
-                  : t('processButton')}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                variant="primary"
+                className="w-full"
+                disabled={
+                  isSubmitting ||
+                  (batchMode ? batchFiles.length === 0 : !selectedFile)
+                }
+                onClick={() => void (batchMode ? handleBatchProcess() : handleProcess())}
+              >
+                {isSubmitting
+                  ? t('processingButton')
+                  : batchMode
+                    ? t('batchProcessButton', { count: batchFiles.length || 0 })
+                    : t('processButton')}
+              </Button>
+              {batchMode && batchFiles.length > 0 ? (
+                <div className="space-y-1 text-center text-xs text-text-tertiary">
+                  <p>
+                    {t('batchCreditsTotal', {
+                      count: batchFiles.length,
+                      total: batchFiles.length * tool.creditsCost,
+                    })}
+                  </p>
+                  <p>{t('creditsPerImageHint', { cost: tool.creditsCost })}</p>
+                </div>
+              ) : (
+                !batchMode &&
+                selectedFile && (
+                  <p className="text-center text-xs text-text-tertiary">
+                    {t('creditsPerImageHint', { cost: tool.creditsCost })}
+                  </p>
+                )
+              )}
+            </div>
           }
         />
       }
@@ -655,7 +711,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
           <BatchResultsView
             results={batchResults}
             hasCommercialLicense={hasCommercialLicense}
+            showCompressionStats={tool.category === 'compress' || tool.category === 'convert'}
             onDownload={(id) => void handleDownload(id)}
+            onDownloadAll={() => void handleDownloadAll()}
             onReset={handleReset}
           />
         ) : previewUrl ? (
@@ -671,6 +729,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               smartFormatSelected={smartFormatSelected}
               formatReasonKey={formatReasonKey}
               sizeReductionPercent={sizeReductionPercent}
+              inputSizeBytes={inputSizeBytes}
               upscaleReasonKey={upscaleReasonKey}
               upscaleWarningKey={upscaleWarningKey}
               upscaleModelLabel={upscaleModelLabel}

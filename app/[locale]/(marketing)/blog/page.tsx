@@ -20,7 +20,7 @@ export default async function BlogIndexPage({ params }: { params: Promise<{ loca
   return (
     <div className="max-w-3xl mx-auto px-6 py-16">
       <h1 className="text-3xl font-semibold text-text-primary mb-3">
-        {isRo ? 'Blog PixelForge' : 'PixelForge Blog'}
+        {isRo ? 'Blog PixiqueAi' : 'PixiqueAi Blog'}
       </h1>
       <p className="text-text-secondary mb-10">
         {isRo

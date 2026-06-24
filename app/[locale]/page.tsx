@@ -5,9 +5,11 @@ import type { Metadata } from 'next';
 import type { Locale } from '@/i18n';
 import { getCurrentUser } from '@/lib/supabase/server';
 import { LandingDemoShowcase } from '@/components/marketplace/landing-demo-showcase';
+import { LandingRealExamples } from '@/components/marketplace/landing-real-examples';
 import { LandingKeywordStrip, LandingPopularTools } from '@/components/marketplace/landing-popular-tools';
 import { LandingToolGroups } from '@/components/marketplace/landing-tool-groups';
 import { LandingWhy } from '@/components/marketplace/landing-why';
+import { LandingTrustSection } from '@/components/marketplace/landing-trust';
 import { LandingPricingPreview } from '@/components/marketplace/landing-pricing-preview';
 import { SocialProof } from '@/components/marketplace/social-proof';
 import { LandingFaq } from '@/components/marketplace/landing-faq';
@@ -73,9 +75,9 @@ const TESTIMONIALS_BY_LOCALE: Record<
 const LANDING_FAQ_BY_LOCALE: Record<Locale, { question: string; answer: string }[]> = {
   en: [
     {
-      question: 'What is PixelForge?',
+      question: 'What is PixiqueAi?',
       answer:
-        'PixelForge is an all-in-one AI image toolkit. Upscale, remove backgrounds, compress, convert, and resize images in your browser — no software install required.',
+        'PixiqueAi is an all-in-one AI image toolkit. Upscale, remove backgrounds, compress, convert, and resize images in your browser — no software install required.',
     },
     {
       question: 'Is it free?',
@@ -93,9 +95,9 @@ const LANDING_FAQ_BY_LOCALE: Record<Locale, { question: string; answer: string }
   ],
   ro: [
     {
-      question: 'Ce este PixelForge?',
+      question: 'Ce este PixiqueAi?',
       answer:
-        'PixelForge e un toolkit AI all-in-one pentru imagini. Upscale, eliminare fundal, compresie, conversie și redimensionare în browser — fără instalare.',
+        'PixiqueAi e un toolkit AI all-in-one pentru imagini. Upscale, eliminare fundal, compresie, conversie și redimensionare în browser — fără instalare.',
     },
     {
       question: 'E gratuit?',
@@ -161,6 +163,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         <LandingDemoShowcase />
       </section>
 
+      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default">
+        <LandingRealExamples />
+      </section>
+
       <LandingPopularTools locale={locale} />
 
       <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default">
@@ -175,6 +181,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         <LandingWhy locale={locale} />
       </section>
 
+      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default">
+        <LandingTrustSection locale={locale} />
+      </section>
+
       <section className="max-w-5xl mx-auto px-6 py-16">
         <LandingPricingPreview locale={locale} />
       </section>
@@ -184,7 +194,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         <SocialProof testimonials={testimonials} />
       </section>
 
-      <section className="max-w-3xl mx-auto px-6 py-16">
+      <section id="faq" className="max-w-3xl mx-auto px-6 py-16">
         <h2 className="text-2xl font-semibold text-text-primary mb-8 text-center">FAQ</h2>
         <LandingFaq items={faqItems} />
       </section>

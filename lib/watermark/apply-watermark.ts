@@ -12,7 +12,7 @@ function buildWatermarkSvg(tileWidth: number, tileHeight: number): string {
     text-anchor="middle"
     dominant-baseline="middle"
     transform="rotate(-30 ${tileWidth / 2} ${tileHeight / 2})"
-  >PixelForge</text>
+  >PixiqueAi</text>
 </svg>`.trim();
 }
 

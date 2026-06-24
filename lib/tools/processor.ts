@@ -20,6 +20,7 @@ export interface ProcessResult {
   formatReasonKey?: string;
   sizeReductionPercent?: number | null;
   inputSizeBytes?: number;
+  keptOriginal?: boolean;
   upscaleReasonKey?: string;
   upscaleWarningKey?: string;
   upscaleModelLabel?: string;

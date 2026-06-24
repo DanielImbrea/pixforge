@@ -69,3 +69,14 @@ export async function deleteFromStorage(bucket: Bucket, storagePath: string): Pr
   const supabase = createAdminClient();
   await supabase.storage.from(bucket).remove([storagePath]);
 }
+
+export async function downloadFromStorage(bucket: Bucket, storagePath: string): Promise<Blob> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.storage.from(bucket).download(storagePath);
+
+  if (error || !data) {
+    throw new Error(`Storage download failed: ${error?.message ?? 'unknown error'}`);
+  }
+
+  return data;
+}

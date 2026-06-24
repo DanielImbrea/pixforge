@@ -5,7 +5,7 @@ export const upscaleTool: ToolDefinition = {
   id: 'tool_upscale_ai',
   slug: {
     en: 'ai-image-upscaler',
-    ro: 'upscalare-poze',
+    ro: 'upscale-ai',
   },
   name: {
     en: 'AI Detail Restorer & Upscaler',
@@ -27,7 +27,7 @@ export const upscaleTool: ToolDefinition = {
   seo: {
     translations: {
       en: {
-        title: 'AI Image Upscaler – Enhance and Upscale Images with AI up to 4x | PixelForge',
+        title: 'AI Image Upscaler – Enhance and Upscale Images with AI up to 4x | PixiqueAi',
         metaDescription:
           'Upscale images with AI and restore missing details. Improve resolution up to 4x with smart enhancement for photos, artwork and screenshots.',
         h1: 'AI Image Upscaler',

@@ -1,4 +1,4 @@
-# PixelForge
+# PixiqueAi
 
 AI-powered image tools SaaS — upscale, background removal, resize, compress, and format conversion.
 

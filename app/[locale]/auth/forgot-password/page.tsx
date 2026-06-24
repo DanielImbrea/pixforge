@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { Locale } from '@/i18n';
 import { getCurrentUser } from '@/lib/supabase/server';
 import { ForgotPasswordForm } from '@/components/auth/forgot-password-form';
+import { AuthBrandHeader } from '@/components/auth/auth-brand-header';
 
 export default async function ForgotPasswordPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
@@ -14,6 +15,7 @@ export default async function ForgotPasswordPage({ params }: { params: Promise<{
 
   return (
     <div className="flex flex-col items-center justify-center py-24 px-6">
+      <AuthBrandHeader locale={locale} />
       <Suspense fallback={<div className="h-64 w-full max-w-md animate-pulse rounded-lg bg-background-secondary" />}>
         <ForgotPasswordForm locale={locale} />
       </Suspense>

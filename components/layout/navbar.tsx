@@ -1,66 +1,38 @@
-import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
-import type { Locale } from '@/i18n';
-import { getCurrentUser } from '@/lib/supabase/server';
-import { LogoutButton } from '@/components/auth/logout-button';
+import { getTranslations } from "next-intl/server";
+import type { Locale } from "@/i18n";
+import { getCurrentUser } from "@/lib/supabase/server";
+import { BrandLogo } from "@/components/layout/brand-logo";
+import { NavbarMenu } from "@/components/layout/navbar-menu";
 
 export async function Navbar({ locale }: { locale: Locale }) {
-  const t = await getTranslations({ locale, namespace: 'nav' });
   const user = await getCurrentUser();
-  const otherLocale: Locale = locale === 'en' ? 'ro' : 'en';
+  const otherLocale: Locale = locale === "en" ? "ro" : "en";
 
   return (
     <header className="border-b border-border-default bg-background-primary sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link href={user ? `/${locale}/dashboard` : `/${locale}`} className="font-semibold text-lg text-text-primary">
-          PixelForge
-        </Link>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[4rem] md:min-h-[4.5rem] py-2 flex items-center justify-between gap-3">
+        <div className="shrink min-w-0 max-w-[calc(100%-3.5rem)]">
+          <div className="md:hidden">
+            <BrandLogo
+              href={user ? `/${locale}/dashboard` : `/${locale}`}
+              height={56}
+              priority
+            />
+          </div>
+          <div className="hidden md:block">
+            <BrandLogo
+              href={user ? `/${locale}/dashboard` : `/${locale}`}
+              height={56}
+              priority
+            />
+          </div>
+        </div>
 
-        <nav className="flex items-center gap-4 md:gap-6">
-          <Link href={`/${locale}/tools`} className="text-sm text-text-secondary hover:text-text-primary">
-            {t('tools')}
-          </Link>
-          <Link href={`/${locale}/blog`} className="text-sm text-text-secondary hover:text-text-primary">
-            {t('blog')}
-          </Link>
-          <Link href={`/${locale}/pricing`} className="text-sm text-text-secondary hover:text-text-primary">
-            {t('pricing')}
-          </Link>
-          <Link href={`/${locale}/about`} className="text-sm text-text-secondary hover:text-text-primary">
-            {t('about')}
-          </Link>
-
-          {user ? (
-            <>
-              <Link
-                href={`/${locale}/dashboard`}
-                className="text-sm bg-accent text-white px-4 py-2 rounded-md hover:bg-accent-hover transition-colors"
-              >
-                {t('dashboard')}
-              </Link>
-              <LogoutButton locale={locale} />
-            </>
-          ) : (
-            <>
-              <Link href={`/${locale}/auth/login`} className="text-sm text-text-secondary hover:text-text-primary">
-                {t('login')}
-              </Link>
-              <Link
-                href={`/${locale}/auth/signup`}
-                className="text-sm bg-accent text-white px-4 py-2 rounded-md hover:bg-accent-hover transition-colors"
-              >
-                {t('signup')}
-              </Link>
-            </>
-          )}
-
-          <Link
-            href={`/${otherLocale}`}
-            className="text-sm text-text-tertiary hover:text-text-primary uppercase"
-          >
-            {otherLocale}
-          </Link>
-        </nav>
+        <NavbarMenu
+          locale={locale}
+          isLoggedIn={!!user}
+          otherLocale={otherLocale}
+        />
       </div>
     </header>
   );

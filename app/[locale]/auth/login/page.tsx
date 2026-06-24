@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import type { Locale } from '@/i18n';
 import { getCurrentUser } from '@/lib/supabase/server';
 import { LoginForm } from '@/components/auth/login-form';
+import { AuthBrandHeader } from '@/components/auth/auth-brand-header';
 
 export default async function LoginPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
@@ -18,6 +19,7 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
 
   return (
     <div className="flex flex-col items-center justify-center py-24 px-6">
+      <AuthBrandHeader locale={locale} />
       <h1 className="text-2xl font-semibold text-text-primary mb-6">{t('loginTitle')}</h1>
       <Suspense fallback={<div className="h-48 w-full max-w-sm animate-pulse rounded-md bg-background-secondary" />}>
         <LoginForm locale={locale} />

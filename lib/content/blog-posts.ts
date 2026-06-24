@@ -51,11 +51,11 @@ export const BLOG_POSTS: BlogPost[] = [
             paragraphs: [
               '2× is ideal when the source is already decent and you only need a modest boost — especially for screenshots with small text.',
               '4× works best on very small sources where aggressive detail reconstruction is required. Going too far on already-large images can introduce artificial texture.',
-              'Smart routing (like PixelForge uses) picks the scale and model based on image type so you do not have to guess.',
+              'Smart routing (like PixiqueAi uses) picks the scale and model based on image type so you do not have to guess.',
             ],
           },
           {
-            heading: 'Try it in PixelForge',
+            heading: 'Try it in PixiqueAi',
             paragraphs: [
               'Upload any JPG, PNG, or WebP to the AI Image Upscaler. Choose Smart mode for automatic routing, or pick 2× / 4× manually. Processing runs in the cloud — no install required.',
             ],
@@ -90,11 +90,11 @@ export const BLOG_POSTS: BlogPost[] = [
             paragraphs: [
               '2× e ideal când sursa e deja decentă și ai nevoie doar de un boost modest.',
               '4× funcționează pe surse foarte mici unde e nevoie de reconstrucție agresivă de detalii.',
-              'Rutarea Smart (ca în PixelForge) alege scala și modelul în funcție de tipul imaginii.',
+              'Rutarea Smart (ca în PixiqueAi) alege scala și modelul în funcție de tipul imaginii.',
             ],
           },
           {
-            heading: 'Testează în PixelForge',
+            heading: 'Testează în PixiqueAi',
             paragraphs: [
               'Încarcă JPG, PNG sau WebP în Upscaler AI. Alege modul Smart sau 2× / 4× manual. Procesarea e în cloud — fără instalare.',
             ],
@@ -138,7 +138,7 @@ export const BLOG_POSTS: BlogPost[] = [
             ],
           },
           {
-            heading: 'Remove backgrounds with PixelForge',
+            heading: 'Remove backgrounds with PixiqueAi',
             paragraphs: [
               'Upload your product or portrait photo, pick the mode that matches your subject, and download a transparent PNG in seconds. Free tier available to test quality before upgrading.',
             ],
@@ -176,7 +176,7 @@ export const BLOG_POSTS: BlogPost[] = [
             ],
           },
           {
-            heading: 'Elimină fundalul cu PixelForge',
+            heading: 'Elimină fundalul cu PixiqueAi',
             paragraphs: [
               'Încarcă poza, alege modul potrivit și descarcă PNG transparent în secunde. Plan gratuit pentru testare.',
             ],
@@ -220,7 +220,7 @@ export const BLOG_POSTS: BlogPost[] = [
             ],
           },
           {
-            heading: 'Compress and convert with PixelForge',
+            heading: 'Compress and convert with PixiqueAi',
             paragraphs: [
               'Use the Image Compressor for smart size reduction and the Image Converter for format optimization with explainable decisions. Both run in the browser with no install.',
             ],
@@ -258,7 +258,7 @@ export const BLOG_POSTS: BlogPost[] = [
             ],
           },
           {
-            heading: 'Comprimă și convertește cu PixelForge',
+            heading: 'Comprimă și convertește cu PixiqueAi',
             paragraphs: [
               'Folosește Compresorul de imagini și Convertorul de format cu decizii explicabile. Totul în browser, fără instalare.',
             ],

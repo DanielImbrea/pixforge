@@ -67,7 +67,7 @@ export function generateHomeMetadata(locale: Locale): Metadata {
     return buildPageMetadata({
       locale,
       pathSuffix: '',
-      title: 'Unelte Foto AI – Upscale, Compresie, Eliminare Fundal & Conversie | PixelForge',
+      title: 'Unelte Foto AI – Upscale, Compresie, Eliminare Fundal & Conversie | PixiqueAi',
       description:
         'Toolkit AI all-in-one pentru imagini. Upscale, eliminare fundal, compresie și conversie format instant. Gratuit la început, fără instalare.',
       keywords: [
@@ -83,7 +83,7 @@ export function generateHomeMetadata(locale: Locale): Metadata {
   return buildPageMetadata({
     locale,
     pathSuffix: '',
-    title: 'AI Image Tools – Upscale, Compress, Remove Background & Convert Images | PixelForge',
+    title: 'AI Image Tools – Upscale, Compress, Remove Background & Convert Images | PixiqueAi',
     description:
       'All-in-one AI image toolkit. Upscale images, remove backgrounds, compress files and convert formats instantly. Free to start, no installation required.',
     keywords: [
@@ -102,20 +102,20 @@ export function generatePricingMetadata(locale: Locale): Metadata {
     return buildPageMetadata({
       locale,
       pathSuffix: '/pricing',
-      title: 'Prețuri – Planuri & Credite PixelForge AI Image Tools',
+      title: 'Prețuri – Planuri & Credite PixiqueAi Image Tools',
       description:
-        'Prețuri simple pentru uneltele PixelForge AI. Începe gratuit și fă upgrade pentru mai multe credite, procesare rapidă și funcții batch.',
-      keywords: ['preturi pixelforge', 'credite unelte foto', 'planuri saas imagini'],
+        'Prețuri simple pentru uneltele PixiqueAi. Începe gratuit și fă upgrade pentru mai multe credite, procesare rapidă și funcții batch.',
+      keywords: ['preturi pixiqueai', 'credite unelte foto', 'planuri saas imagini'],
     });
   }
 
   return buildPageMetadata({
     locale,
     pathSuffix: '/pricing',
-    title: 'Pricing – PixelForge AI Image Tools Plans & Credits',
+    title: 'Pricing – PixiqueAi Image Tools Plans & Credits',
     description:
-      'Simple pricing for PixelForge AI tools. Start free and upgrade for more credits, faster processing and batch features.',
-    keywords: ['pixelforge pricing', 'ai image tools credits', 'image saas plans'],
+      'Simple pricing for PixiqueAi tools. Start free and upgrade for more credits, faster processing and batch features.',
+    keywords: ['pixiqueai pricing', 'ai image tools credits', 'image saas plans'],
   });
 }
 
@@ -124,20 +124,20 @@ export function generateAboutMetadata(locale: Locale): Metadata {
     return buildPageMetadata({
       locale,
       pathSuffix: '/about',
-      title: 'Despre PixelForge – Unelte AI de Procesare Imagini pentru Creatori',
+      title: 'Despre PixiqueAi – Unelte AI de Procesare Imagini pentru Creatori',
       description:
-        'PixelForge ajută creatori, magazine online și echipe de marketing să optimizeze imagini cu AI — rapid, în cloud, fără Photoshop.',
-      keywords: ['despre pixelforge', 'unelte imagini ai'],
+        'PixiqueAi ajută creatori, magazine online și echipe de marketing să optimizeze imagini cu AI — rapid, în cloud, fără Photoshop.',
+      keywords: ['despre pixiqueai', 'unelte imagini ai'],
     });
   }
 
   return buildPageMetadata({
     locale,
     pathSuffix: '/about',
-    title: 'About PixelForge – AI Image Processing Tools for Creators',
+    title: 'About PixiqueAi – AI Image Processing Tools for Creators',
     description:
-      'PixelForge helps creators, e-commerce teams, and marketers optimize images with AI — fast, cloud-based, no Photoshop required.',
-    keywords: ['about pixelforge', 'ai image processing tools'],
+      'PixiqueAi helps creators, e-commerce teams, and marketers optimize images with AI — fast, cloud-based, no Photoshop required.',
+    keywords: ['about pixiqueai', 'ai image processing tools'],
   });
 }
 
@@ -146,17 +146,17 @@ export function generateBlogIndexMetadata(locale: Locale): Metadata {
     return buildPageMetadata({
       locale,
       pathSuffix: '/blog',
-      title: 'Blog PixelForge – Ghiduri Upscale, Compresie & Eliminare Fundal',
+      title: 'Blog PixiqueAi – Ghiduri Upscale, Compresie & Eliminare Fundal',
       description:
         'Ghiduri practice despre upscalare AI, formate imagine pentru web și eliminare fundal pentru produse.',
-      keywords: ['ghid imagini web', 'blog pixelforge'],
+      keywords: ['ghid imagini web', 'blog pixiqueai'],
     });
   }
 
   return buildPageMetadata({
     locale,
     pathSuffix: '/blog',
-    title: 'PixelForge Blog – AI Image Upscaling, Compression & Background Removal Guides',
+    title: 'PixiqueAi Blog – AI Image Upscaling, Compression & Background Removal Guides',
     description:
       'Practical guides on AI upscaling, web image formats, and product photo background removal.',
     keywords: ['ai image guide', 'webp vs avif', 'remove background guide'],
@@ -173,7 +173,7 @@ export function generateBlogPostMetadata(
   return buildPageMetadata({
     locale,
     pathSuffix: `/blog/${slug}`,
-    title: `${title} | PixelForge`,
+    title: `${title} | PixiqueAi`,
     description,
     keywords,
   });
@@ -184,15 +184,15 @@ export function generateToolsIndexMetadata(locale: Locale): Metadata {
     return buildPageMetadata({
       locale,
       pathSuffix: '/tools',
-      title: 'Toate Uneltele – Upscale, Compresie, Conversie & Eliminare Fundal | PixelForge',
-      description: 'Explorează toate uneltele PixelForge AI pentru optimizarea imaginilor.',
+      title: 'Toate Uneltele – Upscale, Compresie, Conversie & Eliminare Fundal | PixiqueAi',
+      description: 'Explorează toate uneltele PixiqueAi pentru optimizarea imaginilor.',
     });
   }
 
   return buildPageMetadata({
     locale,
     pathSuffix: '/tools',
-    title: 'All Tools – Upscale, Compress, Convert & Remove Background | PixelForge',
-    description: 'Browse all PixelForge AI image optimization tools in one place.',
+    title: 'All Tools – Upscale, Compress, Convert & Remove Background | PixiqueAi',
+    description: 'Browse all PixiqueAi image optimization tools in one place.',
   });
 }

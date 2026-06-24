@@ -26,6 +26,13 @@ const MIME_BY_FORMAT: Record<OutputFormat, string> = {
   avif: 'image/avif',
 };
 
+function formatFromSharpMeta(format: string | undefined): OutputFormat {
+  if (format === 'png') return 'png';
+  if (format === 'webp') return 'webp';
+  if (format === 'avif') return 'avif';
+  return 'jpeg';
+}
+
 async function fetchAsBuffer(url: string): Promise<Buffer> {
   const res = await fetch(url);
   if (!res.ok) {
@@ -169,6 +176,16 @@ export const sharpProcessor: ToolProcessor = {
                 : undefined;
 
           formatChoice = selectSmartOutputFormat(profile, { operation: 'compress' });
+          if (formatChoice.lossless && !profile.hasTransparency) {
+            formatChoice = {
+              format: 'webp',
+              automatic: true,
+              reason: 'photo',
+              reasonKey: 'formatReasonCompressLossy',
+              lossless: false,
+            };
+          }
+          enableFallback = formatChoice.format === 'avif';
           break;
         }
         case 'convert': {
@@ -217,7 +234,45 @@ export const sharpProcessor: ToolProcessor = {
       });
 
       formatChoice = encoded.formatChoice;
-      const outputBuffer = encoded.buffer;
+      let outputBuffer = encoded.buffer;
+      let keptOriginal = false;
+
+      if (operation === 'compress' && outputBuffer.byteLength >= inputSizeBytes) {
+        const lossyChoice: SmartFormatChoice = {
+          format: profile.hasTransparency ? 'webp' : 'jpeg',
+          automatic: true,
+          reason: 'fallback',
+          reasonKey: 'formatReasonCompressRetry',
+          lossless: false,
+        };
+        const retry = await encodePipeline(pipeline, lossyChoice, profile, {
+          operation,
+          outputWidth,
+          outputHeight,
+          qualityOverride: qualityOverride ?? 82,
+          qualityIntent: 'balanced',
+          backgroundFill,
+          enableFallback: true,
+        });
+        if (retry.buffer.byteLength < outputBuffer.byteLength) {
+          outputBuffer = retry.buffer;
+          formatChoice = retry.formatChoice;
+        }
+      }
+
+      if (operation === 'compress' && outputBuffer.byteLength >= inputSizeBytes) {
+        const inputSharpMeta = await sharp(buffer).metadata();
+        outputBuffer = buffer;
+        keptOriginal = true;
+        formatChoice = {
+          format: formatFromSharpMeta(inputSharpMeta.format),
+          automatic: true,
+          reason: 'fallback',
+          reasonKey: 'formatReasonAlreadyOptimized',
+          lossless: false,
+        };
+      }
+
       const outputMeta = await readImageDimensions(outputBuffer);
       const sizeReductionPercent = computeSizeReductionPercent(inputSizeBytes, outputBuffer.byteLength);
 
@@ -235,6 +290,7 @@ export const sharpProcessor: ToolProcessor = {
         formatReasonKey: formatChoice.reasonKey,
         sizeReductionPercent,
         inputSizeBytes,
+        keptOriginal,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown processing error';

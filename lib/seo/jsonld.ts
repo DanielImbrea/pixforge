@@ -1,13 +1,13 @@
 import type { Locale } from '@/i18n';
 import type { ToolDefinition } from '@/types';
-import { SITE_URL } from '@/lib/seo/constants';
+import { BRAND_NAME, SITE_URL } from '@/lib/seo/constants';
 import type { BlogPost } from '@/lib/content/blog-posts';
 
 export function generateHomeJsonLd(locale: Locale) {
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'PixelForge',
+    name: BRAND_NAME,
     applicationCategory: 'ImageEditor',
     operatingSystem: 'Web',
     description:
@@ -62,11 +62,11 @@ export function generatePricingJsonLd(locale: Locale) {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    name: locale === 'ro' ? 'Prețuri PixelForge' : 'PixelForge Pricing',
+    name: locale === 'ro' ? `Prețuri ${BRAND_NAME}` : `${BRAND_NAME} Pricing`,
     description:
       locale === 'ro'
-        ? 'Planuri și credite pentru uneltele PixelForge AI.'
-        : 'Plans and credits for PixelForge AI image tools.',
+        ? `Planuri și credite pentru uneltele ${BRAND_NAME}.`
+        : `Plans and credits for ${BRAND_NAME} image tools.`,
     url: `${SITE_URL}/${locale}/pricing`,
   };
 }
@@ -81,11 +81,11 @@ export function generateBlogPostJsonLd(post: BlogPost, locale: Locale) {
     datePublished: post.publishedAt,
     author: {
       '@type': 'Organization',
-      name: 'PixelForge',
+      name: BRAND_NAME,
     },
     publisher: {
       '@type': 'Organization',
-      name: 'PixelForge',
+      name: BRAND_NAME,
     },
     url: `${SITE_URL}/${locale}/blog/${post.slug}`,
   };

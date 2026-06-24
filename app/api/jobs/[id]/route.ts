@@ -73,6 +73,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         contentKind?: string;
         formatReasonKey?: string;
         sizeReductionPercent?: number | null;
+        inputSizeBytes?: number | null;
+        outputSizeBytes?: number | null;
         upscaleReasonKey?: string;
         upscaleWarningKey?: string;
         upscaleModelLabel?: string;
@@ -92,13 +94,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     canDownloadHd: canDownloadHd(user),
     outputWidth: previewAsset.storage_files.width_px,
     outputHeight: previewAsset.storage_files.height_px,
-    outputSizeBytes: previewAsset.storage_files.size_bytes,
+    outputSizeBytes: delivery?.outputSizeBytes ?? previewAsset.storage_files.size_bytes,
     outputFormat: delivery?.outputFormat,
     outputFormatLabel: delivery?.outputFormatLabel,
     smartFormatSelected: delivery?.smartFormatSelected,
     contentKind: delivery?.contentKind,
     formatReasonKey: delivery?.formatReasonKey,
     sizeReductionPercent: delivery?.sizeReductionPercent,
+    inputSizeBytes: delivery?.inputSizeBytes,
     upscaleReasonKey: delivery?.upscaleReasonKey,
     upscaleWarningKey: delivery?.upscaleWarningKey,
     upscaleModelLabel: delivery?.upscaleModelLabel,
