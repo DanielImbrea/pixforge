@@ -1,11 +1,19 @@
 import sharp from 'sharp';
 import type { ImageContentKind, ImageContentProfile } from '@/lib/image/classify-content';
+import type { QualityIntent } from '@/lib/image/quality-intent';
 
 export type OutputFormat = 'jpeg' | 'png' | 'webp' | 'avif';
 
 export type SharpOperation = 'resize' | 'compress' | 'convert';
 
-export type SmartFormatReason = 'transparency' | 'photo' | 'screenshot' | 'graphic' | 'logo' | 'user';
+export type SmartFormatReason =
+  | 'transparency'
+  | 'photo'
+  | 'screenshot'
+  | 'graphic'
+  | 'logo'
+  | 'user'
+  | 'fallback';
 
 const SUPPORTED_FORMATS = new Set(['jpeg', 'png', 'webp', 'avif']);
 
@@ -13,6 +21,7 @@ export interface SmartFormatChoice {
   format: OutputFormat;
   automatic: boolean;
   reason: SmartFormatReason;
+  reasonKey: string;
   lossless: boolean;
 }
 
@@ -22,6 +31,7 @@ export interface EncodeOptions {
   outputWidth?: number;
   outputHeight?: number;
   lossless?: boolean;
+  qualityIntent?: QualityIntent;
 }
 
 export function formatLabel(format: OutputFormat, lossless = false): string {
@@ -43,64 +53,187 @@ function usesModernCompressRouting(operation?: SharpOperation): boolean {
   return operation === 'compress' || operation === 'convert';
 }
 
+function isHighDetailText(profile: ImageContentProfile): boolean {
+  return profile.kind === 'screenshot' && profile.edgeScore >= 17;
+}
+
+function userFormatChoice(profile: ImageContentProfile, userFormat: string): SmartFormatChoice {
+  const format = resolveOutputFormat(userFormat);
+  const lossless =
+    format === 'png' ||
+    (format === 'webp' &&
+      (profile.kind === 'screenshot' || profile.kind === 'logo' || profile.hasTransparency));
+  return {
+    format,
+    automatic: false,
+    reason: 'user',
+    reasonKey: 'formatReasonUser',
+    lossless,
+  };
+}
+
 /**
  * Smart format router — never choose format before classification.
- * Compress/convert use modern codecs (AVIF photos, lossless WebP for UI).
+ * Convert uses a full decision tree with quality intent; compress keeps modern defaults.
  */
 export function selectSmartOutputFormat(
   profile: ImageContentProfile,
   options?: {
     userFormat?: string;
     operation?: SharpOperation;
+    qualityIntent?: QualityIntent;
   }
 ): SmartFormatChoice {
   const operation = options?.operation;
   const userFormat = options?.userFormat;
+  const intent = options?.qualityIntent ?? 'balanced';
 
   if (userFormat && userFormat !== 'auto') {
-    const format = resolveOutputFormat(userFormat);
-    const lossless =
-      format === 'png' ||
-      (format === 'webp' &&
-        (profile.kind === 'screenshot' || profile.kind === 'logo' || profile.hasTransparency));
-    return { format, automatic: false, reason: 'user', lossless };
+    return userFormatChoice(profile, userFormat);
   }
 
   const modern = usesModernCompressRouting(operation);
+  const isConvert = operation === 'convert';
 
   if (profile.hasTransparency) {
-    if (modern) {
-      return { format: 'webp', automatic: true, reason: 'transparency', lossless: true };
+    if (isConvert && intent === 'max') {
+      return {
+        format: 'png',
+        automatic: true,
+        reason: 'transparency',
+        reasonKey: 'formatReasonTransparencyPng',
+        lossless: true,
+      };
     }
-    return { format: 'png', automatic: true, reason: 'transparency', lossless: true };
+    if (modern) {
+      return {
+        format: 'webp',
+        automatic: true,
+        reason: 'transparency',
+        reasonKey: 'formatReasonTransparencyWebp',
+        lossless: true,
+      };
+    }
+    return {
+      format: 'png',
+      automatic: true,
+      reason: 'transparency',
+      reasonKey: 'formatReasonTransparencyPng',
+      lossless: true,
+    };
   }
 
   if (profile.kind === 'logo') {
-    if (modern) {
-      return { format: 'webp', automatic: true, reason: 'logo', lossless: true };
+    if (isConvert && intent === 'max') {
+      return {
+        format: 'png',
+        automatic: true,
+        reason: 'logo',
+        reasonKey: 'formatReasonLogoPng',
+        lossless: true,
+      };
     }
-    return { format: 'png', automatic: true, reason: 'logo', lossless: true };
+    if (modern) {
+      return {
+        format: 'webp',
+        automatic: true,
+        reason: 'logo',
+        reasonKey: 'formatReasonLogoLossless',
+        lossless: true,
+      };
+    }
+    return {
+      format: 'png',
+      automatic: true,
+      reason: 'logo',
+      reasonKey: 'formatReasonLogoPng',
+      lossless: true,
+    };
   }
 
   if (profile.kind === 'screenshot') {
-    if (modern) {
-      return { format: 'webp', automatic: true, reason: 'screenshot', lossless: true };
+    if (isConvert && (intent === 'max' || isHighDetailText(profile))) {
+      return {
+        format: 'png',
+        automatic: true,
+        reason: 'screenshot',
+        reasonKey: 'formatReasonScreenshotPng',
+        lossless: true,
+      };
     }
-    return { format: 'png', automatic: true, reason: 'screenshot', lossless: true };
+    if (modern) {
+      return {
+        format: 'webp',
+        automatic: true,
+        reason: 'screenshot',
+        reasonKey: 'formatReasonScreenshotLossless',
+        lossless: true,
+      };
+    }
+    return {
+      format: 'png',
+      automatic: true,
+      reason: 'screenshot',
+      reasonKey: 'formatReasonScreenshotPng',
+      lossless: true,
+    };
   }
 
   if (profile.kind === 'photo') {
-    if (modern) {
-      return { format: 'avif', automatic: true, reason: 'photo', lossless: false };
+    if (isConvert && intent === 'fast') {
+      return {
+        format: 'webp',
+        automatic: true,
+        reason: 'photo',
+        reasonKey: 'formatReasonPhotoWebpFast',
+        lossless: false,
+      };
     }
-    return { format: 'jpeg', automatic: true, reason: 'photo', lossless: false };
+    if (modern) {
+      return {
+        format: 'avif',
+        automatic: true,
+        reason: 'photo',
+        reasonKey: intent === 'max' ? 'formatReasonPhotoAvifMax' : 'formatReasonPhotoAvif',
+        lossless: false,
+      };
+    }
+    return {
+      format: 'jpeg',
+      automatic: true,
+      reason: 'photo',
+      reasonKey: 'formatReasonPhotoJpeg',
+      lossless: false,
+    };
+  }
+
+  if (isConvert && intent === 'max') {
+    return {
+      format: 'png',
+      automatic: true,
+      reason: 'graphic',
+      reasonKey: 'formatReasonGraphicPng',
+      lossless: true,
+    };
   }
 
   if (modern) {
-    return { format: 'webp', automatic: true, reason: 'graphic', lossless: true };
+    return {
+      format: 'webp',
+      automatic: true,
+      reason: 'graphic',
+      reasonKey: 'formatReasonGraphicWebp',
+      lossless: isConvert ? false : true,
+    };
   }
 
-  return { format: 'webp', automatic: true, reason: 'graphic', lossless: false };
+  return {
+    format: 'webp',
+    automatic: true,
+    reason: 'graphic',
+    reasonKey: 'formatReasonGraphicWebp',
+    lossless: false,
+  };
 }
 
 /** AVIF quality 60 ≈ JPEG 85 visually — scale by output size. */
@@ -216,6 +349,7 @@ export function applyResize(
   });
 }
 
+/** @deprecated Use applyBackgroundFill from background-fill.ts */
 export function prepareForJpeg(pipeline: sharp.Sharp, profile: ImageContentProfile): sharp.Sharp {
   if (profile.hasTransparency || profile.hasAlpha) {
     return pipeline.flatten({ background: { r: 255, g: 255, b: 255 } });

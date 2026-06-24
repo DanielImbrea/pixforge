@@ -10,6 +10,10 @@ import {
   getReplicatePrediction,
   type ReplicatePrediction,
 } from '@/lib/ai/replicate-client';
+import { applyUpscalePostProcess } from '@/lib/ai/upscale-post-process';
+import { applyBgRemovalPostProcess } from '@/lib/ai/bg-removal-post-process';
+import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
+import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
 import { getAiProvider } from '@/lib/ai/config';
 import type { ImageJobRow, UserRow } from '@/types';
 
@@ -58,14 +62,57 @@ export async function completeAiJobFromOutputBuffer(
     throw new Error('Tool not found for job.');
   }
 
+  const upscaleRouting = (jobRow.params as Record<string, unknown> | undefined)?._upscaleRouting as
+    | UpscaleRouting
+    | undefined;
+  const bgRouting = (jobRow.params as Record<string, unknown> | undefined)?._bgRemovalRouting as
+    | BgRemovalRouting
+    | undefined;
+
+  let processedBuffer = outputBuffer;
+  if (tool.category === 'upscale' && upscaleRouting) {
+    processedBuffer = await applyUpscalePostProcess(processedBuffer, upscaleRouting.postProcess);
+  }
+  if (tool.category === 'background' && bgRouting) {
+    processedBuffer = await applyBgRemovalPostProcess(processedBuffer, bgRouting);
+  }
+
+  const deliveryMeta =
+    upscaleRouting || bgRouting
+      ? {
+          ...(upscaleRouting
+            ? {
+                contentKind: upscaleRouting.contentKind,
+                upscaleReasonKey: upscaleRouting.reasonKey,
+                upscaleWarningKey: upscaleRouting.warningKey,
+                upscaleModelLabel: upscaleRouting.modelLabel,
+                upscaleEffectiveScale: upscaleRouting.scale,
+                upscaleSmartMode: upscaleRouting.smartMode,
+              }
+            : {}),
+          ...(bgRouting
+            ? {
+                contentKind: bgRouting.subjectMode,
+                bgRemovalReasonKey: bgRouting.reasonKey,
+                bgRemovalModelLabel: bgRouting.modelLabel,
+                bgRemovalSubjectMode: bgRouting.subjectMode,
+                bgRemovalEdgeQuality: bgRouting.edgeQuality,
+                bgRemovalSmartMode: bgRouting.smartMode,
+              }
+            : {}),
+        }
+      : undefined;
+
   await finalizeJobOutput({
     userId: user.id,
     jobId: jobRow.id,
-    outputBuffer,
+    outputBuffer: processedBuffer,
     outputMimeType,
     isFreePlan: user.plan === 'free',
     toolType: tool.type,
     toolCategory: tool.category,
+    existingParams: (jobRow.params || {}) as Record<string, unknown>,
+    deliveryMeta,
   });
 
   await chargeJobOnCompletion(user, jobRow);

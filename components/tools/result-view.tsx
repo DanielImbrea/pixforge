@@ -12,6 +12,18 @@ interface ResultViewProps {
   outputSizeBytes?: number | null;
   outputFormatLabel?: string | null;
   smartFormatSelected?: boolean;
+  formatReasonKey?: string | null;
+  sizeReductionPercent?: number | null;
+  upscaleReasonKey?: string | null;
+  upscaleWarningKey?: string | null;
+  upscaleModelLabel?: string | null;
+  upscaleEffectiveScale?: 2 | 4 | null;
+  upscaleSmartMode?: boolean;
+  bgRemovalReasonKey?: string | null;
+  bgRemovalModelLabel?: string | null;
+  bgRemovalSubjectMode?: string | null;
+  bgRemovalEdgeQuality?: string | null;
+  bgRemovalSmartMode?: boolean;
   onDownload: () => void;
   onUpgradeClick: () => void;
   onReset: () => void;
@@ -34,6 +46,17 @@ export function ResultView({
   outputSizeBytes,
   outputFormatLabel,
   smartFormatSelected = false,
+  formatReasonKey,
+  sizeReductionPercent,
+  upscaleReasonKey,
+  upscaleWarningKey,
+  upscaleModelLabel,
+  upscaleEffectiveScale,
+  upscaleSmartMode = false,
+  bgRemovalReasonKey,
+  bgRemovalModelLabel,
+  bgRemovalEdgeQuality,
+  bgRemovalSmartMode = false,
   onDownload,
   onUpgradeClick,
   onReset,
@@ -67,13 +90,60 @@ export function ResultView({
         />
       </div>
 
-      {(dimensionsLabel || sizeLabel || smartFormatSelected) && (
-        <div className="text-xs text-text-tertiary text-center space-y-1">
+      {(dimensionsLabel || sizeLabel || outputFormatLabel || upscaleReasonKey || bgRemovalReasonKey) && (
+        <div className="text-xs text-text-tertiary text-center space-y-2">
           {(dimensionsLabel || sizeLabel) && (
             <p>{[dimensionsLabel, sizeLabel].filter(Boolean).join(' · ')}</p>
           )}
-          {smartFormatSelected && outputFormatLabel && (
-            <p className="text-text-secondary">{t('smartFormatBadge', { format: outputFormatLabel })}</p>
+          {outputFormatLabel && (formatReasonKey || smartFormatSelected) && (
+            <div className="rounded-md border border-border-default bg-background-secondary px-3 py-2 text-left space-y-1">
+              <p className="font-medium text-text-primary">
+                {t('formatSelected', { format: outputFormatLabel })}
+              </p>
+              {formatReasonKey && (
+                <p className="text-text-secondary">{t(formatReasonKey as 'formatReasonPhotoAvif')}</p>
+              )}
+              {sizeReductionPercent != null && sizeReductionPercent > 0 && (
+                <p className="text-success">{t('sizeReduction', { percent: sizeReductionPercent })}</p>
+              )}
+            </div>
+          )}
+          {upscaleReasonKey && (
+            <div className="rounded-md border border-border-default bg-background-secondary px-3 py-2 text-left space-y-1">
+              <p className="font-medium text-text-primary">
+                {upscaleEffectiveScale
+                  ? t('upscaleSelected', {
+                      scale: upscaleEffectiveScale,
+                      model: upscaleModelLabel || 'AI',
+                    })
+                  : t('upscaleEnhanced')}
+              </p>
+              {upscaleSmartMode && (
+                <p className="text-text-secondary">{t('upscaleSmartBadge')}</p>
+              )}
+              <p className="text-text-secondary">{t(upscaleReasonKey as 'upscaleReasonPhotoDetail')}</p>
+              {upscaleWarningKey && (
+                <p className="text-warning">{t(upscaleWarningKey as 'upscaleWarnScreenshot4x')}</p>
+              )}
+            </div>
+          )}
+          {bgRemovalReasonKey && (
+            <div className="rounded-md border border-border-default bg-background-secondary px-3 py-2 text-left space-y-1">
+              <p className="font-medium text-text-primary">
+                {bgRemovalModelLabel
+                  ? t('bgRemovalSelected', { model: bgRemovalModelLabel })
+                  : t('bgRemovalComplete')}
+              </p>
+              {bgRemovalSmartMode && (
+                <p className="text-text-secondary">{t('bgRemovalSmartBadge')}</p>
+              )}
+              <p className="text-text-secondary">{t(bgRemovalReasonKey as 'bgReasonProductCutout')}</p>
+              {bgRemovalEdgeQuality && (
+                <p className="text-text-tertiary">
+                  {t('bgEdgeQualityApplied', { quality: t(`bgEdgeQualityLabel_${bgRemovalEdgeQuality}` as 'bgEdgeQualityLabel_high') })}
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -4,12 +4,12 @@ import type { ToolDefinition } from '@/types';
 export const backgroundRemovalTool: ToolDefinition = {
   id: 'tool_background_removal',
   slug: {
-    en: 'background-removal',
+    en: 'background-remover',
     ro: 'eliminare-fundal',
   },
   name: {
-    en: 'Background Removal',
-    ro: 'Eliminare Fundal',
+    en: 'AI Subject Cutout Engine',
+    ro: 'Motor AI Decupare Subiect',
   },
   category: 'background',
   type: 'ai',
@@ -21,70 +21,92 @@ export const backgroundRemovalTool: ToolDefinition = {
     aiWebhookPath: '/api/webhooks/ai-provider',
   },
   limits: {
-    maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 100 },
+    maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 50 },
     acceptedFormats: ['image/png', 'image/jpeg', 'image/webp'],
   },
   seo: {
     translations: {
       en: {
-        title: 'Remove Image Background Online — Free AI Background Remover',
+        title: 'AI Background Remover – Remove Image Background Instantly & Get Transparent PNG',
         metaDescription:
-          'Automatically remove the background from any photo in seconds using AI. Get a transparent PNG ready for product photos, portraits, or designs.',
-        h1: 'Remove backgrounds automatically',
+          'Remove backgrounds from images instantly using AI. Get clean transparent PNGs for products, portraits and objects in seconds.',
+        h1: 'AI Background Remover',
         intro:
-          'Upload a photo and our AI detects the subject and cuts out the background, giving you a clean transparent PNG in seconds.',
+          'Upload an image and get a clean transparent PNG in seconds. Product mode, portrait mode, and object mode optimize edges for your subject type.',
+        howItWorks:
+          'Our AI detects the subject, removes the background, refines hair and fine edges with adaptive matting, and exports a transparent PNG ready to download.',
+        useCases: [
+          'E-commerce product listings and catalogs',
+          'Profile pictures and social avatars',
+          'Design assets and marketing creatives',
+        ],
+        aiExplanation: [
+          'Product mode — crisp hard edges for boxes, bottles, and merchandise',
+          'Portrait mode — hair and skin edge refinement with advanced matting',
+          'Transparent PNG export — alpha channel preserved for any background',
+        ],
         benefits: [
-          'Removes backgrounds from people, products, and objects',
-          'Outputs a transparent PNG ready to use anywhere',
+          'Pixel-perfect cutouts for products, people, and objects',
+          'Advanced AI matting preserves hair, fur, and fine edges',
+          'Clean transparent PNG ready for e-commerce and design',
           'No manual selection or masking required',
-          'Great for product listings and profile photos',
-          'Fast cloud processing, no app to install',
+          'Studio-grade edge refinement for professional output',
         ],
         faq: [
           {
-            question: 'What kinds of images work best?',
-            answer: 'Photos with a clear subject and reasonable contrast against the background give the cleanest results.',
+            question: 'Does it work on hair?',
+            answer:
+              'Yes. Portrait mode and high edge quality settings use advanced matting to preserve hair strands and soft edges naturally.',
           },
           {
-            question: 'What file format do I get back?',
-            answer: 'You receive a PNG with a transparent background, ready to layer onto any backdrop.',
+            question: 'Is it free?',
+            answer:
+              'Yes — start with the free plan (3 credits per day). Background removal costs 5 credits per image on all plans.',
           },
           {
-            question: 'Can I use this for product photography?',
-            answer: 'Yes, this is one of the most common use cases. Pro plan includes a commercial usage license.',
+            question: 'Can I use cutouts for e-commerce?',
+            answer: 'Yes — product mode is optimized for catalog photography. Pro plan includes a commercial usage license.',
           },
         ],
-        keywords: ['remove background image', 'transparent background ai', 'background remover online'],
+        keywords: ['remove background', 'remove bg online free', 'png transparent background', 'background remover'],
       },
       ro: {
-        title: 'Eliminare Fundal din Imagine Online — Eliminator Fundal AI Gratuit',
+        title: 'Eliminare Fundal AI cu Rafinare Pixel-Perfect a Marginilor',
         metaDescription:
-          'Elimină automat fundalul din orice poză în câteva secunde folosind AI. Obține un PNG transparent pregătit pentru poze de produs, portrete sau design.',
-        h1: 'Elimină fundalul automat',
+          'Extrage subiecte cu rafinare AI a marginilor. Optimizare separată pentru produse, portrete și obiecte — PNG transparent pentru e-commerce și design.',
+        h1: 'Extrage subiecte cu rafinare AI a marginilor',
         intro:
-          'Încarcă o poză și AI-ul nostru detectează subiectul și decupează fundalul, oferindu-ți un PNG transparent curat în câteva secunde.',
+          'Încarcă o imagine — motorul detectează subiectul (persoană, produs sau obiect), elimină fundalul și livrează PNG transparent cu margini curate, naturale și matting adaptiv.',
         benefits: [
-          'Elimină fundalul din poze cu persoane, produse și obiecte',
-          'Generează un PNG transparent pregătit de utilizare',
+          'Decupaje pixel-perfect pentru produse, persoane și obiecte',
+          'Matting AI avansat păstrează părul, blana și marginile fine',
+          'PNG transparent curat pentru e-commerce, design și marketing',
           'Fără selecție manuală sau mascare necesară',
-          'Ideal pentru anunțuri de produse și poze de profil',
-          'Procesare rapidă în cloud, fără aplicație de instalat',
+          'Pipeline optimizat pentru rezultate de înaltă calitate',
+          'Rafinare margini de nivel studio pentru output profesional',
         ],
         faq: [
           {
-            question: 'Ce tip de imagini funcționează cel mai bine?',
-            answer: 'Pozele cu un subiect clar și contrast bun față de fundal oferă cele mai bune rezultate.',
+            question: 'Cum diferă de eliminatoarele de fundal de bază?',
+            answer:
+              'Clasificăm imaginea și aplicăm procesare specializată — margini dure pentru produse, matting sigur pentru păr la portrete, rafinare echilibrată pentru obiecte — plus post-procesare dehalo.',
           },
           {
-            question: 'Ce format de fișier primesc înapoi?',
-            answer: 'Primești un PNG cu fundal transparent, pregătit să fie plasat pe orice fundal.',
+            question: 'Ce sunt modurile de calitate a marginilor?',
+            answer:
+              'Standard e cel mai rapid. Precizie înaltă (recomandat) adaugă rafinare alpha matting și eliminare halou. Calitate studio aplică curățarea maximă a marginilor.',
           },
           {
-            question: 'Pot folosi asta pentru fotografie de produse?',
-            answer: 'Da, aceasta este una dintre cele mai comune utilizări. Planul Pro include o licență de utilizare comercială.',
+            question: 'Pot folosi decupajele pentru e-commerce?',
+            answer: 'Da — modul produs e optimizat pentru fotografie de catalog. Planul Pro include licență comercială.',
           },
         ],
-        keywords: ['eliminare fundal imagine', 'fundal transparent ai', 'eliminator fundal online'],
+        keywords: [
+          'eliminare fundal pixel perfect',
+          'decupare subiect ai',
+          'png transparent e-commerce',
+          'eliminator fundal par',
+        ],
       },
     },
   },

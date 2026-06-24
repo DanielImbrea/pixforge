@@ -71,6 +71,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         outputFormatLabel?: string;
         smartFormatSelected?: boolean;
         contentKind?: string;
+        formatReasonKey?: string;
+        sizeReductionPercent?: number | null;
+        upscaleReasonKey?: string;
+        upscaleWarningKey?: string;
+        upscaleModelLabel?: string;
+        upscaleEffectiveScale?: 2 | 4;
+        upscaleSmartMode?: boolean;
+        bgRemovalReasonKey?: string;
+        bgRemovalModelLabel?: string;
+        bgRemovalSubjectMode?: string;
+        bgRemovalEdgeQuality?: string;
+        bgRemovalSmartMode?: boolean;
       }
     | undefined;
 
@@ -85,5 +97,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     outputFormatLabel: delivery?.outputFormatLabel,
     smartFormatSelected: delivery?.smartFormatSelected,
     contentKind: delivery?.contentKind,
+    formatReasonKey: delivery?.formatReasonKey,
+    sizeReductionPercent: delivery?.sizeReductionPercent,
+    upscaleReasonKey: delivery?.upscaleReasonKey,
+    upscaleWarningKey: delivery?.upscaleWarningKey,
+    upscaleModelLabel: delivery?.upscaleModelLabel,
+    upscaleEffectiveScale: delivery?.upscaleEffectiveScale,
+    upscaleSmartMode: delivery?.upscaleSmartMode,
+    bgRemovalReasonKey: delivery?.bgRemovalReasonKey,
+    bgRemovalModelLabel: delivery?.bgRemovalModelLabel,
+    bgRemovalSubjectMode: delivery?.bgRemovalSubjectMode,
+    bgRemovalEdgeQuality: delivery?.bgRemovalEdgeQuality,
+    bgRemovalSmartMode: delivery?.bgRemovalSmartMode,
   });
 }

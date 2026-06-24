@@ -17,5 +17,16 @@ export const resizeParamsSchema = z.object({
 });
 
 export const upscaleParamsSchema = z.object({
-  scale: z.union([z.literal(2), z.literal(4)]).default(2),
+  scale: z.union([z.literal('smart'), z.literal(2), z.literal(4)]).default('smart'),
+});
+
+export const convertParamsSchema = z.object({
+  targetFormat: z.enum(['auto', 'avif', 'webp', 'png', 'jpeg', 'jpg']).default('auto'),
+  qualityIntent: z.enum(['fast', 'balanced', 'max']).default('balanced'),
+  backgroundFill: z.enum(['white', 'black', 'blur', 'auto']).default('white'),
+});
+
+export const bgRemovalParamsSchema = z.object({
+  subjectMode: z.enum(['auto', 'product', 'portrait', 'object']).default('auto'),
+  edgeQuality: z.enum(['standard', 'high', 'studio']).default('high'),
 });

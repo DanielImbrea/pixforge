@@ -19,6 +19,18 @@ export interface FinalizeJobOutputInput {
     outputFormatLabel?: string;
     smartFormatSelected?: boolean;
     contentKind?: string;
+    formatReasonKey?: string;
+    sizeReductionPercent?: number | null;
+    upscaleReasonKey?: string;
+    upscaleWarningKey?: string;
+    upscaleModelLabel?: string;
+    upscaleEffectiveScale?: 2 | 4;
+    upscaleSmartMode?: boolean;
+    bgRemovalReasonKey?: string;
+    bgRemovalModelLabel?: string;
+    bgRemovalSubjectMode?: string;
+    bgRemovalEdgeQuality?: string;
+    bgRemovalSmartMode?: boolean;
   };
 }
 

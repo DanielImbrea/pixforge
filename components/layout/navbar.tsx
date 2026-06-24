@@ -20,6 +20,9 @@ export async function Navbar({ locale }: { locale: Locale }) {
           <Link href={`/${locale}/tools`} className="text-sm text-text-secondary hover:text-text-primary">
             {t('tools')}
           </Link>
+          <Link href={`/${locale}/blog`} className="text-sm text-text-secondary hover:text-text-primary">
+            {t('blog')}
+          </Link>
           <Link href={`/${locale}/pricing`} className="text-sm text-text-secondary hover:text-text-primary">
             {t('pricing')}
           </Link>

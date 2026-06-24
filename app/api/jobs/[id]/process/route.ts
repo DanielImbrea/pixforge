@@ -1,3 +1,5 @@
+import { applyUpscalePostProcess } from '@/lib/ai/upscale-post-process';
+import { applyBgRemovalPostProcess } from '@/lib/ai/bg-removal-post-process';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -73,14 +75,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   if (result.status === 'processing') {
+    const nextParams = {
+      ...(jobRow.params || {}),
+      ...(result.upscaleRouting ? { _upscaleRouting: result.upscaleRouting } : {}),
+      ...(result.bgRemovalRouting ? { _bgRemovalRouting: result.bgRemovalRouting } : {}),
+    };
+
     await admin
       .from('image_jobs')
-      .update({ provider_job_id: result.providerJobId || null })
+      .update({
+        provider_job_id: result.providerJobId || null,
+        params: nextParams,
+      })
       .eq('id', jobRow.id);
     return NextResponse.json({ status: 'processing' });
   }
 
-  if (!result.outputBuffer || !result.outputMimeType) {
+  let outputBuffer = result.outputBuffer;
+  if (tool.category === 'upscale' && result.upscaleRouting && outputBuffer) {
+    outputBuffer = await applyUpscalePostProcess(outputBuffer, result.upscaleRouting.postProcess);
+  }
+  if (tool.category === 'background' && result.bgRemovalRouting && outputBuffer) {
+    outputBuffer = await applyBgRemovalPostProcess(outputBuffer, result.bgRemovalRouting);
+  }
+
+  if (!outputBuffer || !result.outputMimeType) {
     await admin
       .from('image_jobs')
       .update({ status: 'failed', error_message: 'Processor returned no output.' })
@@ -92,7 +111,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const finalized = await finalizeJobOutput({
     userId: user.id,
     jobId: jobRow.id,
-    outputBuffer: result.outputBuffer,
+    outputBuffer,
     outputMimeType: result.outputMimeType,
     isFreePlan: user.plan === 'free',
     toolType: tool.type,
@@ -103,6 +122,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       outputFormatLabel: result.outputFormatLabel,
       smartFormatSelected: result.smartFormatSelected,
       contentKind: result.contentKind,
+      formatReasonKey: result.formatReasonKey,
+      sizeReductionPercent: result.sizeReductionPercent,
+      upscaleReasonKey: result.upscaleReasonKey,
+      upscaleWarningKey: result.upscaleWarningKey,
+      upscaleModelLabel: result.upscaleModelLabel,
+      upscaleEffectiveScale: result.upscaleEffectiveScale,
+      upscaleSmartMode: result.upscaleSmartMode,
+      bgRemovalReasonKey: result.bgRemovalReasonKey,
+      bgRemovalModelLabel: result.bgRemovalModelLabel,
+      bgRemovalSubjectMode: result.bgRemovalSubjectMode,
+      bgRemovalEdgeQuality: result.bgRemovalEdgeQuality,
+      bgRemovalSmartMode: result.bgRemovalSmartMode,
     },
   });
 
@@ -119,5 +150,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     outputFormatLabel: result.outputFormatLabel,
     smartFormatSelected: result.smartFormatSelected,
     contentKind: result.contentKind,
+    formatReasonKey: result.formatReasonKey,
+    sizeReductionPercent: result.sizeReductionPercent,
+    upscaleReasonKey: result.upscaleReasonKey,
+    upscaleWarningKey: result.upscaleWarningKey,
+    upscaleModelLabel: result.upscaleModelLabel,
+    upscaleEffectiveScale: result.upscaleEffectiveScale,
+    upscaleSmartMode: result.upscaleSmartMode,
+    bgRemovalReasonKey: result.bgRemovalReasonKey,
+    bgRemovalModelLabel: result.bgRemovalModelLabel,
+    bgRemovalSubjectMode: result.bgRemovalSubjectMode,
+    bgRemovalEdgeQuality: result.bgRemovalEdgeQuality,
+    bgRemovalSmartMode: result.bgRemovalSmartMode,
   });
 }

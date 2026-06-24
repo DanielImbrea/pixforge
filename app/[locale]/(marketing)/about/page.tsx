@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { Locale } from '@/i18n';
-import { SITE_URL } from '@/lib/seo/generate-metadata';
+import { generateAboutMetadata } from '@/lib/seo/generate-metadata';
 
 export async function generateMetadata({
   params,
@@ -8,11 +8,7 @@ export async function generateMetadata({
   params: Promise<{ locale: Locale }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const title = locale === 'en' ? 'About PixelForge' : 'Despre PixelForge';
-  return {
-    title,
-    alternates: { canonical: `${SITE_URL}/${locale}/about` },
-  };
+  return generateAboutMetadata(locale);
 }
 
 export default async function AboutPage({ params }: { params: Promise<{ locale: Locale }> }) {
@@ -24,16 +20,49 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
       <h1 className="text-3xl font-semibold text-text-primary mb-6">
         {isRo ? 'Despre PixelForge' : 'About PixelForge'}
       </h1>
-      <p className="text-text-secondary mb-4">
-        {isRo
-          ? 'PixelForge este o platformă de unelte foto bazate pe AI, construită pentru a face editarea rapidă, accesibilă și de calitate profesională.'
-          : 'PixelForge is a platform of AI-powered image tools, built to make editing fast, accessible, and professional quality.'}
-      </p>
-      <p className="text-text-secondary">
-        {isRo
-          ? 'Începem cu un set restrâns de unelte esențiale și extindem continuu marketplace-ul de unelte pe baza feedback-ului utilizatorilor.'
-          : 'We start with a focused set of essential tools and continuously expand the tools marketplace based on user feedback.'}
-      </p>
+
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold text-text-primary mb-3">{isRo ? 'Misiunea noastră' : 'Our mission'}</h2>
+        <p className="text-text-secondary leading-relaxed">
+          {isRo
+            ? 'PixelForge face procesarea imaginilor accesibilă oricui — fără Photoshop, fără instalări, fără curbe de învățare. Uneltele AI rulează în cloud și livrează rezultate profesionale în secunde.'
+            : 'PixelForge makes image processing accessible to everyone — no Photoshop, no installs, no learning curve. AI tools run in the cloud and deliver professional results in seconds.'}
+        </p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold text-text-primary mb-3">{isRo ? 'De ce l-am construit' : 'Why we built it'}</h2>
+        <p className="text-text-secondary leading-relaxed">
+          {isRo
+            ? 'Creatori, magazine online și echipe de marketing pierd ore în workflow-uri fragmentate — upscale într-o aplicație, eliminare fundal în alta, compresie manuală. PixelForge le aduce pe toate într-un singur loc, cu credite transparente și prețuri clare.'
+            : 'Creators, e-commerce teams, and marketers lose hours to fragmented workflows — upscale in one app, background removal in another, manual compression. PixelForge brings everything together with transparent credits and clear pricing.'}
+        </p>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold text-text-primary mb-3">{isRo ? 'Pentru cine e' : 'Who it is for'}</h2>
+        <ul className="space-y-2 text-text-secondary">
+          {(isRo
+            ? [
+                'Proprietari de magazine online care pregătesc poze de produs zilnic',
+                'Designeri freelanceri care au nevoie de upscale și decupaje rapide',
+                'Creatori de conținut care optimizează imagini pentru web și social',
+                'Echipe de marketing care scalează asset-uri vizuale fără software desktop',
+              ]
+            : [
+                'E-commerce store owners preparing product photos daily',
+                'Freelance designers needing fast upscaling and cutouts',
+                'Content creators optimizing images for web and social',
+                'Marketing teams scaling visual assets without desktop software',
+              ]
+          ).map((item) => (
+            <li key={item} className="flex items-start gap-2 text-sm">
+              <span className="text-success mt-0.5">✓</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

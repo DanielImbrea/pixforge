@@ -6,7 +6,7 @@ import { validateUploadBuffer, normalizeImageBuffer, ValidationError } from '@/l
 import { reserveCredits, QuotaExceededError, PlanRestrictedError, refundCredits } from '@/lib/billing/entitlements';
 import { uploadBufferToStorage } from '@/lib/supabase/storage';
 import { checkRateLimit, getClientIp, maybeCleanupRateLimitStore } from '@/lib/security/rate-limit';
-import { resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
+import { bgRemovalParamsSchema, resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
 import sharp from 'sharp';
 import type { ToolDefinition, UserRow } from '@/types';
 
@@ -19,7 +19,10 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
       throw new ValidationError('Width or height is required for resize.');
     }
     if (tool.category === 'upscale') {
-      return { scale: 2 };
+      return { scale: 'smart' };
+    }
+    if (tool.category === 'background') {
+      return { subjectMode: 'auto', edgeQuality: 'high' };
     }
     return {};
   }
@@ -46,6 +49,14 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
     const result = upscaleParamsSchema.safeParse(candidate);
     if (!result.success) {
       throw new ValidationError('Invalid upscale quality selected.');
+    }
+    return result.data;
+  }
+
+  if (tool.category === 'background') {
+    const result = bgRemovalParamsSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError('Invalid background removal options selected.');
     }
     return result.data;
   }

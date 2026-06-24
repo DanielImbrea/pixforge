@@ -7,13 +7,29 @@ interface BeforeAfterSliderProps {
   afterSrc: string;
   beforeLabel?: string;
   afterLabel?: string;
+  afterBackground?: 'white' | 'checkerboard';
+  afterObjectFit?: 'cover' | 'contain';
 }
+
+const CHECKERBOARD_STYLE = {
+  backgroundColor: '#ffffff',
+  backgroundImage: `
+    linear-gradient(45deg, #e4e4e7 25%, transparent 25%),
+    linear-gradient(-45deg, #e4e4e7 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e4e4e7 75%),
+    linear-gradient(-45deg, transparent 75%, #e4e4e7 75%)
+  `,
+  backgroundSize: '16px 16px',
+  backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0',
+} as const;
 
 export function BeforeAfterSlider({
   beforeSrc,
   afterSrc,
   beforeLabel = 'Before',
   afterLabel = 'After',
+  afterBackground,
+  afterObjectFit = 'cover',
 }: BeforeAfterSliderProps) {
   const [position, setPosition] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,8 +72,19 @@ export function BeforeAfterSlider({
       onPointerLeave={handlePointerUp}
       className="relative w-full aspect-video rounded-lg overflow-hidden border border-border-default select-none cursor-col-resize"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={afterSrc} alt={afterLabel} className="absolute inset-0 w-full h-full object-cover" draggable={false} />
+      <div
+        className="absolute inset-0"
+        style={afterBackground === 'checkerboard' ? CHECKERBOARD_STYLE : undefined}
+      >
+        {afterBackground === 'white' ? <div className="absolute inset-0 bg-white" /> : null}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={afterSrc}
+          alt={afterLabel}
+          className={`absolute inset-0 w-full h-full ${afterObjectFit === 'contain' ? 'object-contain p-6 md:p-10' : 'object-cover'}`}
+          draggable={false}
+        />
+      </div>
 
       <div
         className="absolute inset-0 overflow-hidden"

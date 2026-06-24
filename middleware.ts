@@ -32,7 +32,8 @@ function isGuestOnlyPath(pathname: string): boolean {
   return locales.some(
     (locale) =>
       pathname === `/${locale}/auth/login` ||
-      pathname === `/${locale}/auth/signup`
+      pathname === `/${locale}/auth/signup` ||
+      pathname === `/${locale}/auth/forgot-password`
   );
 }
 

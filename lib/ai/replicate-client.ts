@@ -4,6 +4,8 @@ import {
   getReplicateWebhookUrl,
   requireReplicateToken,
 } from '@/lib/ai/config';
+import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
+import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
 import type { ProcessResult } from '@/lib/tools/processor';
 
 const REPLICATE_API = 'https://api.replicate.com/v1';
@@ -31,6 +33,15 @@ function buildReplicateInput(
   const params = (job.params || {}) as Record<string, unknown>;
 
   if (tool.category === 'upscale') {
+    const routing = params._upscaleRouting as UpscaleRouting | undefined;
+    if (routing) {
+      return {
+        image: inputAssetUrl,
+        scale: routing.scale,
+        face_enhance: routing.faceEnhance,
+      };
+    }
+
     return {
       image: inputAssetUrl,
       scale: params.scale === 4 ? 4 : 2,
@@ -39,6 +50,16 @@ function buildReplicateInput(
   }
 
   if (tool.category === 'background') {
+    const routing = params._bgRemovalRouting as BgRemovalRouting | undefined;
+    const model = routing?.model || getReplicateModel(tool.category);
+
+    if (model.includes('rembg') && !model.includes('background-remover')) {
+      return { image: inputAssetUrl };
+    }
+    if (model.includes('birefnet')) {
+      return { image: inputAssetUrl };
+    }
+
     return {
       image: inputAssetUrl,
       format: 'png',
@@ -55,7 +76,15 @@ export async function createReplicatePrediction(
   inputAssetUrl: string
 ): Promise<{ id: string }> {
   const token = requireReplicateToken();
-  const model = getReplicateModel(tool.category);
+  const params = (job.params || {}) as Record<string, unknown>;
+  const upscaleRouting = params._upscaleRouting as UpscaleRouting | undefined;
+  const bgRouting = params._bgRemovalRouting as BgRemovalRouting | undefined;
+  const model =
+    tool.category === 'upscale' && upscaleRouting?.model
+      ? upscaleRouting.model
+      : tool.category === 'background' && bgRouting?.model
+        ? bgRouting.model
+        : getReplicateModel(tool.category);
   const { owner, name } = parseModelSlug(model);
   const webhook = getReplicateWebhookUrl(job.id);
 

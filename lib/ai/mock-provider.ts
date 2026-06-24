@@ -61,7 +61,9 @@ export async function applyMockAiTransform(
     return { buffer, mimeType: 'image/png' };
   }
 
-  const scale = params?.scale === 4 ? 4 : 2;
+  const scale =
+    (params?._upscaleRouting as { scale?: number } | undefined)?.scale ??
+    (params?.scale === 4 ? 4 : 2);
   const metadata = await sharp(inputBuffer).metadata();
   const targetWidth = Math.min((metadata.width || 512) * scale, 4000);
   const buffer = await sharp(inputBuffer)

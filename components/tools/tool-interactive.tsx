@@ -12,9 +12,109 @@ import { ImagePreview } from './image-preview';
 import { ProcessingState } from './processing-state';
 import { ResultView } from './result-view';
 import { ResizeOptions } from './resize-options';
-import { UpscaleOptions, type UpscaleOptionsValue } from './upscale-options';
+import { ConvertOptions } from './convert-options';
+import { UpscaleOptions } from './upscale-options';
+import { DEFAULT_CONVERT_PARAMS } from '@/lib/tools/convert-params';
+import { DEFAULT_UPSCALE_PARAMS } from '@/lib/tools/upscale-params';
+import { BgRemovalOptions } from './bg-removal-options';
+import { DEFAULT_BG_REMOVAL_PARAMS } from '@/lib/tools/bg-removal-params';
 import { ToolConfigureLayout, ToolLayout } from './tool-layout';
 import { buildToolParams, validateToolParams } from '@/lib/tools/validate-params';
+
+type JobResultPayload = {
+  previewUrl: string;
+  canDownloadHd: boolean;
+  outputWidth: number | null;
+  outputHeight: number | null;
+  outputSizeBytes: number | null;
+  outputFormatLabel: string | null;
+  smartFormatSelected: boolean;
+  formatReasonKey: string | null;
+  sizeReductionPercent: number | null;
+  upscaleReasonKey: string | null;
+  upscaleWarningKey: string | null;
+  upscaleModelLabel: string | null;
+  upscaleEffectiveScale: 2 | 4 | null;
+  upscaleSmartMode: boolean;
+  bgRemovalReasonKey: string | null;
+  bgRemovalModelLabel: string | null;
+  bgRemovalSubjectMode: string | null;
+  bgRemovalEdgeQuality: string | null;
+  bgRemovalSmartMode: boolean;
+};
+
+function parseJobResultPayload(data: Record<string, unknown>): JobResultPayload {
+  return {
+    previewUrl: data.previewUrl as string,
+    canDownloadHd: Boolean(data.canDownloadHd),
+    outputWidth: (data.outputWidth as number | null | undefined) ?? null,
+    outputHeight: (data.outputHeight as number | null | undefined) ?? null,
+    outputSizeBytes: (data.outputSizeBytes as number | null | undefined) ?? null,
+    outputFormatLabel: (data.outputFormatLabel as string | null | undefined) ?? null,
+    smartFormatSelected: Boolean(data.smartFormatSelected),
+    formatReasonKey: (data.formatReasonKey as string | null | undefined) ?? null,
+    sizeReductionPercent:
+      typeof data.sizeReductionPercent === 'number' ? data.sizeReductionPercent : null,
+    upscaleReasonKey: (data.upscaleReasonKey as string | null | undefined) ?? null,
+    upscaleWarningKey: (data.upscaleWarningKey as string | null | undefined) ?? null,
+    upscaleModelLabel: (data.upscaleModelLabel as string | null | undefined) ?? null,
+    upscaleEffectiveScale:
+      data.upscaleEffectiveScale === 2 || data.upscaleEffectiveScale === 4
+        ? data.upscaleEffectiveScale
+        : null,
+    upscaleSmartMode: Boolean(data.upscaleSmartMode),
+    bgRemovalReasonKey: (data.bgRemovalReasonKey as string | null | undefined) ?? null,
+    bgRemovalModelLabel: (data.bgRemovalModelLabel as string | null | undefined) ?? null,
+    bgRemovalSubjectMode: (data.bgRemovalSubjectMode as string | null | undefined) ?? null,
+    bgRemovalEdgeQuality: (data.bgRemovalEdgeQuality as string | null | undefined) ?? null,
+    bgRemovalSmartMode: Boolean(data.bgRemovalSmartMode),
+  };
+}
+
+function applyJobResultToState(
+  result: JobResultPayload,
+  setters: {
+    setPreviewUrl: (v: string) => void;
+    setCanDownloadHd: (v: boolean) => void;
+    setOutputWidth: (v: number | null) => void;
+    setOutputHeight: (v: number | null) => void;
+    setOutputSizeBytes: (v: number | null) => void;
+    setOutputFormatLabel: (v: string | null) => void;
+    setSmartFormatSelected: (v: boolean) => void;
+    setFormatReasonKey: (v: string | null) => void;
+    setSizeReductionPercent: (v: number | null) => void;
+    setUpscaleReasonKey: (v: string | null) => void;
+    setUpscaleWarningKey: (v: string | null) => void;
+    setUpscaleModelLabel: (v: string | null) => void;
+    setUpscaleEffectiveScale: (v: 2 | 4 | null) => void;
+    setUpscaleSmartMode: (v: boolean) => void;
+    setBgRemovalReasonKey: (v: string | null) => void;
+    setBgRemovalModelLabel: (v: string | null) => void;
+    setBgRemovalSubjectMode: (v: string | null) => void;
+    setBgRemovalEdgeQuality: (v: string | null) => void;
+    setBgRemovalSmartMode: (v: boolean) => void;
+  }
+) {
+  setters.setPreviewUrl(result.previewUrl);
+  setters.setCanDownloadHd(result.canDownloadHd);
+  setters.setOutputWidth(result.outputWidth);
+  setters.setOutputHeight(result.outputHeight);
+  setters.setOutputSizeBytes(result.outputSizeBytes);
+  setters.setOutputFormatLabel(result.outputFormatLabel);
+  setters.setSmartFormatSelected(result.smartFormatSelected);
+  setters.setFormatReasonKey(result.formatReasonKey);
+  setters.setSizeReductionPercent(result.sizeReductionPercent);
+  setters.setUpscaleReasonKey(result.upscaleReasonKey);
+  setters.setUpscaleWarningKey(result.upscaleWarningKey);
+  setters.setUpscaleModelLabel(result.upscaleModelLabel);
+  setters.setUpscaleEffectiveScale(result.upscaleEffectiveScale);
+  setters.setUpscaleSmartMode(result.upscaleSmartMode);
+  setters.setBgRemovalReasonKey(result.bgRemovalReasonKey);
+  setters.setBgRemovalModelLabel(result.bgRemovalModelLabel);
+  setters.setBgRemovalSubjectMode(result.bgRemovalSubjectMode);
+  setters.setBgRemovalEdgeQuality(result.bgRemovalEdgeQuality);
+  setters.setBgRemovalSmartMode(result.bgRemovalSmartMode);
+}
 
 type Stage = 'configure' | 'processing' | 'result' | 'error';
 
@@ -43,6 +143,18 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [outputSizeBytes, setOutputSizeBytes] = useState<number | null>(null);
   const [outputFormatLabel, setOutputFormatLabel] = useState<string | null>(null);
   const [smartFormatSelected, setSmartFormatSelected] = useState(false);
+  const [formatReasonKey, setFormatReasonKey] = useState<string | null>(null);
+  const [sizeReductionPercent, setSizeReductionPercent] = useState<number | null>(null);
+  const [upscaleReasonKey, setUpscaleReasonKey] = useState<string | null>(null);
+  const [upscaleWarningKey, setUpscaleWarningKey] = useState<string | null>(null);
+  const [upscaleModelLabel, setUpscaleModelLabel] = useState<string | null>(null);
+  const [upscaleEffectiveScale, setUpscaleEffectiveScale] = useState<2 | 4 | null>(null);
+  const [upscaleSmartMode, setUpscaleSmartMode] = useState(false);
+  const [bgRemovalReasonKey, setBgRemovalReasonKey] = useState<string | null>(null);
+  const [bgRemovalModelLabel, setBgRemovalModelLabel] = useState<string | null>(null);
+  const [bgRemovalSubjectMode, setBgRemovalSubjectMode] = useState<string | null>(null);
+  const [bgRemovalEdgeQuality, setBgRemovalEdgeQuality] = useState<string | null>(null);
+  const [bgRemovalSmartMode, setBgRemovalSmartMode] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [batchResults, setBatchResults] = useState<BatchResultItem[]>([]);
@@ -50,7 +162,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [resizeParams, setResizeParams] = useState<{ width?: number; height?: number }>({});
-  const [upscaleParams, setUpscaleParams] = useState<UpscaleOptionsValue>({ scale: 2 });
+  const [upscaleParams, setUpscaleParams] = useState(DEFAULT_UPSCALE_PARAMS);
+  const [convertParams, setConvertParams] = useState(DEFAULT_CONVERT_PARAMS);
+  const [bgRemovalParams, setBgRemovalParams] = useState(DEFAULT_BG_REMOVAL_PARAMS);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,7 +172,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
 
   const isResizeTool = tool.category === 'resize';
   const isUpscaleTool = tool.category === 'upscale';
-  const hasOptions = isResizeTool || isUpscaleTool;
+  const isConvertTool = tool.category === 'convert';
+  const isBackgroundTool = tool.category === 'background';
+  const hasOptions = isResizeTool || isUpscaleTool || isConvertTool || isBackgroundTool;
 
   const stopPolling = useCallback(() => {
     if (pollTimer.current) {
@@ -125,15 +241,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     (
       id: string,
       maxAttempts = 90
-    ): Promise<{
-      previewUrl: string;
-      canDownloadHd: boolean;
-      outputWidth: number | null;
-      outputHeight: number | null;
-      outputSizeBytes: number | null;
-      outputFormatLabel: string | null;
-      smartFormatSelected: boolean;
-    }> =>
+    ): Promise<JobResultPayload> =>
       new Promise((resolve, reject) => {
         let attempts = 0;
 
@@ -150,15 +258,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
             const data = await res.json();
 
             if (data.status === 'done') {
-              resolve({
-                previewUrl: data.previewUrl,
-                canDownloadHd: data.canDownloadHd,
-                outputWidth: data.outputWidth ?? null,
-                outputHeight: data.outputHeight ?? null,
-                outputSizeBytes: data.outputSizeBytes ?? null,
-                outputFormatLabel: data.outputFormatLabel ?? null,
-                smartFormatSelected: Boolean(data.smartFormatSelected),
-              });
+              resolve(parseJobResultPayload(data as Record<string, unknown>));
               return;
             }
 
@@ -217,13 +317,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       if (processData.status === 'done') {
         return {
           jobId: createdJobId,
-          previewUrl: processData.previewUrl as string,
-          canDownloadHd: processData.canDownloadHd as boolean,
-          outputWidth: (processData.outputWidth as number | null | undefined) ?? null,
-          outputHeight: (processData.outputHeight as number | null | undefined) ?? null,
-          outputSizeBytes: (processData.outputSizeBytes as number | null | undefined) ?? null,
-          outputFormatLabel: (processData.outputFormatLabel as string | null | undefined) ?? null,
-          smartFormatSelected: Boolean(processData.smartFormatSelected),
+          ...parseJobResultPayload(processData as Record<string, unknown>),
         };
       }
 
@@ -240,7 +334,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       return;
     }
 
-    const rawParams = buildToolParams(tool, resizeParams, upscaleParams);
+    const rawParams = buildToolParams(tool, resizeParams, upscaleParams, convertParams, bgRemovalParams);
     const validation = validateToolParams(tool, rawParams);
 
     if (!validation.valid) {
@@ -259,13 +353,27 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       setJobId(result.jobId);
       stopProgressSimulation();
       setProgress(100);
-      setPreviewUrl(result.previewUrl);
-      setCanDownloadHd(result.canDownloadHd);
-      setOutputWidth(result.outputWidth);
-      setOutputHeight(result.outputHeight);
-      setOutputSizeBytes(result.outputSizeBytes);
-      setOutputFormatLabel(result.outputFormatLabel);
-      setSmartFormatSelected(result.smartFormatSelected);
+      applyJobResultToState(result, {
+        setPreviewUrl,
+        setCanDownloadHd,
+        setOutputWidth,
+        setOutputHeight,
+        setOutputSizeBytes,
+        setOutputFormatLabel,
+        setSmartFormatSelected,
+        setFormatReasonKey,
+        setSizeReductionPercent,
+        setUpscaleReasonKey,
+        setUpscaleWarningKey,
+        setUpscaleModelLabel,
+        setUpscaleEffectiveScale,
+        setUpscaleSmartMode,
+        setBgRemovalReasonKey,
+        setBgRemovalModelLabel,
+        setBgRemovalSubjectMode,
+        setBgRemovalEdgeQuality,
+        setBgRemovalSmartMode,
+      });
       setStage('result');
     } catch (err) {
       stopProgressSimulation();
@@ -280,6 +388,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     tool,
     resizeParams,
     upscaleParams,
+    convertParams,
+    bgRemovalParams,
     startProgressSimulation,
     stopProgressSimulation,
     processSingleFile,
@@ -293,7 +403,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       return;
     }
 
-    const rawParams = buildToolParams(tool, resizeParams, upscaleParams);
+    const rawParams = buildToolParams(tool, resizeParams, upscaleParams, convertParams, bgRemovalParams);
     const validation = validateToolParams(tool, rawParams);
 
     if (!validation.valid) {
@@ -354,6 +464,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     tool,
     resizeParams,
     upscaleParams,
+    convertParams,
+    bgRemovalParams,
     startProgressSimulation,
     stopProgressSimulation,
     processSingleFile,
@@ -388,13 +500,27 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setOutputSizeBytes(null);
     setOutputFormatLabel(null);
     setSmartFormatSelected(false);
+    setFormatReasonKey(null);
+    setSizeReductionPercent(null);
+    setUpscaleReasonKey(null);
+    setUpscaleWarningKey(null);
+    setUpscaleModelLabel(null);
+    setUpscaleEffectiveScale(null);
+    setUpscaleSmartMode(false);
+    setBgRemovalReasonKey(null);
+    setBgRemovalModelLabel(null);
+    setBgRemovalSubjectMode(null);
+    setBgRemovalEdgeQuality(null);
+    setBgRemovalSmartMode(false);
     setErrorMessage(null);
     setValidationErrorKey(null);
     setProgress(0);
     setBatchProgress({ current: 0, total: 0 });
     setIsSubmitting(false);
     setResizeParams({});
-    setUpscaleParams({ scale: 2 });
+    setUpscaleParams(DEFAULT_UPSCALE_PARAMS);
+    setConvertParams(DEFAULT_CONVERT_PARAMS);
+    setBgRemovalParams(DEFAULT_BG_REMOVAL_PARAMS);
   }, [stopPolling, stopProgressSimulation, clearSelectedFile]);
 
   const validationMessage = validationErrorKey ? t(validationErrorKey) : null;
@@ -477,6 +603,10 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 />
               )}
               {isUpscaleTool && <UpscaleOptions value={upscaleParams} onChange={setUpscaleParams} />}
+              {isConvertTool && <ConvertOptions value={convertParams} onChange={setConvertParams} />}
+              {isBackgroundTool && (
+                <BgRemovalOptions value={bgRemovalParams} onChange={setBgRemovalParams} />
+              )}
               {!hasOptions && (
                 <div className="rounded-lg border border-border-default bg-background-secondary p-4">
                   <p className="text-sm font-medium text-text-primary">{t('readyToProcess')}</p>
@@ -487,6 +617,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 <p className="text-xs text-danger">{validationMessage}</p>
               )}
               {validationErrorKey === 'validationUpscaleInvalid' && (
+                <p className="text-xs text-danger">{validationMessage}</p>
+              )}
+              {validationErrorKey === 'validationBgRemovalInvalid' && (
                 <p className="text-xs text-danger">{validationMessage}</p>
               )}
             </>
@@ -536,6 +669,18 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               outputSizeBytes={outputSizeBytes}
               outputFormatLabel={outputFormatLabel}
               smartFormatSelected={smartFormatSelected}
+              formatReasonKey={formatReasonKey}
+              sizeReductionPercent={sizeReductionPercent}
+              upscaleReasonKey={upscaleReasonKey}
+              upscaleWarningKey={upscaleWarningKey}
+              upscaleModelLabel={upscaleModelLabel}
+              upscaleEffectiveScale={upscaleEffectiveScale}
+              upscaleSmartMode={upscaleSmartMode}
+              bgRemovalReasonKey={bgRemovalReasonKey}
+              bgRemovalModelLabel={bgRemovalModelLabel}
+              bgRemovalSubjectMode={bgRemovalSubjectMode}
+              bgRemovalEdgeQuality={bgRemovalEdgeQuality}
+              bgRemovalSmartMode={bgRemovalSmartMode}
               onDownload={() => void handleDownload()}
               onUpgradeClick={handleUpgradeClick}
               onReset={handleReset}

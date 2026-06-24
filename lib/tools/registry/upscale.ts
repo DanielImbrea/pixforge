@@ -4,12 +4,12 @@ import type { ToolDefinition } from '@/types';
 export const upscaleTool: ToolDefinition = {
   id: 'tool_upscale_ai',
   slug: {
-    en: 'image-upscaler',
+    en: 'ai-image-upscaler',
     ro: 'upscalare-poze',
   },
   name: {
-    en: 'AI Image Upscaler',
-    ro: 'Upscalare Poze cu AI',
+    en: 'AI Detail Restorer & Upscaler',
+    ro: 'Restaurare Detalii & Upscalare AI',
   },
   category: 'upscale',
   type: 'ai',
@@ -21,72 +21,92 @@ export const upscaleTool: ToolDefinition = {
     aiWebhookPath: '/api/webhooks/ai-provider',
   },
   limits: {
-    maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 100 },
+    maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 50 },
     acceptedFormats: ['image/png', 'image/jpeg', 'image/webp'],
   },
   seo: {
     translations: {
       en: {
-        title: 'AI Image Upscaler — Increase Photo Resolution Without Losing Detail',
+        title: 'AI Image Upscaler – Enhance and Upscale Images with AI up to 4x | PixelForge',
         metaDescription:
-          'Upscale low-resolution images up to 4x using AI. Restore detail and sharpness automatically, free to try online.',
-        h1: 'Upscale your images with AI',
+          'Upscale images with AI and restore missing details. Improve resolution up to 4x with smart enhancement for photos, artwork and screenshots.',
+        h1: 'AI Image Upscaler',
         intro:
-          'Our AI model analyzes your photo and intelligently fills in detail as it enlarges it, producing sharper results than traditional resizing.',
+          'Upload an image and our AI reconstructs detail, reduces noise, and sharpens edges — up to 4× resolution for photos, artwork, and screenshots.',
+        howItWorks:
+          'Upload your image, choose Smart mode or 2× / 4× scale, and our engine classifies the content type then routes to specialized AI models with adaptive post-processing.',
+        bestFor: [
+          'Blurry photos that need sharper detail',
+          'Old images and low-resolution scans',
+          'Low-resolution screenshots with small text',
+        ],
+        aiExplanation: [
+          'Detail reconstruction — synthesizes plausible texture instead of stretching pixels',
+          'Noise reduction — cleans compression artifacts during enhancement',
+          'Edge sharpening — preserves crisp lines on UI captures and artwork',
+        ],
         benefits: [
-          'Upscale up to 4x with AI-restored detail',
-          'Works well on photos, art, and screenshots',
-          'Removes common compression artifacts while upscaling',
-          'Commercial usage license included on Pro',
-          'Processed in the cloud, no software needed',
+          'AI reconstructs missing details — not just resizing pixels',
+          'Separate enhancement paths for photos, screenshots, and artwork',
+          'Smart 2× / 4× routing based on image type',
+          'Up to 4× with adaptive detail reconstruction',
+          'Processed securely in the cloud — no install required',
         ],
         faq: [
           {
-            question: 'How is AI upscaling different from regular resizing?',
+            question: 'Is 4× always better?',
             answer:
-              'Regular resizing stretches existing pixels, which can look blurry. AI upscaling generates plausible new detail, producing sharper results at larger sizes.',
+              'Not always. 4× works best on very small sources. For screenshots or already-decent photos, 2× often produces cleaner results with less artificial texture.',
           },
           {
-            question: 'How long does AI upscaling take?',
-            answer: 'Most images finish in under 30 seconds, though larger files or busy queues may take a little longer.',
+            question: 'Does it work on screenshots?',
+            answer:
+              'Yes. Screenshot mode uses edge-safe upscaling to keep text and UI elements sharp instead of blurry.',
           },
           {
-            question: 'Can I use upscaled images commercially?',
+            question: 'Can I use enhanced images commercially?',
             answer: 'Pro plan subscribers receive a commercial usage license for all processed images.',
           },
         ],
-        keywords: ['ai image upscaler', 'increase photo resolution', 'upscale image online'],
+        keywords: ['upscale image online', 'ai image upscaler', 'enhance image quality', 'image upscaler online'],
       },
       ro: {
-        title: 'Upscalare Poze cu AI — Crește Rezoluția Fără Pierdere de Detalii',
+        title: 'Upscalare AI & Restaurare Detalii — Poze, UI și Artă',
         metaDescription:
-          'Crește rezoluția imaginilor de calitate scăzută de până la 4x folosind AI. Restaurează automat detaliile și claritatea, gratuit de testat online.',
-        h1: 'Upscalează-ți imaginile cu AI',
+          'Restaurează detaliile pierdute în timpul upscalării cu AI. Rutare separată pentru fotografii, screenshot-uri și artă — până la 4× cu reconstrucție adaptivă.',
+        h1: 'Restaurează detaliile pierdute cu upscalare AI',
         intro:
-          'Modelul nostru AI analizează poza ta și completează inteligent detaliile pe măsură ce o mărește, producând rezultate mai clare decât redimensionarea clasică.',
+          'Motorul clasifică imaginea, apoi aplică enhancement specializat — recuperare detalii pentru poze, upscalare sigură pentru UI și output care păstrează liniile pentru artă.',
         benefits: [
-          'Upscalare de până la 4x cu detalii restaurate prin AI',
-          'Funcționează bine pe poze, artă și capturi de ecran',
-          'Elimină artefactele de compresie comune în timpul upscalării',
-          'Licență de utilizare comercială inclusă în planul Pro',
-          'Procesat în cloud, fără software necesar',
+          'AI reconstruiește detalii lipsă — nu doar redimensionează pixelii',
+          'Căi separate de enhancement pentru poze, screenshot-uri și artă',
+          'Moduri de protecție față/text cu rutare inteligentă 2× / 4×',
+          'Reduce artefactele de compresie în timpul enhancement-ului',
+          'Până la 4× cu reconstrucție adaptivă de detalii',
+          'Procesat securizat în cloud',
         ],
         faq: [
           {
-            question: 'Cum diferă upscalarea AI de redimensionarea obișnuită?',
+            question: 'Cum diferă enhancement-ul AI de redimensionarea obișnuită?',
             answer:
-              'Redimensionarea obișnuită întinde pixelii existenți, ceea ce poate apărea neclar. Upscalarea AI generează detalii noi plauzibile, producând rezultate mai clare la dimensiuni mai mari.',
+              'Redimensionarea clasică întinde pixelii și adaugă blur. AI-ul nostru sintetizează detalii plauzibile, reduce artefactele și aplică post-procesare adaptată conținutului.',
           },
           {
-            question: 'Cât durează upscalarea cu AI?',
-            answer: 'Majoritatea imaginilor sunt finalizate în sub 30 de secunde, dar fișierele mai mari sau cozile încărcate pot dura puțin mai mult.',
+            question: 'Ce face modul Smart?',
+            answer:
+              'Modul Smart analizează tipul imaginii și alege scala și setările optime — de exemplu 2× pentru capturi UI (protejează textul) sau 4× pentru poze mici care necesită recuperare agresivă de detalii.',
           },
           {
-            question: 'Pot folosi imaginile upscalate comercial?',
-            answer: 'Abonații planului Pro primesc o licență de utilizare comercială pentru toate imaginile procesate.',
+            question: 'Pot folosi imaginile enhance-uite comercial?',
+            answer: 'Abonații planului Pro primesc licență de utilizare comercială pentru toate imaginile procesate.',
           },
         ],
-        keywords: ['upscalare poze ai', 'creste rezolutia pozei', 'upscale imagine online'],
+        keywords: [
+          'restaurare detalii ai',
+          'upscalare poze ai',
+          'enhance rezolutie poza',
+          'upscale screenshot text',
+        ],
       },
     },
   },

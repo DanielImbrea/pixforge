@@ -1,12 +1,17 @@
 import sharp from 'sharp';
 import type { ProcessInput, ProcessResult, ToolProcessor } from '../processor';
+import { applyBackgroundFill, type BackgroundFill } from '@/lib/image/background-fill';
 import { classifyImageContent } from '@/lib/image/classify-content';
+import {
+  computeSizeReductionPercent,
+  resolveQualityForFormat,
+  type QualityIntent,
+} from '@/lib/image/quality-intent';
 import {
   applyContentAwareEncode,
   applyResize,
   computeFitInsideDimensions,
   formatLabel,
-  prepareForJpeg,
   readImageDimensions,
   selectSmartOutputFormat,
   type OutputFormat,
@@ -30,34 +35,82 @@ async function fetchAsBuffer(url: string): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
-function finalizePipeline(
-  pipeline: sharp.Sharp,
+async function encodePipeline(
+  basePipeline: sharp.Sharp,
   formatChoice: SmartFormatChoice,
   profile: Awaited<ReturnType<typeof classifyImageContent>>,
-  operation: SharpOperation,
-  outputWidth: number,
-  outputHeight: number,
-  qualityOverride?: number
-): sharp.Sharp {
-  let pipelineOut = pipeline;
+  options: {
+    operation: SharpOperation;
+    outputWidth: number;
+    outputHeight: number;
+    qualityOverride?: number;
+    qualityIntent?: QualityIntent;
+    backgroundFill?: BackgroundFill;
+    enableFallback?: boolean;
+  }
+): Promise<{ buffer: Buffer; formatChoice: SmartFormatChoice }> {
+  const formats: OutputFormat[] =
+    options.enableFallback && formatChoice.format === 'avif'
+      ? ['avif', 'webp', 'jpeg']
+      : [formatChoice.format];
 
-  if (formatChoice.format === 'jpeg') {
-    pipelineOut = prepareForJpeg(pipelineOut, profile);
+  let lastError: unknown;
+
+  for (let i = 0; i < formats.length; i += 1) {
+    const format = formats[i]!;
+    const isFallback = i > 0;
+    let choice = formatChoice;
+
+    if (isFallback) {
+      choice = {
+        format,
+        automatic: false,
+        reason: 'fallback',
+        reasonKey: format === 'webp' ? 'formatReasonFallbackWebp' : 'formatReasonFallbackJpeg',
+        lossless: false,
+      };
+    }
+
+    try {
+      let pipeline = basePipeline.clone();
+      const resolvedQuality = resolveQualityForFormat(
+        format,
+        options.qualityIntent ?? 'balanced',
+        options.outputWidth,
+        options.outputHeight,
+        choice.lossless
+      );
+      const lossless = resolvedQuality.lossless ?? choice.lossless;
+      const qualityOverride = options.qualityOverride ?? resolvedQuality.qualityOverride;
+
+      if (format === 'jpeg') {
+        pipeline = await applyBackgroundFill(pipeline, profile, options.backgroundFill ?? 'white');
+      }
+
+      pipeline = applyContentAwareEncode(pipeline, format, profile, {
+        qualityOverride,
+        operation: options.operation,
+        outputWidth: options.outputWidth,
+        outputHeight: options.outputHeight,
+        lossless,
+        qualityIntent: options.qualityIntent,
+      });
+
+      const buffer = await pipeline.toBuffer();
+      return { buffer, formatChoice: { ...choice, lossless } };
+    } catch (err) {
+      lastError = err;
+    }
   }
 
-  return applyContentAwareEncode(pipelineOut, formatChoice.format, profile, {
-    qualityOverride,
-    operation,
-    outputWidth,
-    outputHeight,
-    lossless: formatChoice.lossless,
-  });
+  throw lastError instanceof Error ? lastError : new Error('Encoding failed');
 }
 
 export const sharpProcessor: ToolProcessor = {
   async process({ job, tool, inputAssetUrl }: ProcessInput): Promise<ProcessResult> {
     try {
       const buffer = await fetchAsBuffer(inputAssetUrl);
+      const inputSizeBytes = buffer.byteLength;
       const inputMeta = await readImageDimensions(buffer);
       const profile = await classifyImageContent(buffer);
       let pipeline = sharp(buffer, { failOn: 'error' }).rotate();
@@ -74,8 +127,11 @@ export const sharpProcessor: ToolProcessor = {
 
       let formatChoice: SmartFormatChoice;
       let qualityOverride: number | undefined;
+      let qualityIntent: QualityIntent = 'balanced';
+      let backgroundFill: BackgroundFill = 'white';
       let outputWidth = inputMeta.width;
       let outputHeight = inputMeta.height;
+      let enableFallback = false;
 
       switch (operation) {
         case 'resize': {
@@ -102,14 +158,6 @@ export const sharpProcessor: ToolProcessor = {
           });
 
           formatChoice = selectSmartOutputFormat(profile, { operation: 'resize' });
-          pipeline = finalizePipeline(
-            pipeline,
-            formatChoice,
-            profile,
-            'resize',
-            outputWidth,
-            outputHeight
-          );
           break;
         }
         case 'compress': {
@@ -121,15 +169,6 @@ export const sharpProcessor: ToolProcessor = {
                 : undefined;
 
           formatChoice = selectSmartOutputFormat(profile, { operation: 'compress' });
-          pipeline = finalizePipeline(
-            pipeline,
-            formatChoice,
-            profile,
-            'compress',
-            outputWidth,
-            outputHeight,
-            qualityOverride
-          );
           break;
         }
         case 'convert': {
@@ -140,26 +179,47 @@ export const sharpProcessor: ToolProcessor = {
                 ? defaults.targetFormat
                 : 'auto';
 
+          qualityIntent =
+            params.qualityIntent === 'fast' ||
+            params.qualityIntent === 'balanced' ||
+            params.qualityIntent === 'max'
+              ? params.qualityIntent
+              : 'balanced';
+
+          backgroundFill =
+            params.backgroundFill === 'white' ||
+            params.backgroundFill === 'black' ||
+            params.backgroundFill === 'blur' ||
+            params.backgroundFill === 'auto'
+              ? params.backgroundFill
+              : 'white';
+
           formatChoice = selectSmartOutputFormat(profile, {
             userFormat: target,
             operation: 'convert',
+            qualityIntent,
           });
-          pipeline = finalizePipeline(
-            pipeline,
-            formatChoice,
-            profile,
-            'convert',
-            outputWidth,
-            outputHeight
-          );
+          enableFallback = target === 'auto' && formatChoice.format === 'avif';
           break;
         }
         default:
           return { status: 'failed', error: 'Unknown sharp operation configured for this tool.' };
       }
 
-      const outputBuffer = await pipeline.toBuffer();
+      const encoded = await encodePipeline(pipeline, formatChoice, profile, {
+        operation,
+        outputWidth,
+        outputHeight,
+        qualityOverride,
+        qualityIntent,
+        backgroundFill,
+        enableFallback,
+      });
+
+      formatChoice = encoded.formatChoice;
+      const outputBuffer = encoded.buffer;
       const outputMeta = await readImageDimensions(outputBuffer);
+      const sizeReductionPercent = computeSizeReductionPercent(inputSizeBytes, outputBuffer.byteLength);
 
       return {
         status: 'done',
@@ -172,6 +232,9 @@ export const sharpProcessor: ToolProcessor = {
         outputFormatLabel: formatLabel(formatChoice.format, formatChoice.lossless),
         smartFormatSelected: formatChoice.automatic,
         contentKind: profile.kind,
+        formatReasonKey: formatChoice.reasonKey,
+        sizeReductionPercent,
+        inputSizeBytes,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown processing error';

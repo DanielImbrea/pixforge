@@ -3,16 +3,17 @@ import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import type { Metadata } from 'next';
 import type { Locale } from '@/i18n';
-import { getEnabledTools } from '@/lib/tools/registry';
-import { PLAN_LIMITS, PLAN_ORDER, formatPlanPrice } from '@/lib/billing/plans';
 import { getCurrentUser } from '@/lib/supabase/server';
-import { ToolCard } from '@/components/marketplace/tool-card';
-import { BeforeAfterSlider } from '@/components/marketplace/before-after-slider';
+import { LandingDemoShowcase } from '@/components/marketplace/landing-demo-showcase';
+import { LandingKeywordStrip, LandingPopularTools } from '@/components/marketplace/landing-popular-tools';
+import { LandingToolGroups } from '@/components/marketplace/landing-tool-groups';
+import { LandingWhy } from '@/components/marketplace/landing-why';
+import { LandingPricingPreview } from '@/components/marketplace/landing-pricing-preview';
 import { SocialProof } from '@/components/marketplace/social-proof';
 import { LandingFaq } from '@/components/marketplace/landing-faq';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { generateHomeMetadata } from '@/lib/seo/generate-metadata';
+import { generateHomeJsonLd } from '@/lib/seo/jsonld';
 
 export async function generateMetadata({
   params,
@@ -23,37 +24,46 @@ export async function generateMetadata({
   return generateHomeMetadata(locale);
 }
 
-const TESTIMONIALS_BY_LOCALE: Record<Locale, { quote: string; author: string; role: string }[]> = {
+const TESTIMONIALS_BY_LOCALE: Record<
+  Locale,
+  { quote: string; author: string; role: string; metric: string }[]
+> = {
   en: [
     {
-      quote: 'Cut our product photo prep time from an hour to a few minutes.',
+      metric: 'Saved ~2 hours/day on product photos',
+      quote: 'Cut our product photo prep from an hour to a few minutes. Background removal plus compress is our daily workflow.',
       author: 'Maria T.',
       role: 'E-commerce store owner',
     },
     {
-      quote: 'The upscaler saved a batch of low-res client photos we thought were unusable.',
+      metric: 'Rescued 120+ low-res client photos',
+      quote: 'The AI upscaler restored sharpness and texture on photos we thought were unusable for print.',
       author: 'Daniel R.',
       role: 'Freelance designer',
     },
     {
-      quote: 'Simple, fast, and the free tier is genuinely useful, not just a teaser.',
+      metric: '92% smaller files, same visual quality',
+      quote: 'Smart format conversion and compression keep our blog fast without a manual Photoshop step.',
       author: 'Ana P.',
       role: 'Content creator',
     },
   ],
   ro: [
     {
-      quote: 'Ne-a redus timpul de pregătire a pozelor de produs de la o oră la câteva minute.',
+      metric: 'Economisește ~2 ore/zi la poze de produs',
+      quote: 'Ne-a redus pregătirea pozelor de la o oră la câteva minute. Eliminare fundal + compresie e rutina zilnică.',
       author: 'Maria T.',
       role: 'Proprietar magazin online',
     },
     {
-      quote: 'Upscalerul a salvat un lot de poze de la clienți pe care le credeam inutilizabile.',
+      metric: '120+ poze low-res salvate pentru clienți',
+      quote: 'Upscalerul AI a restaurat claritatea și textura pozelor pe care le credeam inutilizabile la print.',
       author: 'Daniel R.',
       role: 'Designer freelancer',
     },
     {
-      quote: 'Simplu, rapid, iar planul gratuit este cu adevărat util, nu doar un teaser.',
+      metric: 'Fișiere cu 92% mai mici, aceeași calitate vizuală',
+      quote: 'Conversia inteligentă de format și compresia țin blogul rapid fără pas manual în Photoshop.',
       author: 'Ana P.',
       role: 'Creator de conținut',
     },
@@ -63,38 +73,42 @@ const TESTIMONIALS_BY_LOCALE: Record<Locale, { quote: string; author: string; ro
 const LANDING_FAQ_BY_LOCALE: Record<Locale, { question: string; answer: string }[]> = {
   en: [
     {
-      question: 'Do I need to install anything?',
-      answer: 'No, every tool runs entirely in your browser tab. Nothing to download or install.',
+      question: 'What is PixelForge?',
+      answer:
+        'PixelForge is an all-in-one AI image toolkit. Upscale, remove backgrounds, compress, convert, and resize images in your browser — no software install required.',
     },
     {
-      question: 'Is the free plan really free?',
-      answer: 'Yes. You get 3 processes per day with no credit card required, forever.',
+      question: 'Is it free?',
+      answer:
+        'Yes — start with the free plan (3 credits per day, no card required). Upgrade when you need more volume, watermark-free downloads, or batch features.',
     },
     {
-      question: 'Can I cancel anytime?',
-      answer: 'Yes, manage or cancel your subscription anytime from the billing page.',
+      question: 'Do I need installation?',
+      answer: 'No. Upload in your browser, we process in the cloud, and you download the result in seconds.',
     },
     {
-      question: 'Do you support batch processing?',
-      answer: 'Batch processing is available on the Pro plan.',
+      question: 'How do credits work?',
+      answer: 'Sharp tools (resize, compress, convert) cost 1 credit each. AI upscale and background removal cost 5 credits each.',
     },
   ],
   ro: [
     {
+      question: 'Ce este PixelForge?',
+      answer:
+        'PixelForge e un toolkit AI all-in-one pentru imagini. Upscale, eliminare fundal, compresie, conversie și redimensionare în browser — fără instalare.',
+    },
+    {
+      question: 'E gratuit?',
+      answer:
+        'Da — planul gratuit oferă 3 credite/zi, fără card. Fă upgrade când ai nevoie de volum mai mare sau descărcări fără watermark.',
+    },
+    {
       question: 'Trebuie să instalez ceva?',
-      answer: 'Nu, fiecare unealtă rulează complet în browser. Nimic de descărcat sau instalat.',
+      answer: 'Nu. Încarci în browser, procesăm în cloud și descarci rezultatul în câteva secunde.',
     },
     {
-      question: 'Planul gratuit este cu adevărat gratuit?',
-      answer: 'Da. Primești 3 procesări pe zi fără card bancar, pe termen nelimitat.',
-    },
-    {
-      question: 'Pot anula oricând?',
-      answer: 'Da, gestionează sau anulează abonamentul oricând din pagina de facturare.',
-    },
-    {
-      question: 'Susțineți procesare în lot?',
-      answer: 'Procesarea în lot este disponibilă pe planul Pro.',
+      question: 'Cum funcționează creditele?',
+      answer: 'Uneltele Sharp (resize, compress, convert) costă 1 credit fiecare. Upscale AI și eliminare fundal costă 5 credite fiecare.',
     },
   ],
 };
@@ -108,111 +122,65 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
   }
 
   const t = await getTranslations({ locale, namespace: 'home' });
-  const tPricing = await getTranslations({ locale, namespace: 'pricing' });
-  const tools = getEnabledTools();
   const testimonials = TESTIMONIALS_BY_LOCALE[locale];
   const faqItems = LANDING_FAQ_BY_LOCALE[locale];
+  const homeJsonLd = generateHomeJsonLd(locale);
 
   return (
-    <div>
-      <section className="max-w-4xl mx-auto px-6 py-24 text-center">
-        <h1 className="text-4xl md:text-5xl font-semibold text-text-primary mb-4">{t('heroTitle')}</h1>
-        <p className="text-lg text-text-secondary mb-8">{t('heroSubtitle')}</p>
-        <div className="flex items-center justify-center gap-3">
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }} />
+      <div>
+      <section className="max-w-5xl mx-auto px-6 py-20 md:py-28 text-center">
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent mb-4">{t('heroEyebrow')}</p>
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-text-primary mb-5 text-balance">
+          {t('heroTitle')}
+        </h1>
+        <p className="text-lg md:text-xl text-text-secondary mb-6 max-w-3xl mx-auto text-balance">
+          {t('heroSubtitle')}
+        </p>
+        <LandingKeywordStrip locale={locale} />
+        <p className="text-sm text-text-tertiary mb-8">{t('heroProof')}</p>
+        <div className="flex flex-col items-center justify-center gap-4">
           <Link href={`/${locale}/auth/signup`}>
-            <Button size="lg">{t('ctaPrimary')}</Button>
-          </Link>
-          <Link href={`/${locale}/tools`}>
-            <Button variant="secondary" size="lg">
-              {t('ctaSecondary')}
+            <Button size="lg" className="min-w-[200px] shadow-sm">
+              {t('ctaPrimary')}
             </Button>
+          </Link>
+          <Link
+            href={`/${locale}/tools`}
+            className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+          >
+            {t('ctaSecondary')}
           </Link>
         </div>
       </section>
 
-      <section className="max-w-3xl mx-auto px-6 py-16">
-        <h2 className="text-2xl font-semibold text-text-primary mb-6 text-center">
-          {locale === 'ro' ? 'Vezi rezultatul' : 'See the result'}
-        </h2>
-        <BeforeAfterSlider
-          beforeSrc="https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=800&q=40&blur=40"
-          afterSrc="https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=1600&q=90"
-          beforeLabel={locale === 'ro' ? 'Înainte' : 'Before'}
-          afterLabel={locale === 'ro' ? 'După' : 'After'}
-        />
+      <section className="max-w-4xl mx-auto px-6 pb-8">
+        <h2 className="text-2xl font-semibold text-text-primary mb-2 text-center">{t('demoHeading')}</h2>
+        <p className="text-sm text-text-secondary mb-8 text-center max-w-2xl mx-auto">{t('demoSubheading')}</p>
+        <LandingDemoShowcase />
+      </section>
+
+      <LandingPopularTools locale={locale} />
+
+      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl md:text-3xl font-semibold text-text-primary mb-3">{t('toolsHeading')}</h2>
+          <p className="text-text-secondary max-w-2xl mx-auto">{t('toolsSubheading')}</p>
+        </div>
+        <LandingToolGroups locale={locale} />
       </section>
 
       <section className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="text-2xl font-semibold text-text-primary mb-8 text-center">{t('toolsHeading')}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {tools.map((tool) => (
-            <ToolCard key={tool.id} tool={tool} locale={locale} />
-          ))}
-        </div>
-      </section>
-
-      <section className="max-w-4xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-        {[
-          {
-            title: locale === 'ro' ? 'Rapid' : 'Fast',
-            body:
-              locale === 'ro'
-                ? 'Procesare în câteva secunde, fără cozi de așteptare lungi.'
-                : 'Processing finishes in seconds, no long waiting queues.',
-          },
-          {
-            title: locale === 'ro' ? 'Calitate' : 'Quality',
-            body:
-              locale === 'ro'
-                ? 'Algoritmi optimizați care păstrează detaliile imaginii.'
-                : 'Optimized algorithms that preserve image detail.',
-          },
-          {
-            title: locale === 'ro' ? 'Simplitate' : 'Simplicity',
-            body:
-              locale === 'ro'
-                ? 'Fără curbă de învățare, încarcă și descarcă.'
-                : 'No learning curve, just upload and download.',
-          },
-        ].map((b) => (
-          <div key={b.title}>
-            <p className="font-medium text-text-primary mb-2">{b.title}</p>
-            <p className="text-sm text-text-secondary">{b.body}</p>
-          </div>
-        ))}
+        <LandingWhy locale={locale} />
       </section>
 
       <section className="max-w-5xl mx-auto px-6 py-16">
-        <h2 className="text-2xl font-semibold text-text-primary mb-8 text-center">{tPricing('heading')}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-          {PLAN_ORDER.map((tier) => {
-            const config = PLAN_LIMITS[tier];
-            return (
-              <Card key={tier}>
-                <h3 className="text-lg font-medium text-text-primary mb-1">{tPricing(tier)}</h3>
-                <p className="text-2xl font-semibold text-text-primary mb-4">
-                  {formatPlanPrice(config, locale)}
-                  {config.price.amount > 0 && (
-                    <span className="text-sm text-text-tertiary">{tPricing('perMonth')}</span>
-                  )}
-                </p>
-                <p className="text-sm text-text-secondary">
-                  {config.periodType === 'daily'
-                    ? tPricing('creditsPerDay', { count: config.creditsPerPeriod })
-                    : tPricing('creditsPerMonth', { count: config.creditsPerPeriod })}
-                </p>
-              </Card>
-            );
-          })}
-        </div>
-        <div className="text-center mt-8">
-          <Link href={`/${locale}/pricing`}>
-            <Button variant="secondary">{tPricing('heading')}</Button>
-          </Link>
-        </div>
+        <LandingPricingPreview locale={locale} />
       </section>
 
       <section className="max-w-6xl mx-auto px-6 py-16">
+        <h2 className="text-2xl font-semibold text-text-primary mb-8 text-center">{t('socialProofHeading')}</h2>
         <SocialProof testimonials={testimonials} />
       </section>
 
@@ -221,12 +189,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         <LandingFaq items={faqItems} />
       </section>
 
-      <section className="max-w-3xl mx-auto px-6 py-24 text-center">
-        <h2 className="text-3xl font-semibold text-text-primary mb-4">{t('heroTitle')}</h2>
+      <section className="max-w-3xl mx-auto px-6 py-24 text-center border-t border-border-default">
+        <h2 className="text-3xl font-semibold text-text-primary mb-3 text-balance">{t('finalCtaTitle')}</h2>
+        <p className="text-text-secondary mb-8">{t('finalCtaSubtitle')}</p>
         <Link href={`/${locale}/auth/signup`}>
           <Button size="lg">{t('ctaPrimary')}</Button>
         </Link>
       </section>
     </div>
+    </>
   );
 }

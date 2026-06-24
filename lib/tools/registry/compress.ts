@@ -22,41 +22,44 @@ export const compressTool: ToolDefinition = {
     },
   },
   limits: {
-    maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 100 },
+    maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 50 },
     acceptedFormats: ['image/png', 'image/jpeg', 'image/webp', 'image/avif'],
   },
   seo: {
     translations: {
       en: {
-        title: 'Compress Images Online — Reduce File Size Without Losing Quality',
+        title: 'Image Compressor Online – Reduce Image Size Without Losing Quality | PixelForge',
         metaDescription:
-          'Shrink JPG, PNG, and WEBP file sizes in seconds while keeping visual quality high. Free online image compressor, no signup required.',
-        h1: 'Compress your images',
+          'Compress images instantly with smart AI optimization. Reduce file size for JPG, PNG and WebP while preserving quality.',
+        h1: 'Image Compressor Online',
         intro:
-          'Drop in a photo and we will shrink its file size using smart compression that picks the best format and quality for your image type.',
+          'Drop in a photo and we shrink file size with smart compression — auto-selecting the best format and quality for photos, screenshots, and graphics.',
+        howItWorks:
+          'Upload your image. Our engine classifies the content, picks the optimal format (AVIF for photos, lossless WebP for UI), and applies adaptive quality settings to minimize file size.',
         benefits: [
-          'Detects photos vs screenshots and picks the best format automatically',
-          'Photos → AVIF (smaller than JPEG at equal visual quality)',
-          'UI/screenshots → lossless WebP (no text blur)',
-          'Quality scales with image size — not one-size-fits-all',
-          'Free tier available for everyday use',
+          'Smart compression — format auto selection based on image type',
+          'Photos → AVIF for maximum size savings at equal visual quality',
+          'UI/screenshots → lossless WebP to preserve sharp text',
+          'Before/after file size shown on every result',
+          'Free tier available — no installation required',
         ],
         faq: [
           {
-            question: 'How much smaller will my file get?',
+            question: 'Will quality be reduced?',
             answer:
-              'Typical photos shrink 40 to 70 percent depending on content and starting quality, with little visible difference at normal viewing sizes.',
+              'Compression always trades some data for size, but smart routing keeps changes invisible at normal viewing sizes. Photos tolerate more compression than screenshots with small text.',
+          },
+          {
+            question: 'Best format for web?',
+            answer:
+              'AVIF for photos, WebP (often lossless) for UI and graphics, PNG when you need transparency. Our tool picks automatically.',
           },
           {
             question: 'Does compression change image dimensions?',
-            answer: 'No, compression only reduces file size. Use our resize tool if you also need different dimensions.',
-          },
-          {
-            question: 'Can I compress PNG files?',
-            answer: 'Yes, PNG, JPG, and WEBP are all supported.',
+            answer: 'No, compression only reduces file size. Use our Image Resizer if you also need different dimensions.',
           },
         ],
-        keywords: ['compress image', 'reduce image file size', 'image compressor online'],
+        keywords: ['image compressor online', 'reduce image size', 'compress jpg png', 'compress image'],
       },
       ro: {
         title: 'Compresie Poze Online — Reduce Dimensiunea Fără Pierdere de Calitate',

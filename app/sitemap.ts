@@ -1,10 +1,11 @@
 import type { MetadataRoute } from 'next';
 import { locales } from '@/i18n';
 import { TOOL_REGISTRY } from '@/lib/tools/registry';
-import { SITE_URL } from '@/lib/seo/generate-metadata';
+import { SITE_URL } from '@/lib/seo/constants';
+import { BLOG_POSTS } from '@/lib/content/blog-posts';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const staticPaths = ['', '/pricing', '/tools', '/about'];
+  const staticPaths = ['', '/pricing', '/tools', '/about', '/blog'];
 
   const staticEntries: MetadataRoute.Sitemap = staticPaths.flatMap((path) =>
     locales.map((locale) => ({
@@ -24,5 +25,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }))
   );
 
-  return [...staticEntries, ...toolEntries];
+  const blogEntries: MetadataRoute.Sitemap = BLOG_POSTS.flatMap((post) =>
+    locales.map((locale) => ({
+      url: `${SITE_URL}/${locale}/blog/${post.slug}`,
+      lastModified: new Date(post.publishedAt),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    }))
+  );
+
+  return [...staticEntries, ...toolEntries, ...blogEntries];
 }

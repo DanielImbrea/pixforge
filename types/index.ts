@@ -19,6 +19,10 @@ export interface ToolSeoTranslation {
   benefits: string[];
   faq: FaqItem[];
   keywords: string[];
+  howItWorks?: string;
+  bestFor?: string[];
+  useCases?: string[];
+  aiExplanation?: string[];
 }
 
 export interface ToolSEOConfig {

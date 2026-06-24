@@ -1,5 +1,8 @@
 import type { ToolDefinition } from '@/types';
-import { resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
+import { convertParamsSchema, bgRemovalParamsSchema, resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
+import { DEFAULT_BG_REMOVAL_PARAMS, type BgRemovalParams } from '@/lib/tools/bg-removal-params';
+import { DEFAULT_CONVERT_PARAMS, type ConvertParams } from '@/lib/tools/convert-params';
+import { DEFAULT_UPSCALE_PARAMS, type UpscaleParams } from '@/lib/tools/upscale-params';
 
 export interface ToolParamsValidation {
   valid: boolean;
@@ -30,19 +33,58 @@ export function validateToolParams(
     return { valid: true, params: result.data };
   }
 
+  if (tool.category === 'convert') {
+    const result = convertParamsSchema.safeParse(raw);
+    if (!result.success) {
+      return { valid: false, params: {}, errorKey: 'validationConvertInvalid' };
+    }
+    const targetFormat = result.data.targetFormat === 'jpg' ? 'jpeg' : result.data.targetFormat;
+    return {
+      valid: true,
+      params: {
+        targetFormat,
+        qualityIntent: result.data.qualityIntent,
+        backgroundFill: result.data.backgroundFill,
+      },
+    };
+  }
+
+  if (tool.category === 'background') {
+    const result = bgRemovalParamsSchema.safeParse(raw);
+    if (!result.success) {
+      return { valid: false, params: {}, errorKey: 'validationBgRemovalInvalid' };
+    }
+    return { valid: true, params: result.data };
+  }
+
   return { valid: true, params: {} };
 }
 
 export function buildToolParams(
   tool: ToolDefinition,
   resizeParams: { width?: number; height?: number },
-  upscaleParams: { scale: number }
+  upscaleParams: UpscaleParams = DEFAULT_UPSCALE_PARAMS,
+  convertParams: ConvertParams = DEFAULT_CONVERT_PARAMS,
+  bgRemovalParams: BgRemovalParams = DEFAULT_BG_REMOVAL_PARAMS
 ): Record<string, unknown> {
   if (tool.category === 'resize') {
     return { width: resizeParams.width, height: resizeParams.height };
   }
   if (tool.category === 'upscale') {
     return { scale: upscaleParams.scale };
+  }
+  if (tool.category === 'convert') {
+    return {
+      targetFormat: convertParams.targetFormat,
+      qualityIntent: convertParams.qualityIntent,
+      backgroundFill: convertParams.backgroundFill,
+    };
+  }
+  if (tool.category === 'background') {
+    return {
+      subjectMode: bgRemovalParams.subjectMode,
+      edgeQuality: bgRemovalParams.edgeQuality,
+    };
   }
   return {};
 }

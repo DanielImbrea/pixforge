@@ -33,6 +33,11 @@ export async function Footer({ locale }: { locale: Locale }) {
           <p className="text-sm font-medium text-text-primary mb-3">{t('company')}</p>
           <ul className="space-y-2">
             <li>
+              <Link href={`/${locale}/blog`} className="text-sm text-text-secondary hover:text-text-primary">
+                {t('blog')}
+              </Link>
+            </li>
+            <li>
               <Link href={`/${locale}/pricing`} className="text-sm text-text-secondary hover:text-text-primary">
                 {t('pricing')}
               </Link>

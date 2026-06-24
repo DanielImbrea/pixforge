@@ -39,8 +39,8 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
   basic: {
     tier: 'basic',
     price: { amount: 1.9, currency: 'EUR' },
-    creditsPerPeriod: 3,
-    periodType: 'daily',
+    creditsPerPeriod: 100,
+    periodType: 'monthly',
     maxUploadMB: 10,
     watermark: false,
     hdDownloads: false,
@@ -63,9 +63,9 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
   pro: {
     tier: 'pro',
     price: { amount: 9.99, currency: 'EUR' },
-    creditsPerPeriod: 1000,
+    creditsPerPeriod: 700,
     periodType: 'monthly',
-    maxUploadMB: 100,
+    maxUploadMB: 50,
     watermark: false,
     hdDownloads: true,
     batchProcessing: true,

@@ -1,7 +1,18 @@
+import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import type { Locale } from '@/i18n';
 import { getEnabledTools } from '@/lib/tools/registry';
 import { ToolCard } from '@/components/marketplace/tool-card';
+import { generateToolsIndexMetadata } from '@/lib/seo/generate-metadata';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  return generateToolsIndexMetadata(locale);
+}
 
 export default async function ToolsOverviewPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;

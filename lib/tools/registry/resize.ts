@@ -23,48 +23,44 @@ export const resizeTool: ToolDefinition = {
     },
   },
   limits: {
-    maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 100 },
+    maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 50 },
     acceptedFormats: ['image/png', 'image/jpeg', 'image/webp', 'image/avif'],
     maxDimensionPx: 8000,
   },
   seo: {
     translations: {
       en: {
-        title: 'Free Online Image Resizer — Resize Photos in Seconds',
+        title: 'Image Resizer – Resize Images Without Losing Quality',
         metaDescription:
-          'Resize any image to exact pixel dimensions directly in your browser. Fast, free, no software needed. Supports PNG, JPG, WEBP, and AVIF.',
-        h1: 'Resize your images instantly',
+          'Resize images to exact dimensions while preserving quality. Perfect for social media, web and print.',
+        h1: 'Image Resizer',
         intro:
-          'Upload a photo and set the exact width and height you need. Our resizer preserves quality while fitting your image to any dimension, perfect for web, social media, or print.',
+          'Upload a photo and set exact width and height. Aspect ratio preservation and high-quality resampling keep your image sharp for web, social, and print.',
+        howItWorks:
+          'Upload your image, enter target dimensions or choose a preset, and download the resized file. Lanczos3 resampling preserves clarity when downscaling.',
         benefits: [
-          'Resize to exact pixel dimensions in one click',
-          'Keeps your original aspect ratio if you want it',
-          'Works with PNG, JPG, WEBP, and AVIF',
-          'No installation, runs entirely in your browser tab',
-          'Free tier available, no credit card required',
+          'Aspect ratio preservation — lock proportions or set exact pixels',
+          'Social media presets for common platform sizes',
+          'Works with PNG, JPG, WebP, and AVIF',
+          'High-quality downscaling without visible blur',
+          'Free tier available — no installation required',
         ],
         faq: [
           {
             question: 'Will resizing reduce my image quality?',
             answer:
-              'Downscaling keeps clarity when target dimensions are reasonable. We use Lanczos3 resampling and high-fidelity encoding. To enlarge beyond the original, use our AI Upscaler.',
+              'Downscaling keeps clarity when target dimensions are reasonable. To enlarge beyond the original, use our AI Image Upscaler.',
           },
           {
             question: 'What file formats can I resize?',
-            answer: 'You can upload PNG, JPG, WEBP, or AVIF files and export to any of those formats.',
+            answer: 'You can upload PNG, JPG, WebP, or AVIF files and export to any of those formats.',
           },
           {
-            question: 'Is there a file size limit?',
-            answer:
-              'Free accounts can resize files up to 10MB. Starter and Pro plans raise that limit to 25MB and 100MB respectively.',
-          },
-          {
-            question: 'Do you store my uploaded images?',
-            answer:
-              'Uploaded originals are automatically deleted within 24 hours of processing. Processed results follow your plan retention policy.',
+            question: 'Is batch resizing available?',
+            answer: 'Batch resizing is coming soon on Starter and Pro plans. Single-image resize is available on all plans today.',
           },
         ],
-        keywords: ['image resizer', 'resize photo online', 'resize image pixels'],
+        keywords: ['resize image online', 'change image dimensions', 'image resizer', 'resize photo online'],
       },
       ro: {
         title: 'Redimensionare Poze Online Gratuit — Schimbă Dimensiunea în Secunde',
@@ -93,7 +89,7 @@ export const resizeTool: ToolDefinition = {
           {
             question: 'Există o limită de mărime a fișierului?',
             answer:
-              'Conturile gratuite pot redimensiona fișiere de până la 10MB. Planurile Starter și Pro ridică limita la 25MB și 100MB.',
+              'Conturile gratuite pot redimensiona fișiere de până la 10MB. Planurile Starter și Pro ridică limita la 25MB și 50MB.',
           },
           {
             question: 'Stocați imaginile încărcate?',

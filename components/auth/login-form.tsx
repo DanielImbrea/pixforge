@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -15,6 +16,7 @@ export function LoginForm({ locale }: { locale: string }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const resetSuccess = searchParams.get('reset') === 'success';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -38,12 +40,25 @@ export function LoginForm({ locale }: { locale: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-sm">
+      {resetSuccess && (
+        <p className="text-sm text-success rounded-md border border-success/30 bg-success/5 px-3 py-2">
+          {t('resetPasswordSuccess')}
+        </p>
+      )}
       <div>
         <label className="text-sm text-text-secondary mb-1 block">{t('email')}</label>
         <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </div>
       <div>
-        <label className="text-sm text-text-secondary mb-1 block">{t('password')}</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm text-text-secondary">{t('password')}</label>
+          <Link
+            href={`/${locale}/auth/forgot-password`}
+            className="text-xs text-accent hover:text-[color:var(--accent-hover)] transition-colors"
+          >
+            {t('forgotPasswordLink')}
+          </Link>
+        </div>
         <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </div>
       {error && <p className="text-sm text-danger">{error}</p>}
