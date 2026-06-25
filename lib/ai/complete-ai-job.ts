@@ -11,7 +11,8 @@ import {
   type ReplicatePrediction,
 } from '@/lib/ai/replicate-client';
 import { applyUpscalePostProcess } from '@/lib/ai/upscale-post-process';
-import { applyBgRemovalPostProcess } from '@/lib/ai/bg-removal-post-process';
+import { finalizeBgRemovalOutput } from '@/lib/ai/bg-removal-post-process';
+import { fetchJobInputBuffer } from '@/lib/ai/fetch-job-input';
 import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
 import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
 import { getAiProvider } from '@/lib/ai/config';
@@ -70,11 +71,26 @@ export async function completeAiJobFromOutputBuffer(
     | undefined;
 
   let processedBuffer = outputBuffer;
+  let bgShadowRecoveryApplied = false;
   if (tool.category === 'upscale' && upscaleRouting) {
     processedBuffer = await applyUpscalePostProcess(processedBuffer, upscaleRouting.postProcess);
   }
   if (tool.category === 'background' && bgRouting) {
-    processedBuffer = await applyBgRemovalPostProcess(processedBuffer, bgRouting);
+    const shadowRecovery = Boolean((jobRow.params as Record<string, unknown> | undefined)?.shadowRecovery);
+    let originalBuffer: Buffer | undefined;
+    if (shadowRecovery) {
+      try {
+        originalBuffer = await fetchJobInputBuffer(jobRow);
+      } catch (err) {
+        console.warn(`[ai-job] shadow recovery skipped job=${jobId}`, err);
+      }
+    }
+    const finalized = await finalizeBgRemovalOutput(processedBuffer, bgRouting, {
+      shadowRecovery,
+      originalBuffer,
+    });
+    processedBuffer = finalized.buffer;
+    bgShadowRecoveryApplied = finalized.shadowRecoveryApplied;
   }
 
   const deliveryMeta =
@@ -98,6 +114,7 @@ export async function completeAiJobFromOutputBuffer(
                 bgRemovalSubjectMode: bgRouting.subjectMode,
                 bgRemovalEdgeQuality: bgRouting.edgeQuality,
                 bgRemovalSmartMode: bgRouting.smartMode,
+                bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
               }
             : {}),
         }

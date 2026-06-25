@@ -8,8 +8,8 @@ export const backgroundRemovalTool: ToolDefinition = {
     ro: 'eliminare-fundal',
   },
   name: {
-    en: 'AI Subject Cutout Engine',
-    ro: 'Motor AI Decupare Subiect',
+    en: 'Background Remover AI',
+    ro: 'Elimină fundalul cu AI',
   },
   category: 'background',
   type: 'ai',
@@ -27,12 +27,12 @@ export const backgroundRemovalTool: ToolDefinition = {
   seo: {
     translations: {
       en: {
-        title: 'AI Background Remover – Remove Image Background Instantly & Get Transparent PNG',
+        title: 'Background Remover AI – Remove Background & Get Transparent PNG',
         metaDescription:
-          'Remove backgrounds from images instantly using AI. Get clean transparent PNGs for products, portraits and objects in seconds.',
-        h1: 'AI Background Remover',
+          'Automatically detects the subject, removes the background, and generates a transparent PNG with professionally refined edges. Optional shadow recovery for e-commerce.',
+        h1: 'Background Remover AI',
         intro:
-          'Upload an image and get a clean transparent PNG in seconds. Product mode, portrait mode, and object mode optimize edges for your subject type.',
+          'Automatically detects the subject, removes the background, and generates a transparent PNG with professionally refined edges.',
         howItWorks:
           'Our AI detects the subject, removes the background, refines hair and fine edges with adaptive matting, and exports a transparent PNG ready to download.',
         useCases: [
@@ -43,16 +43,33 @@ export const backgroundRemovalTool: ToolDefinition = {
         aiExplanation: [
           'Product mode — crisp hard edges for boxes, bottles, and merchandise',
           'Portrait mode — hair and skin edge refinement with advanced matting',
+          'Shadow recovery — keeps natural drop shadows on transparent PNG (e-commerce)',
           'Transparent PNG export — alpha channel preserved for any background',
         ],
         benefits: [
           'Pixel-perfect cutouts for products, people, and objects',
           'Advanced AI matting preserves hair, fur, and fine edges',
+          'Shadow recovery for catalog-style product photos',
           'Clean transparent PNG ready for e-commerce and design',
           'No manual selection or masking required',
           'Studio-grade edge refinement for professional output',
         ],
         faq: [
+          {
+            question: 'What file formats are supported?',
+            answer:
+              'You can upload JPG, JPEG, PNG, and WebP images (up to your plan size limit). The output is always a transparent PNG with alpha channel preserved.',
+          },
+          {
+            question: 'Does the background become fully transparent?',
+            answer:
+              'Yes. The default output removes the background and exports a PNG with a transparent alpha channel. Enable shadow recovery if you want to keep a soft natural drop shadow under products.',
+          },
+          {
+            question: 'What is shadow recovery?',
+            answer:
+              'Shadow recovery keeps the natural drop shadow from your original photo after the background is removed — ideal for product shots on white backgrounds. The shadow stays semi-transparent so you can place the cutout on any new background.',
+          },
           {
             question: 'Does it work on hair?',
             answer:
@@ -71,21 +88,49 @@ export const backgroundRemovalTool: ToolDefinition = {
         keywords: ['remove background', 'remove bg online free', 'png transparent background', 'background remover'],
       },
       ro: {
-        title: 'Eliminare Fundal AI cu Rafinare Pixel-Perfect a Marginilor',
+        title: 'Elimină fundalul cu AI – Background Remover, PNG transparent',
         metaDescription:
-          'Extrage subiecte cu rafinare AI a marginilor. Optimizare separată pentru produse, portrete și obiecte — PNG transparent pentru e-commerce și design.',
-        h1: 'Extrage subiecte cu rafinare AI a marginilor',
+          'Decupaj inteligent cu rafinare profesională a marginilor. Detectează subiectul, elimină fundalul și generează PNG transparent pentru e-commerce.',
+        h1: 'Elimină fundalul cu AI',
         intro:
-          'Încarcă o imagine — motorul detectează subiectul (persoană, produs sau obiect), elimină fundalul și livrează PNG transparent cu margini curate, naturale și matting adaptiv.',
+          'Detectează automat subiectul, elimină fundalul și generează PNG transparent cu margini rafinate profesional.',
+        howItWorks:
+          'AI-ul detectează subiectul, elimină fundalul, rafinează părul și marginile fine cu matting adaptiv, apoi exportă PNG transparent gata de descărcat.',
+        useCases: [
+          'Listări produse e-commerce și cataloage',
+          'Poze de profil și avatar social',
+          'Asset-uri design și materiale marketing',
+        ],
+        aiExplanation: [
+          'Mod produs — margini dure pentru cutii, sticle și merchandise',
+          'Mod portret — rafinare păr și piele cu matting avansat',
+          'Recuperare umbră — păstrează umbra naturală pe PNG transparent (e-commerce)',
+          'Export PNG transparent — canal alpha păstrat pentru orice fundal',
+        ],
         benefits: [
           'Decupaje pixel-perfect pentru produse, persoane și obiecte',
           'Matting AI avansat păstrează părul, blana și marginile fine',
+          'Recuperare umbră pentru poze catalog stil profesional',
           'PNG transparent curat pentru e-commerce, design și marketing',
           'Fără selecție manuală sau mascare necesară',
-          'Pipeline optimizat pentru rezultate de înaltă calitate',
           'Rafinare margini de nivel studio pentru output profesional',
         ],
         faq: [
+          {
+            question: 'Ce formate sunt suportate?',
+            answer:
+              'Poți încărca imagini JPG, JPEG, PNG și WebP (până la limita planului tău). Rezultatul este întotdeauna PNG transparent cu canal alpha păstrat.',
+          },
+          {
+            question: 'Fundalul devine complet transparent?',
+            answer:
+              'Da. Implicit, fundalul este eliminat și primești PNG cu transparență completă (canal alpha). Activează recuperarea umbrei dacă vrei să păstrezi umbra moale naturală de sub produse.',
+          },
+          {
+            question: 'Ce este recuperarea umbrei (shadow recovery)?',
+            answer:
+              'Păstrează umbra naturală din poza originală după eliminarea fundalului — ideal pentru produse pe fundal alb. Umbra rămâne semi-transparentă, ca să poți plasa decupajul pe orice fundal nou.',
+          },
           {
             question: 'Cum diferă de eliminatoarele de fundal de bază?',
             answer:
@@ -103,6 +148,7 @@ export const backgroundRemovalTool: ToolDefinition = {
         ],
         keywords: [
           'eliminare fundal pixel perfect',
+          'background remover',
           'decupare subiect ai',
           'png transparent e-commerce',
           'eliminator fundal par',

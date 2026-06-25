@@ -56,6 +56,26 @@ export function BgRemovalOptions({ value, onChange }: BgRemovalOptionsProps) {
           <option value="studio">{t('bgEdgeStudio')}</option>
         </select>
       </div>
+
+      <div className="flex flex-col gap-2 rounded-md border border-border-default bg-background-secondary px-3 py-3">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-border-default"
+            checked={value.shadowRecovery}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                shadowRecovery: e.target.checked,
+              })
+            }
+          />
+          <span className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-text-primary">{t('bgShadowRecovery')}</span>
+            <span className="text-xs text-text-tertiary">{t('bgShadowRecoveryHint')}</span>
+          </span>
+        </label>
+      </div>
     </div>
   );
 }

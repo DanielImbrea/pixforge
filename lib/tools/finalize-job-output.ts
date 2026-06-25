@@ -36,6 +36,7 @@ export interface FinalizeJobOutputInput {
     bgRemovalSubjectMode?: string;
     bgRemovalEdgeQuality?: string;
     bgRemovalSmartMode?: boolean;
+    bgRemovalShadowRecoveryApplied?: boolean;
   };
 }
 

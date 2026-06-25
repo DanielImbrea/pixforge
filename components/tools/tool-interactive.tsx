@@ -52,6 +52,7 @@ type JobResultPayload = {
   bgRemovalSubjectMode: string | null;
   bgRemovalEdgeQuality: string | null;
   bgRemovalSmartMode: boolean;
+  bgRemovalShadowRecoveryApplied: boolean;
 };
 
 function parseJobResultPayload(data: Record<string, unknown>): JobResultPayload {
@@ -82,6 +83,7 @@ function parseJobResultPayload(data: Record<string, unknown>): JobResultPayload 
     bgRemovalSubjectMode: (data.bgRemovalSubjectMode as string | null | undefined) ?? null,
     bgRemovalEdgeQuality: (data.bgRemovalEdgeQuality as string | null | undefined) ?? null,
     bgRemovalSmartMode: Boolean(data.bgRemovalSmartMode),
+    bgRemovalShadowRecoveryApplied: Boolean(data.bgRemovalShadowRecoveryApplied),
   };
 }
 
@@ -110,6 +112,7 @@ function applyJobResultToState(
     setBgRemovalSubjectMode: (v: string | null) => void;
     setBgRemovalEdgeQuality: (v: string | null) => void;
     setBgRemovalSmartMode: (v: boolean) => void;
+    setBgRemovalShadowRecoveryApplied: (v: boolean) => void;
   }
 ) {
   setters.setPreviewUrl(result.previewUrl);
@@ -134,6 +137,7 @@ function applyJobResultToState(
   setters.setBgRemovalSubjectMode(result.bgRemovalSubjectMode);
   setters.setBgRemovalEdgeQuality(result.bgRemovalEdgeQuality);
   setters.setBgRemovalSmartMode(result.bgRemovalSmartMode);
+  setters.setBgRemovalShadowRecoveryApplied(result.bgRemovalShadowRecoveryApplied);
 }
 
 type Stage = 'configure' | 'processing' | 'result' | 'error';
@@ -179,6 +183,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [bgRemovalSubjectMode, setBgRemovalSubjectMode] = useState<string | null>(null);
   const [bgRemovalEdgeQuality, setBgRemovalEdgeQuality] = useState<string | null>(null);
   const [bgRemovalSmartMode, setBgRemovalSmartMode] = useState(false);
+  const [bgRemovalShadowRecoveryApplied, setBgRemovalShadowRecoveryApplied] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [batchResults, setBatchResults] = useState<BatchResultItem[]>([]);
@@ -425,6 +430,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
         setBgRemovalSubjectMode,
         setBgRemovalEdgeQuality,
         setBgRemovalSmartMode,
+        setBgRemovalShadowRecoveryApplied,
       });
       setStage('result');
     } catch (err) {
@@ -606,6 +612,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setBgRemovalSubjectMode(null);
     setBgRemovalEdgeQuality(null);
     setBgRemovalSmartMode(false);
+    setBgRemovalShadowRecoveryApplied(false);
     setErrorMessage(null);
     setValidationErrorKey(null);
     setProgress(0);
@@ -829,6 +836,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               bgRemovalSubjectMode={bgRemovalSubjectMode}
               bgRemovalEdgeQuality={bgRemovalEdgeQuality}
               bgRemovalSmartMode={bgRemovalSmartMode}
+              bgRemovalShadowRecoveryApplied={bgRemovalShadowRecoveryApplied}
               sizeCompareOutputLabel={isResizeTool ? 'result' : 'compressed'}
               beforePreviewUrl={isUpscaleTool ? filePreviewUrl : null}
               inputWidth={originalImageMeta?.width ?? null}

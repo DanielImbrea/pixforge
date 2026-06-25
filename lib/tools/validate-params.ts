@@ -101,6 +101,7 @@ export function buildToolParams(
     return {
       subjectMode: bgRemovalParams.subjectMode,
       edgeQuality: bgRemovalParams.edgeQuality,
+      shadowRecovery: bgRemovalParams.shadowRecovery,
     };
   }
   return {};

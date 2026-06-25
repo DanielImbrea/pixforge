@@ -32,4 +32,5 @@ export const convertParamsSchema = z.object({
 export const bgRemovalParamsSchema = z.object({
   subjectMode: z.enum(['auto', 'product', 'portrait', 'object']).default('auto'),
   edgeQuality: z.enum(['standard', 'high', 'studio']).default('high'),
+  shadowRecovery: z.boolean().default(false),
 });

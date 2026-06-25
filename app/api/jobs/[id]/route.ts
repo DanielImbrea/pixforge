@@ -87,6 +87,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         bgRemovalSubjectMode?: string;
         bgRemovalEdgeQuality?: string;
         bgRemovalSmartMode?: boolean;
+        bgRemovalShadowRecoveryApplied?: boolean;
       }
     | undefined;
 
@@ -116,5 +117,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     bgRemovalSubjectMode: delivery?.bgRemovalSubjectMode,
     bgRemovalEdgeQuality: delivery?.bgRemovalEdgeQuality,
     bgRemovalSmartMode: delivery?.bgRemovalSmartMode,
+    bgRemovalShadowRecoveryApplied: delivery?.bgRemovalShadowRecoveryApplied,
   });
 }

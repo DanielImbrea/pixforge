@@ -1,5 +1,16 @@
 import sharp from 'sharp';
+import { applyShadowRecovery } from '@/lib/ai/shadow-recovery';
 import type { BgEdgeQuality, BgPostProcessProfile, BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
+
+export interface BgRemovalFinalizeOptions {
+  shadowRecovery?: boolean;
+  originalBuffer?: Buffer;
+}
+
+export interface BgRemovalFinalizeResult {
+  buffer: Buffer;
+  shadowRecoveryApplied: boolean;
+}
 
 function qualityStrength(edgeQuality: BgEdgeQuality): number {
   if (edgeQuality === 'studio') return 1.5;
@@ -84,4 +95,20 @@ export async function applyBgRemovalPostProcess(
       effort: routing.edgeQuality === 'studio' ? 10 : 8,
     })
     .toBuffer();
+}
+
+export async function finalizeBgRemovalOutput(
+  cutoutBuffer: Buffer,
+  routing: Pick<BgRemovalRouting, 'postProcess' | 'edgeQuality' | 'subjectMode'>,
+  options: BgRemovalFinalizeOptions = {}
+): Promise<BgRemovalFinalizeResult> {
+  let buffer = await applyBgRemovalPostProcess(cutoutBuffer, routing);
+  let shadowRecoveryApplied = false;
+
+  if (options.shadowRecovery && options.originalBuffer) {
+    buffer = await applyShadowRecovery(options.originalBuffer, buffer);
+    shadowRecoveryApplied = true;
+  }
+
+  return { buffer, shadowRecoveryApplied };
 }

@@ -29,6 +29,7 @@ interface ResultViewProps {
   bgRemovalSubjectMode?: string | null;
   bgRemovalEdgeQuality?: string | null;
   bgRemovalSmartMode?: boolean;
+  bgRemovalShadowRecoveryApplied?: boolean;
   sizeCompareOutputLabel?: 'compressed' | 'result';
   beforePreviewUrl?: string | null;
   inputWidth?: number | null;
@@ -87,6 +88,7 @@ export function ResultView({
   bgRemovalModelLabel,
   bgRemovalEdgeQuality,
   bgRemovalSmartMode = false,
+  bgRemovalShadowRecoveryApplied = false,
   sizeCompareOutputLabel = 'compressed',
   beforePreviewUrl,
   inputWidth,
@@ -220,6 +222,9 @@ export function ResultView({
                 <p className="text-text-tertiary">
                   {t('bgEdgeQualityApplied', { quality: t(`bgEdgeQualityLabel_${bgRemovalEdgeQuality}` as 'bgEdgeQualityLabel_high') })}
                 </p>
+              )}
+              {bgRemovalShadowRecoveryApplied && (
+                <p className="text-text-secondary">{t('bgShadowRecoveryApplied')}</p>
               )}
             </div>
           )}

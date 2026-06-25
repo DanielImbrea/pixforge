@@ -1,5 +1,6 @@
 import { applyUpscalePostProcess } from '@/lib/ai/upscale-post-process';
-import { applyBgRemovalPostProcess } from '@/lib/ai/bg-removal-post-process';
+import { finalizeBgRemovalOutput } from '@/lib/ai/bg-removal-post-process';
+import { fetchAsBuffer } from '@/lib/ai/fetch-image';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -94,11 +95,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   let outputBuffer = result.outputBuffer;
+  let bgShadowRecoveryApplied = false;
   if (tool.category === 'upscale' && result.upscaleRouting && outputBuffer) {
     outputBuffer = await applyUpscalePostProcess(outputBuffer, result.upscaleRouting.postProcess);
   }
   if (tool.category === 'background' && result.bgRemovalRouting && outputBuffer) {
-    outputBuffer = await applyBgRemovalPostProcess(outputBuffer, result.bgRemovalRouting);
+    const shadowRecovery = Boolean((jobRow.params as Record<string, unknown> | undefined)?.shadowRecovery);
+    let originalBuffer: Buffer | undefined;
+    if (shadowRecovery) {
+      try {
+        originalBuffer = await fetchAsBuffer(inputAssetUrl);
+      } catch (err) {
+        console.warn(`[process] shadow recovery skipped job=${jobRow.id}`, err);
+      }
+    }
+    const finalized = await finalizeBgRemovalOutput(outputBuffer, result.bgRemovalRouting, {
+      shadowRecovery,
+      originalBuffer,
+    });
+    outputBuffer = finalized.buffer;
+    bgShadowRecoveryApplied = finalized.shadowRecoveryApplied;
   }
 
   if (!outputBuffer || !result.outputMimeType) {
@@ -140,6 +156,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       bgRemovalSubjectMode: result.bgRemovalSubjectMode,
       bgRemovalEdgeQuality: result.bgRemovalEdgeQuality,
       bgRemovalSmartMode: result.bgRemovalSmartMode,
+      bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
     },
   });
 
@@ -171,5 +188,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     bgRemovalSubjectMode: result.bgRemovalSubjectMode,
     bgRemovalEdgeQuality: result.bgRemovalEdgeQuality,
     bgRemovalSmartMode: result.bgRemovalSmartMode,
+    bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
   });
 }
