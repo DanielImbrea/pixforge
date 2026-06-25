@@ -2,12 +2,31 @@ import { getContactRequestTypeLabel } from '@/lib/contact/request-type-labels';
 import type { ContactFormInput } from '@/lib/validation/contact-schema';
 import type { Locale } from '@/i18n';
 
+function stripEnvQuotes(value: string): string {
+  return value.replace(/^["']|["']$/g, '').trim();
+}
+
 function getContactRecipient(): string {
-  return process.env.CONTACT_EMAIL_TO?.trim() || 'dani_imbrea@yahoo.com';
+  const raw = process.env.CONTACT_EMAIL_TO?.trim() || 'dani_imbrea@yahoo.com';
+  return stripEnvQuotes(raw);
 }
 
 function getContactFromAddress(): string {
-  return process.env.CONTACT_FROM_EMAIL?.trim() || 'PixiqueAi Contact <onboarding@resend.dev>';
+  const raw =
+    process.env.CONTACT_FROM_EMAIL?.trim() || 'PixiqueAi Contact <onboarding@resend.dev>';
+  return stripEnvQuotes(raw);
+}
+
+function formatResendError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { message?: string; name?: string };
+    if (parsed.message) {
+      return `Resend ${status}: ${parsed.message}`;
+    }
+  } catch {
+    // Resend sometimes returns plain text.
+  }
+  return `Resend ${status}: ${body || 'Unknown error'}`;
 }
 
 function buildEmailBody(data: ContactFormInput, locale: Locale): string {
@@ -41,6 +60,8 @@ export async function sendContactEmail(data: ContactFormInput): Promise<void> {
   const locale = (data.locale ?? 'ro') as Locale;
   const subject = `[Contact] ${data.firstName} ${data.lastName}`;
   const text = buildEmailBody(data, locale);
+  const from = getContactFromAddress();
+  const to = getContactRecipient();
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -49,8 +70,8 @@ export async function sendContactEmail(data: ContactFormInput): Promise<void> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: getContactFromAddress(),
-      to: [getContactRecipient()],
+      from,
+      to: [to],
       reply_to: data.email,
       subject,
       text,
@@ -59,6 +80,6 @@ export async function sendContactEmail(data: ContactFormInput): Promise<void> {
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Resend error (${res.status}): ${body || res.statusText}`);
+    throw new Error(`${formatResendError(res.status, body)} (from=${from}, to=${to})`);
   }
 }

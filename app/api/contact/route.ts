@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
     await sendContactEmail(parsed.data);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error('[contact]', err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: 'sendFailed' }, { status: 503 });
+    console.error('[contact]', err);
+    const detail = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: 'sendFailed', detail }, { status: 503 });
   }
 }
