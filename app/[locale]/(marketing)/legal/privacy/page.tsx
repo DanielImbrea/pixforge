@@ -23,6 +23,8 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
     { title: t('privacySection3Title'), body: t('privacySection3Body') },
     { title: t('privacySection4Title'), body: t('privacySection4Body') },
     { title: t('privacySection5Title'), body: t('privacySection5Body') },
+    { title: t('privacySection6Title'), body: t('privacySection6Body') },
+    { title: t('privacySection7Title'), body: t('privacySection7Body') },
   ];
 
   return (

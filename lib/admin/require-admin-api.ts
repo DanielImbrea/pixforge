@@ -1,27 +1,22 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getAiProductionStatus } from '@/lib/ai/config';
 import { isAdminUser } from '@/lib/admin/auth';
 import type { UserRow } from '@/types';
 
-export const runtime = 'nodejs';
-
-/** Admin-only: verify Replicate / AI env configuration on production. */
-export async function GET() {
+export async function requireAdminApi(): Promise<{ user: UserRow } | NextResponse> {
   const supabase = await createClient();
   const {
-    data: { user },
+    data: { user: authUser },
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (!authUser) {
     return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
   }
 
-  const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
+  const { data: profile } = await supabase.from('users').select('*').eq('id', authUser.id).single();
   if (!profile || !isAdminUser(profile as UserRow)) {
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
   }
 
-  const status = getAiProductionStatus();
-  return NextResponse.json(status);
+  return { user: profile as UserRow };
 }

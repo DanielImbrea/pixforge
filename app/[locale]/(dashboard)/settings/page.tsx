@@ -7,6 +7,7 @@ import { LogoutButton } from '@/components/auth/logout-button';
 import { ApiKeysPanel } from '@/components/settings/api-keys-panel';
 import { EconomicsPanel } from '@/components/settings/economics-panel';
 import { planHasFeature } from '@/lib/billing/plan-features';
+import { isAdminUser } from '@/lib/admin/auth';
 
 export default async function SettingsPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
@@ -17,7 +18,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   if (!user) return null;
 
   const showApi = planHasFeature(user.plan, 'apiAccess');
-  const showEconomics = process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL;
+  const showEconomics = isAdminUser(user);
 
   return (
     <div className="space-y-8">
@@ -34,6 +35,16 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
       {showApi && <ApiKeysPanel />}
 
       {showEconomics && <EconomicsPanel locale={locale} />}
+
+      {isAdminUser(user) && (
+        <Card className="max-w-md">
+          <h2 className="text-lg font-medium text-text-primary mb-2">{tSettings('adminPanelTitle')}</h2>
+          <p className="text-sm text-text-secondary mb-4">{tSettings('adminPanelDescription')}</p>
+          <Link href={`/${locale}/admin`} className="text-sm text-accent hover:underline">
+            {tSettings('adminPanelLink')} →
+          </Link>
+        </Card>
+      )}
 
       {planHasFeature(user.plan, 'commercialLicense') && (
         <Card className="max-w-md">

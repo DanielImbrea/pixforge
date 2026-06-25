@@ -70,7 +70,12 @@ export const getCurrentUser = cache(async (): Promise<UserRow | null> => {
       return null;
     }
 
-    return profile as UserRow;
+    const row = profile as UserRow;
+    if (row.deleted_at) {
+      return null;
+    }
+
+    return row;
   } catch (error) {
     console.error('[getCurrentUser] failed:', error);
     return null;

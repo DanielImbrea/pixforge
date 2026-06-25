@@ -87,10 +87,12 @@ export interface UserRow {
   full_name: string | null;
   avatar_url: string | null;
   plan: PlanTier;
+  role: 'user' | 'admin';
   stripe_customer_id: string | null;
   locale: Locale;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface StorageFileRow {

@@ -11,7 +11,7 @@ const intlMiddleware = createMiddleware({
   localePrefix: 'always',
 });
 
-const PROTECTED_PREFIXES = ['/dashboard', '/images', '/history', '/billing', '/settings'];
+const PROTECTED_PREFIXES = ['/dashboard', '/images', '/history', '/billing', '/settings', '/admin'];
 
 function getLocaleFromPath(pathname: string): Locale {
   const segment = pathname.split('/')[1];
