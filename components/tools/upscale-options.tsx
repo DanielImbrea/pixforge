@@ -16,10 +16,10 @@ interface UpscaleOptionsProps {
 const SCALE_OPTIONS: {
   value: UpscaleScaleInput;
   labelKey: 'scaleSmart' | 'scale2x' | 'scale4x';
-  hintKey?: 'scaleSmartHint' | 'scale4xHint';
+  hintKey?: 'scale2xHint' | 'scale4xHint';
 }[] = [
-  { value: 'smart', labelKey: 'scaleSmart', hintKey: 'scaleSmartHint' },
-  { value: 2, labelKey: 'scale2x' },
+  { value: 'smart', labelKey: 'scaleSmart' },
+  { value: 2, labelKey: 'scale2x', hintKey: 'scale2xHint' },
   { value: 4, labelKey: 'scale4x', hintKey: 'scale4xHint' },
 ];
 

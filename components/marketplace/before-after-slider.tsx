@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { cn } from '@/lib/utils/cn';
 
 interface BeforeAfterSliderProps {
   beforeSrc: string;
@@ -8,7 +9,13 @@ interface BeforeAfterSliderProps {
   beforeLabel?: string;
   afterLabel?: string;
   afterBackground?: 'white' | 'checkerboard';
+  objectFit?: 'cover' | 'contain';
+  /** @deprecated use objectFit */
   afterObjectFit?: 'cover' | 'contain';
+  /** Size container to match output dimensions (upscale compare). */
+  intrinsicWidth?: number;
+  intrinsicHeight?: number;
+  className?: string;
 }
 
 const CHECKERBOARD_STYLE = {
@@ -29,8 +36,20 @@ export function BeforeAfterSlider({
   beforeLabel = 'Before',
   afterLabel = 'After',
   afterBackground,
+  objectFit,
   afterObjectFit = 'cover',
+  intrinsicWidth,
+  intrinsicHeight,
+  className,
 }: BeforeAfterSliderProps) {
+  const fit = objectFit ?? afterObjectFit;
+  const useIntrinsicSize = Boolean(intrinsicWidth && intrinsicHeight && intrinsicWidth > 0 && intrinsicHeight > 0);
+  const imageFitClass =
+    fit === 'contain'
+      ? useIntrinsicSize
+        ? 'object-contain'
+        : 'object-contain p-4 md:p-8'
+      : 'object-cover';
   const [position, setPosition] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -46,6 +65,7 @@ export function BeforeAfterSlider({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       isDragging.current = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
       updatePosition(e.clientX);
     },
     [updatePosition]
@@ -65,15 +85,38 @@ export function BeforeAfterSlider({
 
   return (
     <div
-      ref={containerRef}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-      className="relative w-full aspect-video rounded-lg overflow-hidden border border-border-default select-none cursor-col-resize"
+      className={cn('w-full', useIntrinsicSize ? 'flex justify-center' : undefined, className)}
+      style={
+        useIntrinsicSize
+          ? {
+              maxHeight: 'min(70vh, 900px)',
+            }
+          : undefined
+      }
     >
       <div
-        className="absolute inset-0"
+        ref={containerRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        className={cn(
+          'relative w-full overflow-hidden rounded-lg border border-border-default select-none cursor-col-resize touch-none',
+          !useIntrinsicSize && 'aspect-video'
+        )}
+        style={
+          useIntrinsicSize
+            ? {
+                aspectRatio: `${intrinsicWidth} / ${intrinsicHeight}`,
+                maxWidth: `min(100%, ${intrinsicWidth}px)`,
+                maxHeight: 'min(70vh, 900px)',
+                width: '100%',
+              }
+            : undefined
+        }
+      >
+      <div
+        className="absolute inset-0 bg-background-secondary"
         style={afterBackground === 'checkerboard' ? CHECKERBOARD_STYLE : undefined}
       >
         {afterBackground === 'white' ? <div className="absolute inset-0 bg-white" /> : null}
@@ -81,7 +124,7 @@ export function BeforeAfterSlider({
         <img
           src={afterSrc}
           alt={afterLabel}
-          className={`absolute inset-0 w-full h-full ${afterObjectFit === 'contain' ? 'object-contain p-6 md:p-10' : 'object-cover'}`}
+          className={`absolute inset-0 w-full h-full ${imageFitClass}`}
           draggable={false}
         />
       </div>
@@ -91,7 +134,12 @@ export function BeforeAfterSlider({
         style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={beforeSrc} alt={beforeLabel} className="absolute inset-0 w-full h-full object-cover" draggable={false} />
+        <img
+          src={beforeSrc}
+          alt={beforeLabel}
+          className={`absolute inset-0 w-full h-full ${imageFitClass}`}
+          draggable={false}
+        />
       </div>
 
       <div
@@ -111,6 +159,7 @@ export function BeforeAfterSlider({
       <span className="absolute top-3 right-3 text-xs font-medium bg-black/60 text-white px-2 py-1 rounded">
         {afterLabel}
       </span>
+      </div>
     </div>
   );
 }

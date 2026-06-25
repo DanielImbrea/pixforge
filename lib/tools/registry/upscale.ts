@@ -34,21 +34,22 @@ export const upscaleTool: ToolDefinition = {
         intro:
           'Upload an image and our AI reconstructs detail, reduces noise, and sharpens edges — up to 4× resolution for photos, artwork, and screenshots.',
         howItWorks:
-          'Upload your image, choose Smart mode or 2× / 4× scale, and our engine classifies the content type then routes to specialized AI models with adaptive post-processing.',
+          'Upload your image, choose Smart (auto) or manual 2× / 4×. We classify the content, route to the right AI pipeline, then show a before/after comparison so you can see the improvement.',
         bestFor: [
           'Blurry photos that need sharper detail',
           'Old images and low-resolution scans',
           'Low-resolution screenshots with small text',
         ],
         aiExplanation: [
-          'Detail reconstruction — synthesizes plausible texture instead of stretching pixels',
-          'Noise reduction — cleans compression artifacts during enhancement',
-          'Edge sharpening — preserves crisp lines on UI captures and artwork',
+          'Quality — reconstructs detail instead of stretching pixels; reduces blur and artifacts',
+          'Intelligence — detects photo, text, or artwork and applies a different pipeline',
+          'Control — Smart auto mode or manual 2× clean / 4× detail',
+          'Safety — text and face protection on sensitive content',
         ],
         benefits: [
-          'AI reconstructs missing details — not just resizing pixels',
-          'Separate enhancement paths for photos, screenshots, and artwork',
-          'Smart 2× / 4× routing based on image type',
+          'Before/after slider to prove the enhancement',
+          'Smart routing for photos, screenshots, and artwork',
+          '2× for everyday images · 4× for very low-res sources',
           'Up to 4× with adaptive detail reconstruction',
           'Processed securely in the cloud — no install required',
         ],
@@ -76,12 +77,24 @@ export const upscaleTool: ToolDefinition = {
           'Restaurează detaliile pierdute în timpul upscalării cu AI. Rutare separată pentru fotografii, screenshot-uri și artă — până la 4× cu reconstrucție adaptivă.',
         h1: 'Restaurează detaliile pierdute cu upscalare AI',
         intro:
-          'Motorul clasifică imaginea, apoi aplică enhancement specializat — recuperare detalii pentru poze, upscalare sigură pentru UI și output care păstrează liniile pentru artă.',
+          'Motorul clasifică imaginea, aplică enhancement specializat, apoi îți arată comparația înainte/după — ca să vezi clar diferența față de original.',
+        howItWorks:
+          'Încarcă imaginea, alege Smart (automat) sau 2× / 4× manual. Clasificăm conținutul, rutăm spre pipeline-ul AI potrivit, apoi afișăm slider înainte/după.',
+        bestFor: [
+          'Poze neclare care au nevoie de detalii mai clare',
+          'Imagini vechi sau scanări low-res',
+          'Screenshot-uri cu text mic',
+        ],
+        aiExplanation: [
+          'Calitate — reconstruiește detalii, nu doar scalează pixelii; reduce blur și artefacte',
+          'Inteligență — detectează foto, text sau artă și aplică pipeline diferit',
+          'Control — mod Smart automat sau manual 2× curat / 4× detalii',
+          'Siguranță — protecție pentru text și fețe pe conținut sensibil',
+        ],
         benefits: [
-          'AI reconstruiește detalii lipsă — nu doar redimensionează pixelii',
-          'Căi separate de enhancement pentru poze, screenshot-uri și artă',
-          'Moduri de protecție față/text cu rutare inteligentă 2× / 4×',
-          'Reduce artefactele de compresie în timpul enhancement-ului',
+          'Slider înainte/după ca să vezi clar îmbunătățirea',
+          'Rutare Smart pentru poze, screenshot-uri și artă',
+          '2× pentru imagini obișnuite · 4× pentru surse foarte mici',
           'Până la 4× cu reconstrucție adaptivă de detalii',
           'Procesat securizat în cloud',
         ],

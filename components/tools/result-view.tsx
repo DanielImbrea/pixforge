@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { CompressionStats, computeSavedPercent } from './compression-stats';
+import { UpscaleResultCompare } from './upscale-result-compare';
 
 interface ResultViewProps {
   previewUrl: string;
@@ -16,6 +17,8 @@ interface ResultViewProps {
   smartFormatSelected?: boolean;
   formatReasonKey?: string | null;
   sizeReductionPercent?: number | null;
+  contentKind?: string | null;
+  backgroundFillApplied?: boolean;
   upscaleReasonKey?: string | null;
   upscaleWarningKey?: string | null;
   upscaleModelLabel?: string | null;
@@ -26,6 +29,10 @@ interface ResultViewProps {
   bgRemovalSubjectMode?: string | null;
   bgRemovalEdgeQuality?: string | null;
   bgRemovalSmartMode?: boolean;
+  sizeCompareOutputLabel?: 'compressed' | 'result';
+  beforePreviewUrl?: string | null;
+  inputWidth?: number | null;
+  inputHeight?: number | null;
   onDownload: () => void;
   onUpgradeClick: () => void;
   onReset: () => void;
@@ -69,6 +76,8 @@ export function ResultView({
   smartFormatSelected = false,
   formatReasonKey,
   sizeReductionPercent,
+  contentKind,
+  backgroundFillApplied = false,
   upscaleReasonKey,
   upscaleWarningKey,
   upscaleModelLabel,
@@ -78,6 +87,10 @@ export function ResultView({
   bgRemovalModelLabel,
   bgRemovalEdgeQuality,
   bgRemovalSmartMode = false,
+  sizeCompareOutputLabel = 'compressed',
+  beforePreviewUrl,
+  inputWidth,
+  inputHeight,
   onDownload,
   onUpgradeClick,
   onReset,
@@ -99,6 +112,7 @@ export function ResultView({
     resolvedInputBytes > 0;
   const savedPercent = computeSavedPercent(resolvedInputBytes ?? 0, outputSizeBytes ?? 0);
   const alreadyOptimized = formatReasonKey === 'formatReasonAlreadyOptimized';
+  const showUpscaleCompare = Boolean(upscaleReasonKey && beforePreviewUrl);
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,21 +122,32 @@ export function ResultView({
         </p>
       )}
 
-      <div className="rounded-lg border border-border-default overflow-hidden bg-[linear-gradient(45deg,#f3f4f6_25%,transparent_25%),linear-gradient(-45deg,#f3f4f6_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f3f4f6_75%),linear-gradient(-45deg,transparent_75%,#f3f4f6_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0px] bg-background-secondary p-4 flex items-center justify-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={previewUrl}
-          alt={t('result')}
-          width={outputWidth ?? undefined}
-          height={outputHeight ?? undefined}
-          className="h-auto max-h-[70vh] object-contain"
-          style={
-            outputWidth
-              ? { maxWidth: `min(100%, ${outputWidth}px)`, width: 'auto', height: 'auto' }
-              : { maxWidth: '100%', width: 'auto', height: 'auto' }
-          }
+      {showUpscaleCompare ? (
+        <UpscaleResultCompare
+          beforeSrc={beforePreviewUrl!}
+          afterSrc={previewUrl}
+          beforeWidth={inputWidth}
+          beforeHeight={inputHeight}
+          afterWidth={outputWidth}
+          afterHeight={outputHeight}
         />
-      </div>
+      ) : (
+        <div className="rounded-lg border border-border-default overflow-hidden bg-[linear-gradient(45deg,#f3f4f6_25%,transparent_25%),linear-gradient(-45deg,#f3f4f6_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f3f4f6_75%),linear-gradient(-45deg,transparent_75%,#f3f4f6_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0px] bg-background-secondary p-4 flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt={t('result')}
+            width={outputWidth ?? undefined}
+            height={outputHeight ?? undefined}
+            className="h-auto max-h-[70vh] object-contain"
+            style={
+              outputWidth
+                ? { maxWidth: `min(100%, ${outputWidth}px)`, width: 'auto', height: 'auto' }
+                : { maxWidth: '100%', width: 'auto', height: 'auto' }
+            }
+          />
+        </div>
+      )}
 
       {showCompressionStats && (
         <CompressionStats
@@ -130,6 +155,7 @@ export function ResultView({
           alreadyOptimized={alreadyOptimized}
           inputBytes={resolvedInputBytes!}
           outputBytes={outputSizeBytes!}
+          outputLabel={sizeCompareOutputLabel}
         />
       )}
 
@@ -140,11 +166,26 @@ export function ResultView({
           )}
           {outputFormatLabel && (formatReasonKey || smartFormatSelected) && (
             <div className="rounded-md border border-border-default bg-background-secondary px-3 py-2 text-left space-y-1">
+              {smartFormatSelected && (
+                <p className="text-[11px] font-medium text-accent">
+                  {t('smartFormatBadge', { format: outputFormatLabel })}
+                </p>
+              )}
               <p className="font-medium text-text-primary">
-                {t('formatSelected', { format: outputFormatLabel })}
+                {smartFormatSelected
+                  ? t('convertDecisionTitle', { format: outputFormatLabel })
+                  : t('formatSelected', { format: outputFormatLabel })}
               </p>
+              {contentKind && (
+                <p className="text-text-tertiary">
+                  {t(`convertContentKind_${contentKind}` as 'convertContentKind_photo')}
+                </p>
+              )}
               {formatReasonKey && (
                 <p className="text-text-secondary">{t(formatReasonKey as 'formatReasonPhotoAvif')}</p>
+              )}
+              {backgroundFillApplied && (
+                <p className="text-text-secondary">{t('convertBackgroundApplied')}</p>
               )}
             </div>
           )}
@@ -158,9 +199,6 @@ export function ResultView({
                     })
                   : t('upscaleEnhanced')}
               </p>
-              {upscaleSmartMode && (
-                <p className="text-text-secondary">{t('upscaleSmartBadge')}</p>
-              )}
               <p className="text-text-secondary">{t(upscaleReasonKey as 'upscaleReasonPhotoDetail')}</p>
               {upscaleWarningKey && (
                 <p className="text-warning">{t(upscaleWarningKey as 'upscaleWarnScreenshot4x')}</p>

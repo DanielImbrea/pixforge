@@ -15,6 +15,8 @@ export interface ProcessResult {
   outputSizeBytes?: number;
   outputFormat?: string;
   outputFormatLabel?: string;
+  outputEncodeQuality?: number | null;
+  backgroundFillApplied?: boolean;
   smartFormatSelected?: boolean;
   contentKind?: string;
   formatReasonKey?: string;

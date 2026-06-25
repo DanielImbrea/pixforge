@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import type { PlanTier, ToolDefinition } from '@/types';
 import { Button } from '@/components/ui/button';
-import { planHasFeature } from '@/lib/billing/plan-features';
+import { planHasFeature, getMaxResizeQuality } from '@/lib/billing/plan-features';
 import { BatchUploadZone } from './batch-upload-zone';
 import { BatchResultsView, type BatchResultItem } from './batch-results-view';
 import { ImagePreview } from './image-preview';
@@ -18,6 +18,13 @@ import { DEFAULT_CONVERT_PARAMS } from '@/lib/tools/convert-params';
 import { DEFAULT_UPSCALE_PARAMS } from '@/lib/tools/upscale-params';
 import { BgRemovalOptions } from './bg-removal-options';
 import { DEFAULT_BG_REMOVAL_PARAMS } from '@/lib/tools/bg-removal-params';
+import {
+  buildResizeDownloadFilename,
+  clampResizeQuality,
+  DEFAULT_RESIZE_PARAMS,
+  readImageDimensionsFromFile,
+  type ResizeParams,
+} from '@/lib/tools/resize-params';
 import { ToolConfigureLayout, ToolLayout } from './tool-layout';
 import { buildToolParams, validateToolParams } from '@/lib/tools/validate-params';
 import { buildDownloadFallbackFilename, triggerBrowserDownload, triggerBrowserDownloadPost } from '@/lib/utils/trigger-download';
@@ -33,6 +40,8 @@ type JobResultPayload = {
   formatReasonKey: string | null;
   sizeReductionPercent: number | null;
   inputSizeBytes: number | null;
+  contentKind: string | null;
+  backgroundFillApplied: boolean;
   upscaleReasonKey: string | null;
   upscaleWarningKey: string | null;
   upscaleModelLabel: string | null;
@@ -58,6 +67,8 @@ function parseJobResultPayload(data: Record<string, unknown>): JobResultPayload 
     sizeReductionPercent:
       typeof data.sizeReductionPercent === 'number' ? data.sizeReductionPercent : null,
     inputSizeBytes: typeof data.inputSizeBytes === 'number' ? data.inputSizeBytes : null,
+    contentKind: (data.contentKind as string | null | undefined) ?? null,
+    backgroundFillApplied: Boolean(data.backgroundFillApplied),
     upscaleReasonKey: (data.upscaleReasonKey as string | null | undefined) ?? null,
     upscaleWarningKey: (data.upscaleWarningKey as string | null | undefined) ?? null,
     upscaleModelLabel: (data.upscaleModelLabel as string | null | undefined) ?? null,
@@ -87,6 +98,8 @@ function applyJobResultToState(
     setFormatReasonKey: (v: string | null) => void;
     setSizeReductionPercent: (v: number | null) => void;
     setInputSizeBytes: (v: number | null) => void;
+    setContentKind: (v: string | null) => void;
+    setBackgroundFillApplied: (v: boolean) => void;
     setUpscaleReasonKey: (v: string | null) => void;
     setUpscaleWarningKey: (v: string | null) => void;
     setUpscaleModelLabel: (v: string | null) => void;
@@ -109,6 +122,8 @@ function applyJobResultToState(
   setters.setFormatReasonKey(result.formatReasonKey);
   setters.setSizeReductionPercent(result.sizeReductionPercent);
   setters.setInputSizeBytes(result.inputSizeBytes);
+  setters.setContentKind(result.contentKind);
+  setters.setBackgroundFillApplied(result.backgroundFillApplied);
   setters.setUpscaleReasonKey(result.upscaleReasonKey);
   setters.setUpscaleWarningKey(result.upscaleWarningKey);
   setters.setUpscaleModelLabel(result.upscaleModelLabel);
@@ -135,6 +150,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
 
   const canBatch = Boolean(userPlan && planHasFeature(userPlan, 'batchProcessing'));
   const hasCommercialLicense = Boolean(userPlan && planHasFeature(userPlan, 'commercialLicense'));
+  const maxResizeQuality = getMaxResizeQuality(userPlan);
 
   const [stage, setStage] = useState<Stage>('configure');
   const [batchMode, setBatchMode] = useState(false);
@@ -151,6 +167,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [formatReasonKey, setFormatReasonKey] = useState<string | null>(null);
   const [sizeReductionPercent, setSizeReductionPercent] = useState<number | null>(null);
   const [inputSizeBytes, setInputSizeBytes] = useState<number | null>(null);
+  const [contentKind, setContentKind] = useState<string | null>(null);
+  const [backgroundFillApplied, setBackgroundFillApplied] = useState(false);
   const [upscaleReasonKey, setUpscaleReasonKey] = useState<string | null>(null);
   const [upscaleWarningKey, setUpscaleWarningKey] = useState<string | null>(null);
   const [upscaleModelLabel, setUpscaleModelLabel] = useState<string | null>(null);
@@ -167,7 +185,12 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
-  const [resizeParams, setResizeParams] = useState<{ width?: number; height?: number }>({});
+  const [resizeParams, setResizeParams] = useState<ResizeParams>(DEFAULT_RESIZE_PARAMS);
+  const [originalImageMeta, setOriginalImageMeta] = useState<{
+    width: number;
+    height: number;
+    sizeBytes: number;
+  } | null>(null);
   const [upscaleParams, setUpscaleParams] = useState(DEFAULT_UPSCALE_PARAMS);
   const [convertParams, setConvertParams] = useState(DEFAULT_CONVERT_PARAMS);
   const [bgRemovalParams, setBgRemovalParams] = useState(DEFAULT_BG_REMOVAL_PARAMS);
@@ -181,6 +204,14 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const isConvertTool = tool.category === 'convert';
   const isBackgroundTool = tool.category === 'background';
   const hasOptions = isResizeTool || isUpscaleTool || isConvertTool || isBackgroundTool;
+
+  useEffect(() => {
+    if (!isResizeTool) return;
+    setResizeParams((current) => {
+      const clamped = clampResizeQuality(current.quality, maxResizeQuality);
+      return clamped === current.quality ? current : { ...current, quality: clamped };
+    });
+  }, [isResizeTool, maxResizeQuality]);
 
   const stopPolling = useCallback(() => {
     if (pollTimer.current) {
@@ -229,6 +260,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
     setSelectedFile(null);
     setFilePreviewUrl(null);
+    setOriginalImageMeta(null);
     setValidationErrorKey(null);
   }, [filePreviewUrl]);
 
@@ -239,6 +271,17 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       setFilePreviewUrl(URL.createObjectURL(file));
       setValidationErrorKey(null);
       setErrorMessage(null);
+      void readImageDimensionsFromFile(file).then((dimensions) => {
+        if (dimensions) {
+          setOriginalImageMeta({
+            width: dimensions.width,
+            height: dimensions.height,
+            sizeBytes: file.size,
+          });
+        } else {
+          setOriginalImageMeta(null);
+        }
+      });
     },
     [filePreviewUrl]
   );
@@ -370,6 +413,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
         setFormatReasonKey,
         setSizeReductionPercent,
         setInputSizeBytes,
+        setContentKind,
+        setBackgroundFillApplied,
         setUpscaleReasonKey,
         setUpscaleWarningKey,
         setUpscaleModelLabel,
@@ -444,6 +489,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
             inputSizeBytes: result.inputSizeBytes,
             outputSizeBytes: result.outputSizeBytes,
             formatReasonKey: result.formatReasonKey,
+            outputWidth: result.outputWidth,
+            outputHeight: result.outputHeight,
           });
         } catch (err) {
           results.push({
@@ -482,19 +529,25 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     t,
   ]);
 
-  const handleDownload = useCallback(async (targetJobId?: string) => {
-    const id = targetJobId || jobId;
-    if (!id) return;
+  const handleDownload = useCallback(
+    async (targetJobId?: string, downloadFileName?: string) => {
+      const id = targetJobId || jobId;
+      if (!id) return;
 
-    try {
-      await triggerBrowserDownload(
-        `/api/assets/${id}/download`,
-        buildDownloadFallbackFilename('image/webp', id)
-      );
-    } catch {
-      // Keep the result visible; browser may block popups or network failed.
-    }
-  }, [jobId]);
+      const fallback =
+        downloadFileName ||
+        (isResizeTool && outputWidth && outputHeight && selectedFile
+          ? buildResizeDownloadFilename(selectedFile.name, outputWidth, outputHeight)
+          : buildDownloadFallbackFilename('image/webp', id));
+
+      try {
+        await triggerBrowserDownload(`/api/assets/${id}/download`, fallback);
+      } catch {
+        // Keep the result visible; browser may block popups or network failed.
+      }
+    },
+    [jobId, isResizeTool, outputWidth, outputHeight, selectedFile]
+  );
 
   const handleDownloadAll = useCallback(async () => {
     const doneItems = batchResults.filter((item) => item.status === 'done' && item.jobId);
@@ -506,7 +559,10 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
         {
           items: doneItems.map((item) => ({
             jobId: item.jobId,
-            fileName: item.fileName,
+            fileName:
+              isResizeTool && item.outputWidth && item.outputHeight
+                ? buildResizeDownloadFilename(item.fileName, item.outputWidth, item.outputHeight)
+                : item.fileName,
           })),
         },
         `pixiqueai-batch-${new Date().toISOString().slice(0, 10)}.zip`
@@ -514,7 +570,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     } catch {
       // Keep results visible if download fails.
     }
-  }, [batchResults]);
+  }, [batchResults, isResizeTool]);
 
   const handleUpgradeClick = useCallback(() => {
     window.location.href = `/${locale}/pricing`;
@@ -538,6 +594,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setFormatReasonKey(null);
     setSizeReductionPercent(null);
     setInputSizeBytes(null);
+    setContentKind(null);
+    setBackgroundFillApplied(false);
     setUpscaleReasonKey(null);
     setUpscaleWarningKey(null);
     setUpscaleModelLabel(null);
@@ -553,7 +611,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setProgress(0);
     setBatchProgress({ current: 0, total: 0 });
     setIsSubmitting(false);
-    setResizeParams({});
+    setResizeParams(DEFAULT_RESIZE_PARAMS);
+    setOriginalImageMeta(null);
     setUpscaleParams(DEFAULT_UPSCALE_PARAMS);
     setConvertParams(DEFAULT_CONVERT_PARAMS);
     setBgRemovalParams(DEFAULT_BG_REMOVAL_PARAMS);
@@ -598,6 +657,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 file={selectedFile}
                 previewUrl={filePreviewUrl}
                 acceptedFormats={tool.limits.acceptedFormats}
+                originalDimensions={
+                  originalImageMeta
+                    ? { width: originalImageMeta.width, height: originalImageMeta.height }
+                    : null
+                }
                 onFileSelected={handleFileSelected}
                 onClear={clearSelectedFile}
               />
@@ -635,11 +699,24 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 <ResizeOptions
                   value={resizeParams}
                   onChange={setResizeParams}
+                  originalDimensions={
+                    originalImageMeta
+                      ? { width: originalImageMeta.width, height: originalImageMeta.height }
+                      : null
+                  }
+                  originalFileSize={originalImageMeta?.sizeBytes ?? null}
+                  maxQuality={maxResizeQuality}
                   error={isResizeTool && validationErrorKey?.startsWith('validationResize') ? validationMessage : null}
                 />
               )}
               {isUpscaleTool && <UpscaleOptions value={upscaleParams} onChange={setUpscaleParams} />}
-              {isConvertTool && <ConvertOptions value={convertParams} onChange={setConvertParams} />}
+              {isConvertTool && (
+                <ConvertOptions
+                  value={convertParams}
+                  onChange={setConvertParams}
+                  imageMimeType={selectedFile?.type ?? null}
+                />
+              )}
               {isBackgroundTool && (
                 <BgRemovalOptions value={bgRemovalParams} onChange={setBgRemovalParams} />
               )}
@@ -691,7 +768,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 !batchMode &&
                 selectedFile && (
                   <p className="text-center text-xs text-text-tertiary">
-                    {t('creditsPerImageHint', { cost: tool.creditsCost })}
+                    {isUpscaleTool || isBackgroundTool
+                      ? t('creditsAiToolHint', { cost: tool.creditsCost })
+                      : t('creditsPerImageHint', { cost: tool.creditsCost })}
                   </p>
                 )
               )}
@@ -704,6 +783,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
           progress={progress}
           label={processingLabel}
           isAiTool={tool.type === 'ai'}
+          isUpscaleTool={isUpscaleTool}
         />
       }
       result={
@@ -712,7 +792,14 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
             results={batchResults}
             hasCommercialLicense={hasCommercialLicense}
             showCompressionStats={tool.category === 'compress' || tool.category === 'convert'}
-            onDownload={(id) => void handleDownload(id)}
+            onDownload={(id) => {
+              const item = batchResults.find((entry) => entry.jobId === id);
+              const downloadFileName =
+                isResizeTool && item?.outputWidth && item?.outputHeight
+                  ? buildResizeDownloadFilename(item.fileName, item.outputWidth, item.outputHeight)
+                  : undefined;
+              void handleDownload(id, downloadFileName);
+            }}
             onDownloadAll={() => void handleDownloadAll()}
             onReset={handleReset}
           />
@@ -730,6 +817,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               formatReasonKey={formatReasonKey}
               sizeReductionPercent={sizeReductionPercent}
               inputSizeBytes={inputSizeBytes}
+              contentKind={contentKind}
+              backgroundFillApplied={backgroundFillApplied}
               upscaleReasonKey={upscaleReasonKey}
               upscaleWarningKey={upscaleWarningKey}
               upscaleModelLabel={upscaleModelLabel}
@@ -740,6 +829,10 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               bgRemovalSubjectMode={bgRemovalSubjectMode}
               bgRemovalEdgeQuality={bgRemovalEdgeQuality}
               bgRemovalSmartMode={bgRemovalSmartMode}
+              sizeCompareOutputLabel={isResizeTool ? 'result' : 'compressed'}
+              beforePreviewUrl={isUpscaleTool ? filePreviewUrl : null}
+              inputWidth={originalImageMeta?.width ?? null}
+              inputHeight={originalImageMeta?.height ?? null}
               onDownload={() => void handleDownload()}
               onUpgradeClick={handleUpgradeClick}
               onReset={handleReset}

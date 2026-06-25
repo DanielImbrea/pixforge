@@ -15,6 +15,8 @@ export interface BatchResultItem {
   inputSizeBytes?: number | null;
   outputSizeBytes?: number | null;
   formatReasonKey?: string | null;
+  outputWidth?: number | null;
+  outputHeight?: number | null;
 }
 
 interface BatchResultsViewProps {

@@ -12,3 +12,8 @@ export const BATCH_MAX_FILES = 10;
 export function getPlanConfig(plan: PlanTier): PlanConfig {
   return PLAN_LIMITS[plan];
 }
+
+export function getMaxResizeQuality(plan: PlanTier | null | undefined): number {
+  if (!plan) return PLAN_LIMITS.free.maxResizeQuality;
+  return PLAN_LIMITS[plan].maxResizeQuality;
+}

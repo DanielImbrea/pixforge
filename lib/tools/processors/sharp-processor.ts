@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import type { ProcessInput, ProcessResult, ToolProcessor } from '../processor';
-import { applyBackgroundFill, type BackgroundFill } from '@/lib/image/background-fill';
+import { applyBackgroundFill, shouldApplyBackgroundFill, type BackgroundFill } from '@/lib/image/background-fill';
 import { classifyImageContent } from '@/lib/image/classify-content';
 import {
   computeSizeReductionPercent,
@@ -25,6 +25,23 @@ const MIME_BY_FORMAT: Record<OutputFormat, string> = {
   webp: 'image/webp',
   avif: 'image/avif',
 };
+
+function buildOutputFormatLabel(
+  formatChoice: SmartFormatChoice,
+  encodeQuality: number | null
+): string {
+  const base = formatLabel(formatChoice.format, formatChoice.lossless);
+  if (formatChoice.lossless || encodeQuality == null) return base;
+  return `${base} · ${encodeQuality}%`;
+}
+
+function wasBackgroundFillApplied(
+  outputFormat: OutputFormat,
+  profile: Awaited<ReturnType<typeof classifyImageContent>>,
+  backgroundFill: BackgroundFill
+): boolean {
+  return shouldApplyBackgroundFill(profile, outputFormat, backgroundFill);
+}
 
 function formatFromSharpMeta(format: string | undefined): OutputFormat {
   if (format === 'png') return 'png';
@@ -55,7 +72,7 @@ async function encodePipeline(
     backgroundFill?: BackgroundFill;
     enableFallback?: boolean;
   }
-): Promise<{ buffer: Buffer; formatChoice: SmartFormatChoice }> {
+): Promise<{ buffer: Buffer; formatChoice: SmartFormatChoice; encodeQuality: number | null }> {
   const formats: OutputFormat[] =
     options.enableFallback && formatChoice.format === 'avif'
       ? ['avif', 'webp', 'jpeg']
@@ -90,7 +107,7 @@ async function encodePipeline(
       const lossless = resolvedQuality.lossless ?? choice.lossless;
       const qualityOverride = options.qualityOverride ?? resolvedQuality.qualityOverride;
 
-      if (format === 'jpeg') {
+      if (shouldApplyBackgroundFill(profile, format, options.backgroundFill ?? 'white')) {
         pipeline = await applyBackgroundFill(pipeline, profile, options.backgroundFill ?? 'white');
       }
 
@@ -104,7 +121,8 @@ async function encodePipeline(
       });
 
       const buffer = await pipeline.toBuffer();
-      return { buffer, formatChoice: { ...choice, lossless } };
+      const encodeQuality = lossless ? null : qualityOverride ?? null;
+      return { buffer, formatChoice: { ...choice, lossless }, encodeQuality };
     } catch (err) {
       lastError = err;
     }
@@ -154,17 +172,52 @@ export const sharpProcessor: ToolProcessor = {
           outputWidth = projected.width;
           outputHeight = projected.height;
 
+          const allowsEnlargement =
+            projected.width > (inputMeta.width ?? 0) || projected.height > (inputMeta.height ?? 0);
+
           pipeline = applyResize(pipeline, {
             width,
             height,
             fit: (defaults.fit as keyof sharp.FitEnum) || 'inside',
             withoutEnlargement:
-              defaults.withoutEnlargement !== undefined ? Boolean(defaults.withoutEnlargement) : true,
+              allowsEnlargement
+                ? false
+                : defaults.withoutEnlargement !== undefined
+                  ? Boolean(defaults.withoutEnlargement)
+                  : true,
             inputWidth: inputMeta.width,
             inputHeight: inputMeta.height,
           });
 
-          formatChoice = selectSmartOutputFormat(profile, { operation: 'resize' });
+          const targetFormat =
+            typeof params.targetFormat === 'string' ? params.targetFormat : 'original';
+          qualityOverride =
+            typeof params.quality === 'number' ? params.quality : undefined;
+
+          if (targetFormat === 'original') {
+            const inputSharpMeta = await sharp(buffer).metadata();
+            const originalFormat = formatFromSharpMeta(inputSharpMeta.format);
+            formatChoice = {
+              format: originalFormat,
+              automatic: false,
+              reason: 'user',
+              reasonKey: 'formatReasonUser',
+              lossless: originalFormat === 'png',
+            };
+          } else if (targetFormat === 'auto') {
+            formatChoice = selectSmartOutputFormat(profile, { operation: 'resize' });
+          } else {
+            formatChoice = selectSmartOutputFormat(profile, {
+              userFormat: targetFormat,
+              operation: 'resize',
+            });
+          }
+
+          if (qualityOverride != null && formatChoice.format !== 'png') {
+            formatChoice = { ...formatChoice, lossless: false };
+          }
+
+          enableFallback = formatChoice.format === 'avif';
           break;
         }
         case 'compress': {
@@ -235,6 +288,7 @@ export const sharpProcessor: ToolProcessor = {
 
       formatChoice = encoded.formatChoice;
       let outputBuffer = encoded.buffer;
+      let encodeQuality = encoded.encodeQuality;
       let keptOriginal = false;
 
       if (operation === 'compress' && outputBuffer.byteLength >= inputSizeBytes) {
@@ -257,6 +311,7 @@ export const sharpProcessor: ToolProcessor = {
         if (retry.buffer.byteLength < outputBuffer.byteLength) {
           outputBuffer = retry.buffer;
           formatChoice = retry.formatChoice;
+          encodeQuality = retry.encodeQuality;
         }
       }
 
@@ -275,6 +330,11 @@ export const sharpProcessor: ToolProcessor = {
 
       const outputMeta = await readImageDimensions(outputBuffer);
       const sizeReductionPercent = computeSizeReductionPercent(inputSizeBytes, outputBuffer.byteLength);
+      const backgroundFillApplied = wasBackgroundFillApplied(
+        formatChoice.format,
+        profile,
+        backgroundFill
+      );
 
       return {
         status: 'done',
@@ -284,7 +344,9 @@ export const sharpProcessor: ToolProcessor = {
         outputHeight: outputMeta.height,
         outputSizeBytes: outputBuffer.byteLength,
         outputFormat: formatChoice.format,
-        outputFormatLabel: formatLabel(formatChoice.format, formatChoice.lossless),
+        outputFormatLabel: buildOutputFormatLabel(formatChoice, encodeQuality),
+        outputEncodeQuality: encodeQuality,
+        backgroundFillApplied,
         smartFormatSelected: formatChoice.automatic,
         contentKind: profile.kind,
         formatReasonKey: formatChoice.reasonKey,

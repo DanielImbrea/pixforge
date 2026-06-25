@@ -1,6 +1,9 @@
 import sharp from 'sharp';
 import type { ImageContentKind, ImageContentProfile } from '@/lib/image/classify-content';
 import type { QualityIntent } from '@/lib/image/quality-intent';
+import { computeFitInsideDimensions } from '@/lib/image/fit-inside-dimensions';
+
+export { computeFitInsideDimensions };
 
 export type OutputFormat = 'jpeg' | 'png' | 'webp' | 'avif';
 
@@ -263,45 +266,6 @@ export function dynamicScreenshotJpegQuality(width: number, height: number): num
   if (maxDim < 500) return 88;
   if (maxDim < 1500) return 92;
   return 95;
-}
-
-export function computeFitInsideDimensions(
-  inputWidth: number,
-  inputHeight: number,
-  targetWidth?: number,
-  targetHeight?: number
-): { width: number; height: number } {
-  if (!targetWidth && !targetHeight) {
-    return { width: inputWidth, height: inputHeight };
-  }
-
-  const ratio = inputWidth / inputHeight;
-
-  if (targetWidth && targetHeight) {
-    const widthScale = targetWidth / inputWidth;
-    const heightScale = targetHeight / inputHeight;
-    const scale = Math.min(widthScale, heightScale);
-    return {
-      width: Math.max(1, Math.round(inputWidth * scale)),
-      height: Math.max(1, Math.round(inputHeight * scale)),
-    };
-  }
-
-  if (targetWidth && !targetHeight) {
-    return {
-      width: targetWidth,
-      height: Math.max(1, Math.round(targetWidth / ratio)),
-    };
-  }
-
-  if (!targetWidth && targetHeight) {
-    return {
-      width: Math.max(1, Math.round(targetHeight * ratio)),
-      height: targetHeight,
-    };
-  }
-
-  return { width: inputWidth, height: inputHeight };
 }
 
 export function selectResizeKernel(

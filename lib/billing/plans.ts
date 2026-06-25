@@ -19,6 +19,7 @@ export interface PlanConfig {
   batchProcessing: boolean;
   apiAccess: boolean;
   commercialLicense: boolean;
+  maxResizeQuality: number;
 }
 
 export const PLAN_ORDER: PlanTier[] = ['free', 'basic', 'starter', 'pro'];
@@ -35,6 +36,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     batchProcessing: false,
     apiAccess: false,
     commercialLicense: false,
+    maxResizeQuality: 70,
   },
   basic: {
     tier: 'basic',
@@ -47,6 +49,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     batchProcessing: false,
     apiAccess: false,
     commercialLicense: false,
+    maxResizeQuality: 90,
   },
   starter: {
     tier: 'starter',
@@ -59,6 +62,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     batchProcessing: false,
     apiAccess: false,
     commercialLicense: false,
+    maxResizeQuality: 100,
   },
   pro: {
     tier: 'pro',
@@ -71,6 +75,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     batchProcessing: true,
     apiAccess: true,
     commercialLicense: true,
+    maxResizeQuality: 100,
   },
 };
 

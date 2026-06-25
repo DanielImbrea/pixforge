@@ -14,6 +14,9 @@ export const jobCreateRequestSchema = z.object({
 export const resizeParamsSchema = z.object({
   width: z.number().int().positive().max(10000).optional(),
   height: z.number().int().positive().max(10000).optional(),
+  maintainAspectRatio: z.boolean().optional(),
+  targetFormat: z.enum(['original', 'auto', 'avif', 'webp', 'png', 'jpeg', 'jpg']).default('original'),
+  quality: z.number().int().min(70).max(100).default(85),
 });
 
 export const upscaleParamsSchema = z.object({

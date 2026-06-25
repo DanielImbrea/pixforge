@@ -10,6 +10,8 @@ interface CompressionStatsProps {
   alreadyOptimized?: boolean;
   inputBytes: number;
   outputBytes: number;
+  /** Use "Result" label instead of "Compressed" (e.g. resize tool). */
+  outputLabel?: 'compressed' | 'result';
 }
 
 interface CompressionStatsRingProps {
@@ -127,10 +129,13 @@ export function CompressionStats({
   alreadyOptimized = false,
   inputBytes,
   outputBytes,
+  outputLabel = 'compressed',
 }: CompressionStatsProps) {
   const t = useTranslations('tool');
   const hasReduction = savedPercent > 0 && !alreadyOptimized;
   const displayPercent = formatSavedPercent(alreadyOptimized ? 0 : savedPercent);
+  const outputLabelText =
+    outputLabel === 'result' ? t('sizeCompareResult') : t('compressionCompressed');
 
   return (
     <div
@@ -158,7 +163,7 @@ export function CompressionStats({
             </dd>
           </div>
           <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-text-secondary">{t('compressionCompressed')}</dt>
+            <dt className="text-text-secondary">{outputLabelText}</dt>
             <dd className="font-semibold tabular-nums" style={{ color: BRAND_PRIMARY }}>
               {formatBytesPrecise(outputBytes)}
             </dd>

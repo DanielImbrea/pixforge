@@ -4,9 +4,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getToolById } from '@/lib/tools/registry';
 import { validateUploadBuffer, normalizeImageBuffer, ValidationError } from '@/lib/validation/upload';
 import { reserveCredits, QuotaExceededError, PlanRestrictedError, refundCredits } from '@/lib/billing/entitlements';
+import { getMaxResizeQuality } from '@/lib/billing/plan-features';
+import { clampResizeQuality } from '@/lib/tools/resize-params';
 import { uploadBufferToStorage } from '@/lib/supabase/storage';
 import { checkRateLimit, getClientIp, maybeCleanupRateLimitStore } from '@/lib/security/rate-limit';
-import { bgRemovalParamsSchema, resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
+import { bgRemovalParamsSchema, convertParamsSchema, resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
 import sharp from 'sharp';
 import type { ToolDefinition, UserRow } from '@/types';
 
@@ -42,7 +44,14 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
     if (!result.data.width && !result.data.height) {
       throw new ValidationError('Width or height is required for resize.');
     }
-    return result.data;
+    const targetFormat = result.data.targetFormat === 'jpg' ? 'jpeg' : result.data.targetFormat;
+    return {
+      width: result.data.width,
+      height: result.data.height,
+      maintainAspectRatio: result.data.maintainAspectRatio ?? true,
+      targetFormat,
+      quality: result.data.quality,
+    };
   }
 
   if (tool.category === 'upscale') {
@@ -59,6 +68,19 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
       throw new ValidationError('Invalid background removal options selected.');
     }
     return result.data;
+  }
+
+  if (tool.category === 'convert') {
+    const result = convertParamsSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError('Invalid optimizer options selected.');
+    }
+    const targetFormat = result.data.targetFormat === 'jpg' ? 'jpeg' : result.data.targetFormat;
+    return {
+      targetFormat,
+      qualityIntent: result.data.qualityIntent,
+      backgroundFill: result.data.backgroundFill,
+    };
   }
 
   return {};
@@ -161,6 +183,13 @@ export async function POST(req: NextRequest) {
     }
 
     const parsedParams = parseToolParams(tool, formData.get('params'));
+    const jobParams =
+      tool.category === 'resize' && typeof parsedParams.quality === 'number'
+        ? {
+            ...parsedParams,
+            quality: clampResizeQuality(parsedParams.quality, getMaxResizeQuality(user.plan)),
+          }
+        : parsedParams;
 
     let job;
     try {
@@ -171,7 +200,7 @@ export async function POST(req: NextRequest) {
           tool_id: tool.id,
           input_asset_id: imageAsset.id,
           status: 'pending',
-          params: parsedParams,
+          params: jobParams,
           units_cost: tool.creditsCost,
           credits_charged: true,
         })

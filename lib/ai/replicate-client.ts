@@ -1,5 +1,6 @@
 import type { ImageJobRow, ToolDefinition } from '@/types';
 import {
+  getAiProductionStatus,
   getReplicateModel,
   getReplicateWebhookUrl,
   requireReplicateToken,
@@ -87,6 +88,10 @@ export async function createReplicatePrediction(
         : getReplicateModel(tool.category);
   const { owner, name } = parseModelSlug(model);
   const webhook = getReplicateWebhookUrl(job.id);
+  const { issues } = getAiProductionStatus();
+  if (issues.length > 0) {
+    console.warn(`[replicate] config issues job=${job.id}:`, issues.join(' '));
+  }
 
   const res = await fetch(`${REPLICATE_API}/models/${owner}/${name}/predictions`, {
     method: 'POST',

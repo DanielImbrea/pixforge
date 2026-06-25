@@ -69,6 +69,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     | {
         outputFormat?: string;
         outputFormatLabel?: string;
+        outputEncodeQuality?: number | null;
+        backgroundFillApplied?: boolean;
         smartFormatSelected?: boolean;
         contentKind?: string;
         formatReasonKey?: string;
@@ -97,6 +99,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     outputSizeBytes: delivery?.outputSizeBytes ?? previewAsset.storage_files.size_bytes,
     outputFormat: delivery?.outputFormat,
     outputFormatLabel: delivery?.outputFormatLabel,
+    outputEncodeQuality: delivery?.outputEncodeQuality,
+    backgroundFillApplied: delivery?.backgroundFillApplied,
     smartFormatSelected: delivery?.smartFormatSelected,
     contentKind: delivery?.contentKind,
     formatReasonKey: delivery?.formatReasonKey,

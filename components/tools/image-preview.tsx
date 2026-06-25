@@ -8,6 +8,7 @@ interface ImagePreviewProps {
   file: File | null;
   previewUrl: string | null;
   acceptedFormats: string[];
+  originalDimensions?: { width: number; height: number } | null;
   onFileSelected: (file: File) => void;
   onClear: () => void;
 }
@@ -16,6 +17,7 @@ export function ImagePreview({
   file,
   previewUrl,
   acceptedFormats,
+  originalDimensions,
   onFileSelected,
   onClear,
 }: ImagePreviewProps) {
@@ -33,8 +35,15 @@ export function ImagePreview({
         alt={t('previewAlt')}
         className="w-full h-auto max-h-[420px] object-contain"
       />
-      <div className="absolute top-3 left-3 rounded-md bg-background-primary/90 px-2 py-1 text-xs text-text-secondary backdrop-blur-sm">
-        {file.name}
+      <div className="absolute top-3 left-3 flex flex-col gap-1">
+        <div className="rounded-md bg-background-primary/90 px-2 py-1 text-xs text-text-secondary backdrop-blur-sm">
+          {file.name}
+        </div>
+        {originalDimensions && (
+          <div className="rounded-md bg-background-primary/90 px-2 py-1 text-[11px] text-text-tertiary backdrop-blur-sm tabular-nums">
+            {originalDimensions.width} × {originalDimensions.height} px
+          </div>
+        )}
       </div>
       <button
         type="button"

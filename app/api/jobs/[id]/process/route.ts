@@ -7,6 +7,7 @@ import { getToolById } from '@/lib/tools/registry';
 import { getProcessor } from '@/lib/tools/get-processor';
 import { finalizeJobOutput } from '@/lib/tools/finalize-job-output';
 import { createSignedUrl } from '@/lib/supabase/storage';
+import { getReplicateInputUrlTtlSeconds } from '@/lib/ai/config';
 import { chargeJobOnCompletion, canDownloadHd, refundFailedJob } from '@/lib/billing/entitlements';
 import type { ImageJobRow, UserRow } from '@/types';
 
@@ -54,10 +55,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Input asset not found.' }, { status: 404 });
   }
 
+  const inputUrlTtl = tool.type === 'ai' ? getReplicateInputUrlTtlSeconds() : 300;
   const inputAssetUrl = await createSignedUrl(
     inputAsset.storage_files.bucket,
     inputAsset.storage_files.storage_path,
-    300
+    inputUrlTtl
   );
 
   await admin.from('image_jobs').update({ status: 'processing' }).eq('id', jobRow.id);
@@ -120,6 +122,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     deliveryMeta: {
       outputFormat: result.outputFormat,
       outputFormatLabel: result.outputFormatLabel,
+      outputEncodeQuality: result.outputEncodeQuality,
+      backgroundFillApplied: result.backgroundFillApplied,
       smartFormatSelected: result.smartFormatSelected,
       contentKind: result.contentKind,
       formatReasonKey: result.formatReasonKey,
@@ -150,6 +154,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     outputSizeBytes: finalized.outputSizeBytes,
     outputFormat: result.outputFormat,
     outputFormatLabel: result.outputFormatLabel,
+    outputEncodeQuality: result.outputEncodeQuality,
+    backgroundFillApplied: result.backgroundFillApplied,
     smartFormatSelected: result.smartFormatSelected,
     contentKind: result.contentKind,
     formatReasonKey: result.formatReasonKey,
