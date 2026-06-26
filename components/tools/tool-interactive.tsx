@@ -14,7 +14,9 @@ import { ResultView } from './result-view';
 import { ResizeOptions } from './resize-options';
 import { ConvertOptions } from './convert-options';
 import { UpscaleOptions } from './upscale-options';
+import { DEFAULT_COMPRESS_PARAMS } from '@/lib/tools/compress-params';
 import { DEFAULT_CONVERT_PARAMS } from '@/lib/tools/convert-params';
+import { CompressOptions } from './compress-options';
 import { DEFAULT_UPSCALE_PARAMS } from '@/lib/tools/upscale-params';
 import { BgRemovalOptions } from './bg-removal-options';
 import { DEFAULT_BG_REMOVAL_PARAMS } from '@/lib/tools/bg-removal-params';
@@ -53,6 +55,7 @@ type JobResultPayload = {
   bgRemovalEdgeQuality: string | null;
   bgRemovalSmartMode: boolean;
   bgRemovalShadowRecoveryApplied: boolean;
+  compressionLevel: 'fast' | 'balanced' | 'max' | null;
 };
 
 function parseJobResultPayload(data: Record<string, unknown>): JobResultPayload {
@@ -84,6 +87,12 @@ function parseJobResultPayload(data: Record<string, unknown>): JobResultPayload 
     bgRemovalEdgeQuality: (data.bgRemovalEdgeQuality as string | null | undefined) ?? null,
     bgRemovalSmartMode: Boolean(data.bgRemovalSmartMode),
     bgRemovalShadowRecoveryApplied: Boolean(data.bgRemovalShadowRecoveryApplied),
+    compressionLevel:
+      data.compressionLevel === 'fast' ||
+      data.compressionLevel === 'balanced' ||
+      data.compressionLevel === 'max'
+        ? data.compressionLevel
+        : null,
   };
 }
 
@@ -113,6 +122,7 @@ function applyJobResultToState(
     setBgRemovalEdgeQuality: (v: string | null) => void;
     setBgRemovalSmartMode: (v: boolean) => void;
     setBgRemovalShadowRecoveryApplied: (v: boolean) => void;
+    setCompressionLevel: (v: 'fast' | 'balanced' | 'max' | null) => void;
   }
 ) {
   setters.setPreviewUrl(result.previewUrl);
@@ -138,6 +148,7 @@ function applyJobResultToState(
   setters.setBgRemovalEdgeQuality(result.bgRemovalEdgeQuality);
   setters.setBgRemovalSmartMode(result.bgRemovalSmartMode);
   setters.setBgRemovalShadowRecoveryApplied(result.bgRemovalShadowRecoveryApplied);
+  setters.setCompressionLevel(result.compressionLevel);
 }
 
 type Stage = 'configure' | 'processing' | 'result' | 'error';
@@ -199,6 +210,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [upscaleParams, setUpscaleParams] = useState(DEFAULT_UPSCALE_PARAMS);
   const [convertParams, setConvertParams] = useState(DEFAULT_CONVERT_PARAMS);
   const [bgRemovalParams, setBgRemovalParams] = useState(DEFAULT_BG_REMOVAL_PARAMS);
+  const [compressParams, setCompressParams] = useState(DEFAULT_COMPRESS_PARAMS);
+  const [compressionLevel, setCompressionLevel] = useState<'fast' | 'balanced' | 'max' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -207,8 +220,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const isResizeTool = tool.category === 'resize';
   const isUpscaleTool = tool.category === 'upscale';
   const isConvertTool = tool.category === 'convert';
+  const isCompressTool = tool.category === 'compress';
   const isBackgroundTool = tool.category === 'background';
-  const hasOptions = isResizeTool || isUpscaleTool || isConvertTool || isBackgroundTool;
+  const hasOptions = isResizeTool || isUpscaleTool || isConvertTool || isCompressTool || isBackgroundTool;
 
   useEffect(() => {
     if (!isResizeTool) return;
@@ -388,7 +402,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       return;
     }
 
-    const rawParams = buildToolParams(tool, resizeParams, upscaleParams, convertParams, bgRemovalParams);
+    const rawParams = buildToolParams(tool, resizeParams, upscaleParams, convertParams, bgRemovalParams, compressParams);
     const validation = validateToolParams(tool, rawParams);
 
     if (!validation.valid) {
@@ -431,6 +445,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
         setBgRemovalEdgeQuality,
         setBgRemovalSmartMode,
         setBgRemovalShadowRecoveryApplied,
+        setCompressionLevel,
       });
       setStage('result');
     } catch (err) {
@@ -448,6 +463,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     upscaleParams,
     convertParams,
     bgRemovalParams,
+    compressParams,
     startProgressSimulation,
     stopProgressSimulation,
     processSingleFile,
@@ -461,7 +477,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       return;
     }
 
-    const rawParams = buildToolParams(tool, resizeParams, upscaleParams, convertParams, bgRemovalParams);
+    const rawParams = buildToolParams(tool, resizeParams, upscaleParams, convertParams, bgRemovalParams, compressParams);
     const validation = validateToolParams(tool, rawParams);
 
     if (!validation.valid) {
@@ -529,6 +545,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     upscaleParams,
     convertParams,
     bgRemovalParams,
+    compressParams,
     startProgressSimulation,
     stopProgressSimulation,
     processSingleFile,
@@ -613,6 +630,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setBgRemovalEdgeQuality(null);
     setBgRemovalSmartMode(false);
     setBgRemovalShadowRecoveryApplied(false);
+    setCompressionLevel(null);
     setErrorMessage(null);
     setValidationErrorKey(null);
     setProgress(0);
@@ -623,6 +641,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setUpscaleParams(DEFAULT_UPSCALE_PARAMS);
     setConvertParams(DEFAULT_CONVERT_PARAMS);
     setBgRemovalParams(DEFAULT_BG_REMOVAL_PARAMS);
+    setCompressParams(DEFAULT_COMPRESS_PARAMS);
   }, [stopPolling, stopProgressSimulation, clearSelectedFile]);
 
   const validationMessage = validationErrorKey ? t(validationErrorKey) : null;
@@ -724,6 +743,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                   imageMimeType={selectedFile?.type ?? null}
                 />
               )}
+              {isCompressTool && (
+                <CompressOptions value={compressParams} onChange={setCompressParams} />
+              )}
               {isBackgroundTool && (
                 <BgRemovalOptions value={bgRemovalParams} onChange={setBgRemovalParams} />
               )}
@@ -740,6 +762,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 <p className="text-xs text-danger">{validationMessage}</p>
               )}
               {validationErrorKey === 'validationBgRemovalInvalid' && (
+                <p className="text-xs text-danger">{validationMessage}</p>
+              )}
+              {validationErrorKey === 'validationCompressInvalid' && (
                 <p className="text-xs text-danger">{validationMessage}</p>
               )}
             </>
@@ -837,6 +862,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               bgRemovalEdgeQuality={bgRemovalEdgeQuality}
               bgRemovalSmartMode={bgRemovalSmartMode}
               bgRemovalShadowRecoveryApplied={bgRemovalShadowRecoveryApplied}
+              isCompressOnly={isCompressTool}
+              compressionLevel={compressionLevel}
               sizeCompareOutputLabel={isResizeTool ? 'result' : 'compressed'}
               beforePreviewUrl={isUpscaleTool ? filePreviewUrl : null}
               inputWidth={originalImageMeta?.width ?? null}

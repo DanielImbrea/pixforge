@@ -1,6 +1,7 @@
 import type { ToolDefinition } from '@/types';
 import { convertParamsSchema, bgRemovalParamsSchema, resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
 import { DEFAULT_BG_REMOVAL_PARAMS, type BgRemovalParams } from '@/lib/tools/bg-removal-params';
+import { DEFAULT_COMPRESS_PARAMS, type CompressParams } from '@/lib/tools/compress-params';
 import { DEFAULT_CONVERT_PARAMS, type ConvertParams } from '@/lib/tools/convert-params';
 import { DEFAULT_RESIZE_PARAMS, type ResizeParams } from '@/lib/tools/resize-params';
 import { DEFAULT_UPSCALE_PARAMS, type UpscaleParams } from '@/lib/tools/upscale-params';
@@ -44,6 +45,14 @@ export function validateToolParams(
     return { valid: true, params: result.data };
   }
 
+  if (tool.category === 'compress') {
+    const qualityIntent = raw.qualityIntent;
+    if (qualityIntent !== 'fast' && qualityIntent !== 'balanced' && qualityIntent !== 'max') {
+      return { valid: false, params: {}, errorKey: 'validationCompressInvalid' };
+    }
+    return { valid: true, params: { qualityIntent } };
+  }
+
   if (tool.category === 'convert') {
     const result = convertParamsSchema.safeParse(raw);
     if (!result.success) {
@@ -76,7 +85,8 @@ export function buildToolParams(
   resizeParams: ResizeParams = DEFAULT_RESIZE_PARAMS,
   upscaleParams: UpscaleParams = DEFAULT_UPSCALE_PARAMS,
   convertParams: ConvertParams = DEFAULT_CONVERT_PARAMS,
-  bgRemovalParams: BgRemovalParams = DEFAULT_BG_REMOVAL_PARAMS
+  bgRemovalParams: BgRemovalParams = DEFAULT_BG_REMOVAL_PARAMS,
+  compressParams: CompressParams = DEFAULT_COMPRESS_PARAMS
 ): Record<string, unknown> {
   if (tool.category === 'resize') {
     return {
@@ -89,6 +99,9 @@ export function buildToolParams(
   }
   if (tool.category === 'upscale') {
     return { scale: upscaleParams.scale };
+  }
+  if (tool.category === 'compress') {
+    return { qualityIntent: compressParams.qualityIntent };
   }
   if (tool.category === 'convert') {
     return {

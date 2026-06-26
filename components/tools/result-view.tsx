@@ -30,6 +30,8 @@ interface ResultViewProps {
   bgRemovalEdgeQuality?: string | null;
   bgRemovalSmartMode?: boolean;
   bgRemovalShadowRecoveryApplied?: boolean;
+  isCompressOnly?: boolean;
+  compressionLevel?: 'fast' | 'balanced' | 'max' | null;
   sizeCompareOutputLabel?: 'compressed' | 'result';
   beforePreviewUrl?: string | null;
   inputWidth?: number | null;
@@ -89,6 +91,8 @@ export function ResultView({
   bgRemovalEdgeQuality,
   bgRemovalSmartMode = false,
   bgRemovalShadowRecoveryApplied = false,
+  isCompressOnly = false,
+  compressionLevel = null,
   sizeCompareOutputLabel = 'compressed',
   beforePreviewUrl,
   inputWidth,
@@ -102,12 +106,13 @@ export function ResultView({
   const dimensionsLabel =
     outputWidth && outputHeight ? `${outputWidth} × ${outputHeight} px` : null;
   const resolvedInputBytes = resolveInputBytes(inputSizeBytes, outputSizeBytes, sizeReductionPercent);
-  const isCompressOrConvertResult =
+  const isConvertResult =
+    !isCompressOnly &&
     Boolean(outputFormatLabel || formatReasonKey || smartFormatSelected) &&
     !upscaleReasonKey &&
     !bgRemovalReasonKey;
   const showCompressionStats =
-    isCompressOrConvertResult &&
+    (isCompressOnly || isConvertResult) &&
     outputSizeBytes != null &&
     outputSizeBytes > 0 &&
     resolvedInputBytes != null &&
@@ -158,10 +163,12 @@ export function ResultView({
           inputBytes={resolvedInputBytes!}
           outputBytes={outputSizeBytes!}
           outputLabel={sizeCompareOutputLabel}
+          dimensionsLabel={dimensionsLabel}
+          compressionLevel={compressionLevel}
         />
       )}
 
-      {(dimensionsLabel || sizeLabel || outputFormatLabel || upscaleReasonKey || bgRemovalReasonKey) && (
+      {!isCompressOnly && (dimensionsLabel || sizeLabel || outputFormatLabel || upscaleReasonKey || bgRemovalReasonKey) && (
         <div className="text-xs text-text-tertiary text-center space-y-2">
           {(dimensionsLabel || sizeLabel) && (
             <p>{[dimensionsLabel, sizeLabel].filter(Boolean).join(' · ')}</p>

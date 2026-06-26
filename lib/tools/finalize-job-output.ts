@@ -22,6 +22,7 @@ export interface FinalizeJobOutputInput {
     smartFormatSelected?: boolean;
     contentKind?: string;
     formatReasonKey?: string;
+    compressionLevel?: 'fast' | 'balanced' | 'max';
     sizeReductionPercent?: number | null;
     inputSizeBytes?: number | null;
     outputSizeBytes?: number | null;

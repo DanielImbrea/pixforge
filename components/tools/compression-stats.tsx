@@ -12,6 +12,8 @@ interface CompressionStatsProps {
   outputBytes: number;
   /** Use "Result" label instead of "Compressed" (e.g. resize tool). */
   outputLabel?: 'compressed' | 'result';
+  dimensionsLabel?: string | null;
+  compressionLevel?: 'fast' | 'balanced' | 'max' | null;
 }
 
 interface CompressionStatsRingProps {
@@ -130,12 +132,22 @@ export function CompressionStats({
   inputBytes,
   outputBytes,
   outputLabel = 'compressed',
+  dimensionsLabel = null,
+  compressionLevel = null,
 }: CompressionStatsProps) {
   const t = useTranslations('tool');
   const hasReduction = savedPercent > 0 && !alreadyOptimized;
   const displayPercent = formatSavedPercent(alreadyOptimized ? 0 : savedPercent);
   const outputLabelText =
     outputLabel === 'result' ? t('sizeCompareResult') : t('compressionCompressed');
+  const compressionLevelLabel =
+    compressionLevel === 'fast'
+      ? t('compressLevelMaximum')
+      : compressionLevel === 'max'
+        ? t('compressLevelLow')
+        : compressionLevel === 'balanced'
+          ? t('compressLevelBalanced')
+          : null;
 
   return (
     <div
@@ -178,6 +190,18 @@ export function CompressionStats({
               </dd>
             </div>
           )}
+          {dimensionsLabel ? (
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-text-secondary">{t('compressionDimensions')}</dt>
+              <dd className="font-medium tabular-nums text-text-primary">{dimensionsLabel}</dd>
+            </div>
+          ) : null}
+          {compressionLevelLabel ? (
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-text-secondary">{t('compressionLevelLabel')}</dt>
+              <dd className="font-medium text-text-primary">{compressionLevelLabel}</dd>
+            </div>
+          ) : null}
         </dl>
       </div>
     </div>

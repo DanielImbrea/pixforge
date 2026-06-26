@@ -23,71 +23,81 @@ export const compressTool: ToolDefinition = {
   },
   limits: {
     maxUploadMB: { free: 10, basic: 10, starter: 25, pro: 50 },
-    acceptedFormats: ['image/png', 'image/jpeg', 'image/webp', 'image/avif'],
+    acceptedFormats: [
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'image/avif',
+      'image/gif',
+      'image/svg+xml',
+    ],
   },
   seo: {
     translations: {
       en: {
-        title: 'Image Compressor Online – Reduce Image Size Without Losing Quality | PixiqueAi',
+        title: 'Compress Images Online – Reduce File Size, Keep Original Format | PixiqueAi',
         metaDescription:
-          'Compress images instantly with smart AI optimization. Reduce file size for JPG, PNG and WebP while preserving quality.',
-        h1: 'Image Compressor Online',
+          'Compress JPG, PNG, WebP, AVIF, SVG and GIF images in seconds. Reduce file size while keeping the original format and excellent visual quality.',
+        h1: 'Compress your images',
         intro:
-          'Drop in a photo and we shrink file size with smart compression — auto-selecting the best format and quality for photos, screenshots, and graphics.',
+          'Compress JPG, PNG, WebP, AVIF, SVG and GIF images with the best balance between quality and file size.',
         howItWorks:
-          'Upload your image. Our engine classifies the content, picks the optimal format (AVIF for photos, lossless WebP for UI), and applies adaptive quality settings to minimize file size.',
+          'Reduce the file size of your images in seconds while keeping the original format and excellent visual quality.',
         benefits: [
-          'Smart compression — format auto selection based on image type',
-          'Photos → AVIF for maximum size savings at equal visual quality',
-          'UI/screenshots → lossless WebP to preserve sharp text',
-          'Before/after file size shown on every result',
+          'Keeps your original format — JPG stays JPG, PNG stays PNG',
+          'Adaptive compression tuned for each format',
+          'Before/after file size and savings shown on every result',
+          'Optional compression levels from maximum savings to higher quality',
           'Free tier available — no installation required',
         ],
         faq: [
           {
-            question: 'Will quality be reduced?',
+            question: 'Will compression change my file format?',
             answer:
-              'Compression always trades some data for size, but smart routing keeps changes invisible at normal viewing sizes. Photos tolerate more compression than screenshots with small text.',
+              'No. This tool only compresses your image in its original format. Use the Smart Format Optimizer if you want automatic format conversion.',
           },
           {
-            question: 'Best format for web?',
+            question: 'Will quality be reduced?',
             answer:
-              'AVIF for photos, WebP (often lossless) for UI and graphics, PNG when you need transparency. Our tool picks automatically.',
+              'Compression trades some data for a smaller file, but we tune quality per format so changes stay invisible at normal viewing sizes.',
           },
           {
             question: 'Does compression change image dimensions?',
-            answer: 'No, compression only reduces file size. Use our Image Resizer if you also need different dimensions.',
+            answer: 'No, only file size changes. Use the Image Resizer if you need different dimensions.',
           },
         ],
         keywords: ['image compressor online', 'reduce image size', 'compress jpg png', 'compress image'],
       },
       ro: {
-        title: 'Compresie Poze Online — Reduce Dimensiunea Fără Pierdere de Calitate',
+        title: 'Comprimă Imagini Online — Reduce Dimensiunea, Păstrează Formatul Original',
         metaDescription:
-          'Micșorează dimensiunea fișierelor JPG, PNG și WEBP în câteva secunde, păstrând calitatea vizuală. Compresor de imagini gratuit, fără înregistrare.',
-        h1: 'Comprimă-ți imaginile',
+          'Comprimă imagini JPG, PNG, WebP, AVIF, SVG și GIF în câteva secunde. Redu dimensiunea fișierului fără a schimba formatul original.',
+        h1: 'Comprimă imaginile',
         intro:
-          'Încarcă o poză și îi reducem dimensiunea fișierului cu compresie inteligentă care alege automat formatul și calitatea potrivite tipului de imagine.',
+          'Comprimă imagini JPG, PNG, WebP, AVIF, SVG și GIF păstrând cea mai bună calitate posibilă.',
+        howItWorks:
+          'Redu dimensiunea fișierelor în doar câteva secunde, fără a schimba formatul original al imaginii.',
         benefits: [
-          'Detectează automat fotografii vs screenshot-uri și alege formatul optim',
-          'Fotografii → AVIF (fișier mai mic decât JPEG la aceeași calitate vizuală)',
-          'UI/screenshot-uri → WebP lossless (fără blur pe text)',
-          'Calitatea se adaptează la dimensiunea imaginii',
-          'Plan gratuit disponibil pentru uz zilnic',
+          'Păstrează formatul original — JPG rămâne JPG, PNG rămâne PNG',
+          'Compresie adaptată pentru fiecare format',
+          'Dimensiune înainte/după și economii afișate la fiecare rezultat',
+          'Niveluri de compresie de la economie maximă la calitate mai mare',
+          'Plan gratuit disponibil — fără instalare',
         ],
         faq: [
           {
-            question: 'Cu cât se va micșora fișierul meu?',
+            question: 'Compresia schimbă formatul fișierului?',
             answer:
-              'Pozele obișnuite se micșorează cu 40 până la 70 la sută, în funcție de conținut și calitatea inițială, cu diferențe vizuale minime la dimensiuni normale de vizualizare.',
+              'Nu. Această unealtă comprimă imaginea în formatul original. Folosește Smart Format Optimizer dacă vrei conversie automată de format.',
+          },
+          {
+            question: 'Calitatea va scădea?',
+            answer:
+              'Compresia reduce dimensiunea fișierului, dar ajustăm calitatea pe format astfel încât diferențele să fie greu de observat la dimensiuni normale.',
           },
           {
             question: 'Compresia schimbă dimensiunile imaginii?',
-            answer: 'Nu, compresia reduce doar dimensiunea fișierului. Folosește unealta de redimensionare dacă ai nevoie și de alte dimensiuni.',
-          },
-          {
-            question: 'Pot comprima fișiere PNG?',
-            answer: 'Da, PNG, JPG și WEBP sunt toate suportate.',
+            answer: 'Nu, doar dimensiunea fișierului. Folosește unealta de redimensionare dacă ai nevoie de alte dimensiuni.',
           },
         ],
         keywords: ['compresie poze', 'reduce dimensiune imagine', 'compresor imagini online'],

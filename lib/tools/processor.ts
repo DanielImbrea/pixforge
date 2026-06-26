@@ -1,4 +1,5 @@
 import type { ImageJobRow, ToolDefinition } from '@/types';
+import type { QualityIntent } from '@/lib/image/quality-intent';
 
 export interface ProcessInput {
   job: ImageJobRow;
@@ -20,6 +21,7 @@ export interface ProcessResult {
   smartFormatSelected?: boolean;
   contentKind?: string;
   formatReasonKey?: string;
+  compressionLevel?: QualityIntent;
   sizeReductionPercent?: number | null;
   inputSizeBytes?: number;
   keptOriginal?: boolean;

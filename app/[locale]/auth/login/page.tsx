@@ -12,7 +12,7 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
   const user = await getCurrentUser();
 
   if (user) {
-    redirect(`/${locale}/dashboard`);
+    redirect(`/${locale}/tools`);
   }
 
   const t = await getTranslations({ locale, namespace: 'auth' });

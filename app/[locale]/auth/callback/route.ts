@@ -16,5 +16,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/${locale}/auth/reset-password`);
   }
 
-  return NextResponse.redirect(`${origin}/${locale}/dashboard`);
+  return NextResponse.redirect(`${origin}/${locale}/tools`);
 }

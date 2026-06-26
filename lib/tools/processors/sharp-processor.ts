@@ -19,12 +19,28 @@ import {
   type SmartFormatChoice,
 } from '@/lib/image/sharp-encode';
 
-const MIME_BY_FORMAT: Record<OutputFormat, string> = {
+const MIME_BY_FORMAT: Record<string, string> = {
   jpeg: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
   avif: 'image/avif',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
 };
+
+function buildPreserveFormatChoice(format: OutputFormat): SmartFormatChoice {
+  return {
+    format,
+    automatic: false,
+    reason: 'user',
+    reasonKey: 'formatReasonUser',
+    lossless: format === 'png',
+  };
+}
+
+async function encodeGifCompress(pipeline: sharp.Sharp, effort: number): Promise<Buffer> {
+  return pipeline.gif({ effort, dither: 1 }).toBuffer();
+}
 
 function buildOutputFormatLabel(
   formatChoice: SmartFormatChoice,
@@ -221,24 +237,67 @@ export const sharpProcessor: ToolProcessor = {
           break;
         }
         case 'compress': {
-          qualityOverride =
-            typeof params.quality === 'number'
-              ? params.quality
-              : typeof defaults.quality === 'number'
-                ? defaults.quality
-                : undefined;
+          const inputSharpMeta = await sharp(buffer).metadata();
+          const rawFormat = inputSharpMeta.format;
 
-          formatChoice = selectSmartOutputFormat(profile, { operation: 'compress' });
-          if (formatChoice.lossless && !profile.hasTransparency) {
-            formatChoice = {
-              format: 'webp',
-              automatic: true,
-              reason: 'photo',
-              reasonKey: 'formatReasonCompressLossy',
-              lossless: false,
+          qualityIntent =
+            params.qualityIntent === 'fast' ||
+            params.qualityIntent === 'balanced' ||
+            params.qualityIntent === 'max'
+              ? params.qualityIntent
+              : 'balanced';
+
+          if (rawFormat === 'svg') {
+            return {
+              status: 'done',
+              outputBuffer: buffer,
+              outputMimeType: MIME_BY_FORMAT.svg,
+              outputWidth: inputMeta.width,
+              outputHeight: inputMeta.height,
+              outputSizeBytes: inputSizeBytes,
+              outputFormat: 'svg',
+              keptOriginal: true,
+              smartFormatSelected: false,
+              formatReasonKey: 'formatReasonAlreadyOptimized',
+              compressionLevel: qualityIntent,
+              sizeReductionPercent: null,
+              inputSizeBytes,
             };
           }
-          enableFallback = formatChoice.format === 'avif';
+
+          if (rawFormat === 'gif') {
+            let outputBuffer = await encodeGifCompress(pipeline, 10);
+            let keptOriginal = false;
+
+            if (outputBuffer.byteLength >= inputSizeBytes) {
+              outputBuffer = await encodeGifCompress(pipeline, 7);
+            }
+            if (outputBuffer.byteLength >= inputSizeBytes) {
+              outputBuffer = buffer;
+              keptOriginal = true;
+            }
+
+            const outputMeta = await readImageDimensions(outputBuffer);
+            return {
+              status: 'done',
+              outputBuffer,
+              outputMimeType: MIME_BY_FORMAT.gif,
+              outputWidth: outputMeta.width,
+              outputHeight: outputMeta.height,
+              outputSizeBytes: outputBuffer.byteLength,
+              outputFormat: 'gif',
+              keptOriginal,
+              smartFormatSelected: false,
+              formatReasonKey: keptOriginal ? 'formatReasonAlreadyOptimized' : undefined,
+              compressionLevel: qualityIntent,
+              sizeReductionPercent: computeSizeReductionPercent(inputSizeBytes, outputBuffer.byteLength),
+              inputSizeBytes,
+            };
+          }
+
+          const originalFormat = formatFromSharpMeta(rawFormat);
+          formatChoice = buildPreserveFormatChoice(originalFormat);
+          enableFallback = false;
           break;
         }
         case 'convert': {
@@ -292,26 +351,23 @@ export const sharpProcessor: ToolProcessor = {
       let keptOriginal = false;
 
       if (operation === 'compress' && outputBuffer.byteLength >= inputSizeBytes) {
-        const lossyChoice: SmartFormatChoice = {
-          format: profile.hasTransparency ? 'webp' : 'jpeg',
-          automatic: true,
-          reason: 'fallback',
-          reasonKey: 'formatReasonCompressRetry',
-          lossless: false,
-        };
-        const retry = await encodePipeline(pipeline, lossyChoice, profile, {
-          operation,
-          outputWidth,
-          outputHeight,
-          qualityOverride: qualityOverride ?? 82,
-          qualityIntent: 'balanced',
-          backgroundFill,
-          enableFallback: true,
-        });
-        if (retry.buffer.byteLength < outputBuffer.byteLength) {
-          outputBuffer = retry.buffer;
-          formatChoice = retry.formatChoice;
-          encodeQuality = retry.encodeQuality;
+        const retryIntent: QualityIntent =
+          qualityIntent === 'max' ? 'balanced' : qualityIntent === 'balanced' ? 'fast' : 'fast';
+        if (retryIntent !== qualityIntent) {
+          const retry = await encodePipeline(pipeline, formatChoice, profile, {
+            operation,
+            outputWidth,
+            outputHeight,
+            qualityIntent: retryIntent,
+            backgroundFill,
+            enableFallback: false,
+          });
+          if (retry.buffer.byteLength < outputBuffer.byteLength) {
+            outputBuffer = retry.buffer;
+            formatChoice = retry.formatChoice;
+            encodeQuality = retry.encodeQuality;
+            qualityIntent = retryIntent;
+          }
         }
       }
 
@@ -321,7 +377,7 @@ export const sharpProcessor: ToolProcessor = {
         keptOriginal = true;
         formatChoice = {
           format: formatFromSharpMeta(inputSharpMeta.format),
-          automatic: true,
+          automatic: false,
           reason: 'fallback',
           reasonKey: 'formatReasonAlreadyOptimized',
           lossless: false,
@@ -335,21 +391,27 @@ export const sharpProcessor: ToolProcessor = {
         profile,
         backgroundFill
       );
+      const isCompressOperation = operation === 'compress';
 
       return {
         status: 'done',
         outputBuffer,
-        outputMimeType: MIME_BY_FORMAT[formatChoice.format],
+        outputMimeType: MIME_BY_FORMAT[formatChoice.format] ?? MIME_BY_FORMAT.jpeg,
         outputWidth: outputMeta.width,
         outputHeight: outputMeta.height,
         outputSizeBytes: outputBuffer.byteLength,
         outputFormat: formatChoice.format,
-        outputFormatLabel: buildOutputFormatLabel(formatChoice, encodeQuality),
+        outputFormatLabel: isCompressOperation ? undefined : buildOutputFormatLabel(formatChoice, encodeQuality),
         outputEncodeQuality: encodeQuality,
         backgroundFillApplied,
-        smartFormatSelected: formatChoice.automatic,
-        contentKind: profile.kind,
-        formatReasonKey: formatChoice.reasonKey,
+        smartFormatSelected: isCompressOperation ? false : formatChoice.automatic,
+        contentKind: isCompressOperation ? undefined : profile.kind,
+        formatReasonKey: isCompressOperation
+          ? keptOriginal
+            ? 'formatReasonAlreadyOptimized'
+            : undefined
+          : formatChoice.reasonKey,
+        compressionLevel: isCompressOperation ? qualityIntent : undefined,
         sizeReductionPercent,
         inputSizeBytes,
         keptOriginal,

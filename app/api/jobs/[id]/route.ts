@@ -74,6 +74,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         smartFormatSelected?: boolean;
         contentKind?: string;
         formatReasonKey?: string;
+        compressionLevel?: 'fast' | 'balanced' | 'max';
         sizeReductionPercent?: number | null;
         inputSizeBytes?: number | null;
         outputSizeBytes?: number | null;
@@ -105,6 +106,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     smartFormatSelected: delivery?.smartFormatSelected,
     contentKind: delivery?.contentKind,
     formatReasonKey: delivery?.formatReasonKey,
+    compressionLevel: delivery?.compressionLevel,
     sizeReductionPercent: delivery?.sizeReductionPercent,
     inputSizeBytes: delivery?.inputSizeBytes,
     upscaleReasonKey: delivery?.upscaleReasonKey,

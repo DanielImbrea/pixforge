@@ -33,7 +33,7 @@ export function LoginForm({ locale }: { locale: string }) {
       return;
     }
 
-    const redirectTo = searchParams.get('redirectTo') || `/${locale}/dashboard`;
+    const redirectTo = searchParams.get('redirectTo') || `/${locale}/tools`;
     router.push(redirectTo);
     router.refresh();
   };

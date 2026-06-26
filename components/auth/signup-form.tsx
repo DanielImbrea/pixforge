@@ -48,7 +48,7 @@ export function SignupForm({ locale }: { locale: string }) {
     }
 
     if (data.session) {
-      router.push(`/${locale}/dashboard`);
+      router.push(`/${locale}/tools`);
       router.refresh();
       return;
     }

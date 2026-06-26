@@ -9,7 +9,7 @@ export default async function SignupPage({ params }: { params: Promise<{ locale:
   const user = await getCurrentUser();
 
   if (user) {
-    redirect(`/${locale}/dashboard`);
+    redirect(`/${locale}/tools`);
   }
 
   return (

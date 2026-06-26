@@ -33,13 +33,13 @@ function Toggle({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 rounded-full transition-colors ${
+      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
         checked ? 'bg-accent' : 'bg-background-tertiary'
       } ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-5' : 'translate-x-0.5'
+        className={`pointer-events-none absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all duration-200 ${
+          checked ? 'left-[1.375rem]' : 'left-0.5'
         }`}
       />
     </button>
