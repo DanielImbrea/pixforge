@@ -1,13 +1,16 @@
-import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import type { Locale } from '@/i18n';
 import { getCurrentUser } from '@/lib/supabase/server';
-import { Card } from '@/components/ui/card';
-import { LogoutButton } from '@/components/auth/logout-button';
-import { ApiKeysPanel } from '@/components/settings/api-keys-panel';
-import { EconomicsPanel } from '@/components/settings/economics-panel';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getPeriodStartForPlan } from '@/lib/billing/plans';
+import { getCreditsLimit, getRemainingCredits } from '@/lib/billing/entitlements';
 import { planHasFeature } from '@/lib/billing/plan-features';
-import { isAdminUser } from '@/lib/admin/auth';
+import { SettingsAccountSection } from '@/components/settings/settings-account-section';
+import { SettingsSubscriptionSection } from '@/components/settings/settings-subscription-section';
+import { SettingsPreferencesSection } from '@/components/settings/settings-preferences-section';
+import { SettingsNotificationsSection } from '@/components/settings/settings-notifications-section';
+import { SettingsPrivacySection } from '@/components/settings/settings-privacy-section';
+import { SettingsLegalSection } from '@/components/settings/settings-legal-section';
 
 export default async function SettingsPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
@@ -17,44 +20,60 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
 
   if (!user) return null;
 
-  const showApi = planHasFeature(user.plan, 'apiAccess');
-  const showEconomics = isAdminUser(user);
+  const admin = createAdminClient();
+  const periodStart = getPeriodStartForPlan(user.plan);
+
+  const [{ data: usage }, { data: subscription }] = await Promise.all([
+    admin
+      .from('tool_usage')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('period_start', periodStart)
+      .maybeSingle(),
+    admin
+      .from('subscriptions')
+      .select('current_period_end')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .maybeSingle(),
+  ]);
+
+  const creditsRemaining = getRemainingCredits(user.plan, usage);
+  const creditsLimit = getCreditsLimit(user.plan);
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-semibold text-text-primary">{t('settings')}</h1>
+    <div className="mx-auto max-w-3xl space-y-6 pb-8">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">{t('settings')}</h1>
+        <p className="text-sm text-text-secondary">{tSettings('pageDescription')}</p>
+      </header>
 
-      <Card className="max-w-md">
-        <p className="text-sm text-text-secondary mb-1">{tSettings('email')}</p>
-        <p className="text-text-primary mb-2">{user.email}</p>
-        <p className="text-sm text-text-secondary mb-1">{tSettings('currentPlan')}</p>
-        <p className="text-text-primary mb-6 capitalize">{user.plan}</p>
-        <LogoutButton locale={locale} />
-      </Card>
+      <SettingsAccountSection
+        locale={locale}
+        email={user.email}
+        plan={user.plan}
+        createdAt={user.created_at}
+      />
 
-      {showApi && <ApiKeysPanel />}
+      <SettingsSubscriptionSection
+        locale={locale}
+        plan={user.plan}
+        creditsRemaining={creditsRemaining}
+        creditsLimit={creditsLimit}
+        renewalDate={subscription?.current_period_end ?? null}
+        hasStripeCustomer={!!user.stripe_customer_id}
+      />
 
-      {showEconomics && <EconomicsPanel locale={locale} />}
+      <SettingsPreferencesSection locale={locale} />
 
-      {isAdminUser(user) && (
-        <Card className="max-w-md">
-          <h2 className="text-lg font-medium text-text-primary mb-2">{tSettings('adminPanelTitle')}</h2>
-          <p className="text-sm text-text-secondary mb-4">{tSettings('adminPanelDescription')}</p>
-          <Link href={`/${locale}/admin`} className="text-sm text-accent hover:underline">
-            {tSettings('adminPanelLink')} →
-          </Link>
-        </Card>
-      )}
+      <SettingsNotificationsSection locale={locale} />
 
-      {planHasFeature(user.plan, 'commercialLicense') && (
-        <Card className="max-w-md">
-          <h2 className="text-lg font-medium text-text-primary mb-2">{tSettings('commercialTitle')}</h2>
-          <p className="text-sm text-text-secondary mb-4">{tSettings('commercialDescription')}</p>
-          <Link href={`/${locale}/legal/commercial-license`} className="text-sm text-accent hover:underline">
-            {tSettings('commercialLink')} →
-          </Link>
-        </Card>
-      )}
+      <SettingsPrivacySection locale={locale} />
+
+      <SettingsLegalSection
+        locale={locale}
+        showCommercialLicense={planHasFeature(user.plan, 'commercialLicense')}
+      />
     </div>
   );
 }

@@ -14,4 +14,4 @@ export const DEFAULT_OG_IMAGE = {
 
 export const BRAND_NAME = 'PixiqueAi';
 
-export const BRAND_LOGO_SRC = '/demo/pixique_ai_logo.svg';
+export const BRAND_LOGO_SRC = '/demo/pixique_ai_logo.png';

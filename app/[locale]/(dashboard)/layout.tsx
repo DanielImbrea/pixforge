@@ -15,7 +15,6 @@ export default async function DashboardLayout({
 
   const links = [
     { href: `/${locale}/dashboard`, label: t('overview') },
-    { href: `/${locale}/images`, label: t('myImages') },
     { href: `/${locale}/history`, label: t('history') },
     { href: `/${locale}/billing`, label: t('billing') },
     { href: `/${locale}/settings`, label: t('settings') },

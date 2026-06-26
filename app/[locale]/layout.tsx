@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { locales, type Locale } from '@/i18n';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
+import { LightModeOnly } from '@/components/settings/light-mode-only';
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -30,6 +31,7 @@ export default async function LocaleLayout({
   return (
     <html lang={locale}>
       <body className="min-h-screen flex flex-col font-sans antialiased">
+        <LightModeOnly />
         <NextIntlClientProvider messages={messages}>
           <Navbar locale={locale as Locale} />
           <main className="flex-1">{children}</main>

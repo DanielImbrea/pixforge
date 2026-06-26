@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import type { Locale } from '@/i18n';
 import { Card } from '@/components/ui/card';
+import { AdminEconomicsPanel } from '@/components/admin/admin-economics-panel';
 import { getAdminDashboardStats } from '@/lib/admin/queries';
 import { formatAdminBytes, formatAdminDate } from '@/lib/admin/format';
 import { logAdminAction } from '@/lib/admin/audit-log';
@@ -69,6 +70,8 @@ export default async function AdminDashboardPage({ params }: { params: Promise<{
           </div>
         )}
       </Card>
+
+      <AdminEconomicsPanel locale={locale} />
     </div>
   );
 }

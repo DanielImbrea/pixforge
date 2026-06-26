@@ -2,12 +2,15 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 
-export function ManageBillingButton() {
+export function ManageBillingButton({ label }: { label?: string }) {
   const [loading, setLoading] = useState(false);
   const params = useParams();
   const locale = (params?.locale as string) || 'en';
+  const t = useTranslations('settings');
+  const buttonLabel = label ?? t('manageSubscriptionButton');
 
   const handleClick = async () => {
     setLoading(true);
@@ -24,8 +27,8 @@ export function ManageBillingButton() {
   };
 
   return (
-    <Button variant="secondary" onClick={handleClick} disabled={loading}>
-      Manage billing
+    <Button variant="secondary" size="sm" onClick={handleClick} disabled={loading}>
+      {buttonLabel}
     </Button>
   );
 }

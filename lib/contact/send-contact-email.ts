@@ -6,6 +6,22 @@ function stripEnvQuotes(value: string): string {
   return value.replace(/^["']|["']$/g, '').trim();
 }
 
+/** Resend requires `email@domain.com` or `Name <email@domain.com>`. */
+function normalizeFromAddress(value: string): string {
+  const trimmed = stripEnvQuotes(value);
+  if (/<[^>\s]+@[^>\s]+>/.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^[^\s<>]+@[^\s<>]+$/.test(trimmed)) {
+    return trimmed;
+  }
+  const nameAndEmail = trimmed.match(/^(.+?)\s+([^\s<>]+@[^\s<>]+)$/);
+  if (nameAndEmail) {
+    return `${nameAndEmail[1]} <${nameAndEmail[2]}>`;
+  }
+  return trimmed;
+}
+
 function getContactRecipient(): string {
   const raw = process.env.CONTACT_EMAIL_TO?.trim() || 'dani_imbrea@yahoo.com';
   return stripEnvQuotes(raw);
@@ -14,7 +30,7 @@ function getContactRecipient(): string {
 function getContactFromAddress(): string {
   const raw =
     process.env.CONTACT_FROM_EMAIL?.trim() || 'PixiqueAi Contact <onboarding@resend.dev>';
-  return stripEnvQuotes(raw);
+  return normalizeFromAddress(raw);
 }
 
 function formatResendError(status: number, body: string): string {

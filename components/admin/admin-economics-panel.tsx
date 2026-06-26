@@ -3,12 +3,12 @@ import type { Locale } from '@/i18n';
 import { calculateAllPlansEconomics } from '@/lib/billing/unit-economics';
 import { Card } from '@/components/ui/card';
 
-export async function EconomicsPanel({ locale }: { locale: Locale }) {
-  const t = await getTranslations({ locale, namespace: 'settings' });
+export async function AdminEconomicsPanel({ locale }: { locale: Locale }) {
+  const t = await getTranslations({ locale, namespace: 'admin' });
   const plans = calculateAllPlansEconomics();
 
   return (
-    <Card className="max-w-3xl mt-8">
+    <Card>
       <h2 className="text-lg font-medium text-text-primary mb-1">{t('economicsTitle')}</h2>
       <p className="text-sm text-text-secondary mb-6">{t('economicsDescription')}</p>
 
@@ -33,11 +33,7 @@ export async function EconomicsPanel({ locale }: { locale: Locale }) {
                   €{row.estimatedMarginEur.toFixed(2)} ({row.marginPercent.toFixed(0)}%)
                 </td>
                 <td className="py-3">
-                  <span
-                    className={
-                      row.profitableAtMaxUsage ? 'text-success' : 'text-danger'
-                    }
-                  >
+                  <span className={row.profitableAtMaxUsage ? 'text-success' : 'text-danger'}>
                     {row.profitableAtMaxUsage ? t('economicsProfitable') : t('economicsLoss')}
                   </span>
                 </td>
