@@ -5,6 +5,7 @@ import {
   getReplicateWebhookUrl,
   requireReplicateToken,
 } from '@/lib/ai/config';
+import { normalizeReplicateModelSlug, parseModelSlug } from '@/lib/ai/replicate-models';
 import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
 import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
 import type { ProcessResult } from '@/lib/tools/processor';
@@ -18,18 +19,25 @@ export interface ReplicatePrediction {
   error?: string | null;
 }
 
-function parseModelSlug(model: string): { owner: string; name: string } {
-  const [owner, name] = model.split('/');
-  if (!owner || !name) {
-    throw new Error(`Invalid Replicate model slug "${model}". Expected owner/name.`);
+function resolveModelForJob(tool: ToolDefinition, job: ImageJobRow): string {
+  const params = (job.params || {}) as Record<string, unknown>;
+  const upscaleRouting = params._upscaleRouting as UpscaleRouting | undefined;
+  const bgRouting = params._bgRemovalRouting as BgRemovalRouting | undefined;
+
+  if (tool.category === 'upscale' && upscaleRouting?.model) {
+    return normalizeReplicateModelSlug(upscaleRouting.model);
   }
-  return { owner, name };
+  if (tool.category === 'background' && bgRouting?.model) {
+    return normalizeReplicateModelSlug(bgRouting.model);
+  }
+  return normalizeReplicateModelSlug(getReplicateModel(tool.category));
 }
 
 function buildReplicateInput(
   tool: ToolDefinition,
   inputAssetUrl: string,
-  job: ImageJobRow
+  job: ImageJobRow,
+  model: string
 ): Record<string, unknown> {
   const params = (job.params || {}) as Record<string, unknown>;
 
@@ -51,9 +59,6 @@ function buildReplicateInput(
   }
 
   if (tool.category === 'background') {
-    const routing = params._bgRemovalRouting as BgRemovalRouting | undefined;
-    const model = routing?.model || getReplicateModel(tool.category);
-
     if (model.includes('rembg') && !model.includes('background-remover')) {
       return { image: inputAssetUrl };
     }
@@ -71,44 +76,82 @@ function buildReplicateInput(
   throw new Error(`Replicate input not defined for category ${tool.category}`);
 }
 
+async function postReplicatePrediction(params: {
+  model: string;
+  input: Record<string, unknown>;
+  webhook: string;
+  token: string;
+}): Promise<Response> {
+  const parsed = parseModelSlug(params.model);
+  const body = {
+    input: params.input,
+    webhook: params.webhook,
+    webhook_events_filter: ['completed'],
+  };
+
+  if (parsed.version) {
+    return fetch(`${REPLICATE_API}/predictions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${params.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...body, version: parsed.version }),
+    });
+  }
+
+  return fetch(`${REPLICATE_API}/models/${parsed.owner}/${parsed.name}/predictions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${params.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function verifyReplicateModel(model: string): Promise<{
+  slug: string;
+  ok: boolean;
+  status: number;
+}> {
+  const slug = normalizeReplicateModelSlug(model);
+  const parsed = parseModelSlug(slug);
+
+  try {
+    const token = requireReplicateToken();
+    const res = await fetch(`${REPLICATE_API}/models/${parsed.owner}/${parsed.name}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return { slug, ok: res.ok, status: res.status };
+  } catch {
+    return { slug, ok: false, status: 0 };
+  }
+}
+
 export async function createReplicatePrediction(
   tool: ToolDefinition,
   job: ImageJobRow,
   inputAssetUrl: string
 ): Promise<{ id: string }> {
   const token = requireReplicateToken();
-  const params = (job.params || {}) as Record<string, unknown>;
-  const upscaleRouting = params._upscaleRouting as UpscaleRouting | undefined;
-  const bgRouting = params._bgRemovalRouting as BgRemovalRouting | undefined;
-  const model =
-    tool.category === 'upscale' && upscaleRouting?.model
-      ? upscaleRouting.model
-      : tool.category === 'background' && bgRouting?.model
-        ? bgRouting.model
-        : getReplicateModel(tool.category);
-  const { owner, name } = parseModelSlug(model);
+  const model = resolveModelForJob(tool, job);
   const webhook = getReplicateWebhookUrl(job.id);
+  const input = buildReplicateInput(tool, inputAssetUrl, job, model);
   const { issues } = getAiProductionStatus();
   if (issues.length > 0) {
     console.warn(`[replicate] config issues job=${job.id}:`, issues.join(' '));
   }
 
-  const res = await fetch(`${REPLICATE_API}/models/${owner}/${name}/predictions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      input: buildReplicateInput(tool, inputAssetUrl, job),
-      webhook,
-      webhook_events_filter: ['completed'],
-    }),
-  });
+  const res = await postReplicatePrediction({ model, input, webhook, token });
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Replicate API error (${res.status}): ${body.slice(0, 300)}`);
+    const hint =
+      res.status === 404
+        ? ` Model "${model}" was not found on Replicate. Check REPLICATE_BG_* / REPLICATE_UPSCALE_* env vars — use 851-labs/background-remover (not background-removal).`
+        : '';
+    throw new Error(`Replicate API error (${res.status}): ${body.slice(0, 300)}.${hint}`);
   }
 
   const data = (await res.json()) as { id: string };

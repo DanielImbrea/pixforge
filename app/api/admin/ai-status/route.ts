@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAiProductionStatus } from '@/lib/ai/config';
+import {
+  getResolvedBgRemovalModels,
+  getResolvedUpscaleModels,
+} from '@/lib/ai/replicate-models';
+import { verifyReplicateModel } from '@/lib/ai/replicate-client';
 import { isAdminUser } from '@/lib/admin/auth';
 import type { UserRow } from '@/types';
 
@@ -23,5 +28,23 @@ export async function GET() {
   }
 
   const status = getAiProductionStatus();
-  return NextResponse.json(status);
+  const bgModels = getResolvedBgRemovalModels();
+  const upscaleModels = getResolvedUpscaleModels();
+
+  const uniqueModels = [...new Set([...Object.values(bgModels), ...Object.values(upscaleModels)])];
+  const modelChecks =
+    status.provider === 'replicate' && status.replicateTokenConfigured
+      ? await Promise.all(
+          uniqueModels.map(async (model) => {
+            const check = await verifyReplicateModel(model);
+            return { model: check.slug, ok: check.ok, status: check.status };
+          })
+        )
+      : [];
+
+  return NextResponse.json({
+    ...status,
+    models: { background: bgModels, upscale: upscaleModels },
+    modelChecks,
+  });
 }

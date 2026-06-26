@@ -1,4 +1,5 @@
 import type { ImageContentProfile } from '@/lib/image/classify-content';
+import { getResolvedBgRemovalModels } from '@/lib/ai/replicate-models';
 
 export type BgSubjectMode = 'product' | 'portrait' | 'object';
 export type BgSubjectModeInput = 'auto' | BgSubjectMode;
@@ -16,19 +17,18 @@ export interface BgRemovalRouting {
 }
 
 function getModelForRoute(subjectMode: BgSubjectMode, edgeQuality: BgEdgeQuality): string {
-  const fallback =
-    process.env.REPLICATE_BG_REMOVAL_MODEL?.trim() || '851-labs/background-remover';
+  const models = getResolvedBgRemovalModels();
 
   if (edgeQuality === 'studio') {
-    return process.env.REPLICATE_BG_STUDIO_MODEL?.trim() || fallback;
+    return models.studio;
   }
   if (subjectMode === 'product') {
-    return process.env.REPLICATE_BG_PRODUCT_MODEL?.trim() || fallback;
+    return models.product;
   }
   if (subjectMode === 'portrait') {
-    return process.env.REPLICATE_BG_PORTRAIT_MODEL?.trim() || fallback;
+    return models.portrait;
   }
-  return process.env.REPLICATE_BG_OBJECT_MODEL?.trim() || fallback;
+  return models.object;
 }
 
 function getModelLabel(subjectMode: BgSubjectMode, edgeQuality: BgEdgeQuality): string {

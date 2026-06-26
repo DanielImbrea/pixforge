@@ -1,4 +1,5 @@
 import type { ToolCategory } from '@/types';
+import { getResolvedBgRemovalModels } from '@/lib/ai/replicate-models';
 
 export type AiProviderMode = 'mock' | 'replicate';
 
@@ -30,7 +31,7 @@ export function getReplicateModel(category: ToolCategory): string {
     return process.env.REPLICATE_UPSCALE_MODEL?.trim() || 'nightmareai/real-esrgan';
   }
   if (category === 'background') {
-    return process.env.REPLICATE_BG_REMOVAL_MODEL?.trim() || '851-labs/background-remover';
+    return getResolvedBgRemovalModels().default;
   }
   throw new Error(`No Replicate model configured for tool category: ${category}`);
 }
