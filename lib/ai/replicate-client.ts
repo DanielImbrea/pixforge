@@ -5,7 +5,14 @@ import {
   getReplicateWebhookUrl,
   requireReplicateToken,
 } from '@/lib/ai/config';
-import { normalizeReplicateModelSlug, parseModelSlug } from '@/lib/ai/replicate-models';
+import { mapReplicateError } from '@/lib/ai/replicate-errors';
+import {
+  normalizeReplicateModelSlug,
+  parseModelSlug,
+  formatReplicateVersion,
+  getPinnedReplicateVersion,
+  getBgRemovalVersionFromEnv,
+} from '@/lib/ai/replicate-models';
 import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
 import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
 import type { ProcessResult } from '@/lib/tools/processor';
@@ -76,42 +83,85 @@ function buildReplicateInput(
   throw new Error(`Replicate input not defined for category ${tool.category}`);
 }
 
-async function postReplicatePrediction(params: {
-  model: string;
-  input: Record<string, unknown>;
-  webhook: string;
-  token: string;
-}): Promise<Response> {
-  const parsed = parseModelSlug(params.model);
-  const body = {
-    input: params.input,
-    webhook: params.webhook,
-    webhook_events_filter: ['completed'],
-  };
+export async function resolveReplicateVersion(
+  model: string,
+  token: string,
+  options: { toolCategory?: string } = {}
+): Promise<string> {
+  const parsed = parseModelSlug(model);
 
   if (parsed.version) {
-    return fetch(`${REPLICATE_API}/predictions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ...body, version: parsed.version }),
+    return formatReplicateVersion(parsed.slug, parsed.version);
+  }
+
+  if (options.toolCategory === 'background') {
+    const envVersion = getBgRemovalVersionFromEnv();
+    if (envVersion) {
+      return formatReplicateVersion(parsed.slug, envVersion);
+    }
+  }
+
+  const pinned = getPinnedReplicateVersion(parsed.slug);
+  if (pinned) {
+    return formatReplicateVersion(parsed.slug, pinned);
+  }
+
+  const res = await fetch(`${REPLICATE_API}/models/${parsed.owner}/${parsed.name}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw Object.assign(new Error(`Model lookup failed (${res.status})`), {
+      httpStatus: res.status,
+      apiBody: body,
+      model: parsed.slug,
     });
   }
 
-  return fetch(`${REPLICATE_API}/models/${parsed.owner}/${parsed.name}/predictions`, {
+  const data = (await res.json()) as { latest_version?: { id?: string } | null };
+  const versionId = data.latest_version?.id;
+  if (!versionId) {
+    throw Object.assign(new Error(`Model "${parsed.slug}" has no published version.`), {
+      httpStatus: 404,
+      model: parsed.slug,
+    });
+  }
+
+  return formatReplicateVersion(parsed.slug, versionId);
+}
+
+async function postReplicatePrediction(params: {
+  model: string;
+  toolCategory: string;
+  input: Record<string, unknown>;
+  webhook: string;
+  token: string;
+}): Promise<{ response: Response; version: string }> {
+  const version = await resolveReplicateVersion(params.model, params.token, {
+    toolCategory: params.toolCategory,
+  });
+
+  const response = await fetch(`${REPLICATE_API}/predictions`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${params.token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      version,
+      input: params.input,
+      webhook: params.webhook,
+      webhook_events_filter: ['completed'],
+    }),
   });
+
+  return { response, version };
 }
 
 export async function verifyReplicateModel(model: string): Promise<{
   slug: string;
+  version: string | null;
   ok: boolean;
   status: number;
 }> {
@@ -123,9 +173,19 @@ export async function verifyReplicateModel(model: string): Promise<{
     const res = await fetch(`${REPLICATE_API}/models/${parsed.owner}/${parsed.name}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    return { slug, ok: res.ok, status: res.status };
+
+    let version: string | null = null;
+    if (res.ok) {
+      try {
+        version = await resolveReplicateVersion(slug, token);
+      } catch {
+        version = getPinnedReplicateVersion(slug) ?? null;
+      }
+    }
+
+    return { slug, version, ok: res.ok, status: res.status };
   } catch {
-    return { slug, ok: false, status: 0 };
+    return { slug, version: getPinnedReplicateVersion(slug) ?? null, ok: false, status: 0 };
   }
 }
 
@@ -143,15 +203,29 @@ export async function createReplicatePrediction(
     console.warn(`[replicate] config issues job=${job.id}:`, issues.join(' '));
   }
 
-  const res = await postReplicatePrediction({ model, input, webhook, token });
+  const { response: res, version } = await postReplicatePrediction({
+    model,
+    toolCategory: tool.category,
+    input,
+    webhook,
+    token,
+  });
 
   if (!res.ok) {
     const body = await res.text();
-    const hint =
-      res.status === 404
-        ? ` Model "${model}" was not found on Replicate. Check REPLICATE_BG_* / REPLICATE_UPSCALE_* env vars — use 851-labs/background-remover (not background-removal).`
-        : '';
-    throw new Error(`Replicate API error (${res.status}): ${body.slice(0, 300)}.${hint}`);
+    const mapped = mapReplicateError(new Error(`Replicate API ${res.status}`), {
+      jobId: job.id,
+      toolCategory: tool.category,
+      model,
+      version,
+      httpStatus: res.status,
+      apiBody: body,
+    });
+    console.error(mapped.logMessage, mapped.logContext);
+    throw Object.assign(new Error(mapped.userMessage), {
+      errorKey: mapped.errorKey,
+      logContext: mapped.logContext,
+    });
   }
 
   const data = (await res.json()) as { id: string };
@@ -159,7 +233,9 @@ export async function createReplicatePrediction(
     throw new Error('Replicate did not return a prediction id.');
   }
 
-  console.log(`[replicate] prediction=${data.id} job=${job.id} model=${model}`);
+  console.log(
+    `[replicate] prediction=${data.id} job=${job.id} model=${model} version=${version}`
+  );
   return { id: data.id };
 }
 
@@ -171,7 +247,8 @@ export async function getReplicatePrediction(predictionId: string): Promise<Repl
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Replicate poll error (${res.status}): ${body.slice(0, 200)}`);
+    console.error(`[replicate] poll error prediction=${predictionId} status=${res.status}`, body.slice(0, 200));
+    throw new Error('Could not retrieve AI job status.');
   }
 
   return (await res.json()) as ReplicatePrediction;
@@ -208,7 +285,23 @@ export async function submitReplicateJob(
     const { id } = await createReplicatePrediction(tool, job, inputAssetUrl);
     return { status: 'processing', providerJobId: id };
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Replicate submission failed';
-    return { status: 'failed', error: message };
+    const model = resolveModelForJob(tool, job);
+    const mapped = mapReplicateError(err, {
+      jobId: job.id,
+      toolCategory: tool.category,
+      model,
+    });
+    if (!(err instanceof Error && 'logContext' in err)) {
+      console.error(mapped.logMessage, mapped.logContext);
+    }
+    const errorKey =
+      err instanceof Error && 'errorKey' in err
+        ? (err as Error & { errorKey?: string }).errorKey
+        : mapped.errorKey;
+    return {
+      status: 'failed',
+      error: mapped.userMessage,
+      errorKey,
+    };
   }
 }

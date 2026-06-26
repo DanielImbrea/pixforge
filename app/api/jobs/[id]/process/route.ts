@@ -74,7 +74,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .update({ status: 'failed', error_message: result.error || 'Processing failed.' })
       .eq('id', jobRow.id);
     await refundFailedJob(user, jobRow);
-    return NextResponse.json({ error: result.error || 'Processing failed.' }, { status: 500 });
+    return NextResponse.json(
+      { error: result.error || 'Processing failed.', errorKey: result.errorKey },
+      { status: 500 }
+    );
   }
 
   if (result.status === 'processing') {

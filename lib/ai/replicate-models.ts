@@ -3,6 +3,18 @@ const MODEL_SLUG_ALIASES: Record<string, string> = {
   '851-labs/background-removal': '851-labs/background-remover',
 };
 
+/**
+ * Pinned version hashes for community models.
+ * Community models must use POST /v1/predictions with a version id — not the official-model endpoint.
+ */
+export const PINNED_REPLICATE_VERSIONS: Record<string, string> = {
+  '851-labs/background-remover':
+    'a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc',
+  'nightmareai/real-esrgan':
+    'e1f4a2081605342caf55ba4294914cf266dcdf738397cf8826b48cdae516137c',
+  'cjwbw/rembg': 'fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003',
+};
+
 export interface ParsedModelSlug {
   owner: string;
   name: string;
@@ -10,6 +22,50 @@ export interface ParsedModelSlug {
   version?: string;
   /** Normalized `owner/name` without version */
   slug: string;
+}
+
+export interface BgRemovalEnvConfig {
+  models: Record<string, string>;
+  versionOverride?: string;
+  envSources: Record<string, string | undefined>;
+}
+
+function readEnv(key: string): string | undefined {
+  const value = process.env[key]?.trim();
+  return value || undefined;
+}
+
+/** Primary bg model slug — supports legacy REPLICATE_BG_MODEL alias. */
+export function getBgRemovalModelFromEnv(): string {
+  const raw =
+    readEnv('REPLICATE_BG_REMOVAL_MODEL') ??
+    readEnv('REPLICATE_BG_MODEL') ??
+    '851-labs/background-remover';
+  return normalizeReplicateModelSlug(raw);
+}
+
+/** Optional pinned version hash for bg removal (REPLICATE_BG_VERSION). */
+export function getBgRemovalVersionFromEnv(): string | undefined {
+  return readEnv('REPLICATE_BG_VERSION') ?? readEnv('REPLICATE_BG_REMOVAL_VERSION');
+}
+
+export function getBgRemovalEnvConfig(): BgRemovalEnvConfig {
+  const fallback = getBgRemovalModelFromEnv();
+
+  return {
+    models: getResolvedBgRemovalModels(),
+    versionOverride: getBgRemovalVersionFromEnv(),
+    envSources: {
+      REPLICATE_BG_REMOVAL_MODEL: readEnv('REPLICATE_BG_REMOVAL_MODEL'),
+      REPLICATE_BG_MODEL: readEnv('REPLICATE_BG_MODEL'),
+      REPLICATE_BG_PRODUCT_MODEL: readEnv('REPLICATE_BG_PRODUCT_MODEL'),
+      REPLICATE_BG_PORTRAIT_MODEL: readEnv('REPLICATE_BG_PORTRAIT_MODEL'),
+      REPLICATE_BG_OBJECT_MODEL: readEnv('REPLICATE_BG_OBJECT_MODEL'),
+      REPLICATE_BG_STUDIO_MODEL: readEnv('REPLICATE_BG_STUDIO_MODEL'),
+      REPLICATE_BG_VERSION: readEnv('REPLICATE_BG_VERSION'),
+      REPLICATE_BG_REMOVAL_VERSION: readEnv('REPLICATE_BG_REMOVAL_VERSION'),
+    },
+  };
 }
 
 export function normalizeReplicateModelSlug(raw: string): string {
@@ -32,37 +88,42 @@ export function parseModelSlug(raw: string): ParsedModelSlug {
   return { owner, name, version, slug: `${owner}/${name}` };
 }
 
+export function formatReplicateVersion(slug: string, versionId: string): string {
+  return `${slug}:${versionId}`;
+}
+
+export function getPinnedReplicateVersion(slug: string): string | undefined {
+  return PINNED_REPLICATE_VERSIONS[slug];
+}
+
 export function getResolvedBgRemovalModels(): Record<string, string> {
-  const fallback =
-    normalizeReplicateModelSlug(
-      process.env.REPLICATE_BG_REMOVAL_MODEL?.trim() || '851-labs/background-remover'
-    );
+  const fallback = getBgRemovalModelFromEnv();
 
   return {
     default: fallback,
     product: normalizeReplicateModelSlug(
-      process.env.REPLICATE_BG_PRODUCT_MODEL?.trim() || fallback
+      readEnv('REPLICATE_BG_PRODUCT_MODEL') ?? fallback
     ),
     portrait: normalizeReplicateModelSlug(
-      process.env.REPLICATE_BG_PORTRAIT_MODEL?.trim() || fallback
+      readEnv('REPLICATE_BG_PORTRAIT_MODEL') ?? fallback
     ),
     object: normalizeReplicateModelSlug(
-      process.env.REPLICATE_BG_OBJECT_MODEL?.trim() || fallback
+      readEnv('REPLICATE_BG_OBJECT_MODEL') ?? fallback
     ),
     studio: normalizeReplicateModelSlug(
-      process.env.REPLICATE_BG_STUDIO_MODEL?.trim() || fallback
+      readEnv('REPLICATE_BG_STUDIO_MODEL') ?? fallback
     ),
   };
 }
 
 export function getResolvedUpscaleModels(): Record<string, string> {
   const fallback =
-    process.env.REPLICATE_UPSCALE_MODEL?.trim() || 'nightmareai/real-esrgan';
+    readEnv('REPLICATE_UPSCALE_MODEL') ?? 'nightmareai/real-esrgan';
 
   return {
     default: fallback,
-    photo: process.env.REPLICATE_UPSCALE_PHOTO_MODEL?.trim() || fallback,
-    ui: process.env.REPLICATE_UPSCALE_UI_MODEL?.trim() || fallback,
-    art: process.env.REPLICATE_UPSCALE_ART_MODEL?.trim() || fallback,
+    photo: readEnv('REPLICATE_UPSCALE_PHOTO_MODEL') ?? fallback,
+    ui: readEnv('REPLICATE_UPSCALE_UI_MODEL') ?? fallback,
+    art: readEnv('REPLICATE_UPSCALE_ART_MODEL') ?? fallback,
   };
 }

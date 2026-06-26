@@ -347,10 +347,24 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   );
 
   const parseApiError = useCallback(
-    (body: { error?: string }, fallback: string) => {
+    (body: { error?: string; errorKey?: string }, fallback: string) => {
+      if (
+        body.errorKey &&
+        [
+          'errorAiUnavailable',
+          'errorAiModelConfig',
+          'errorAiBilling',
+          'errorAiAuth',
+        ].includes(body.errorKey)
+      ) {
+        return t(body.errorKey as 'errorAiUnavailable');
+      }
       const msg = body.error || fallback;
       if (msg.toLowerCase().includes('not enough credits') || msg.toLowerCase().includes('credite')) {
         return t('errorInsufficientCredits');
+      }
+      if (msg.toLowerCase().includes('replicate api error')) {
+        return t('errorAiUnavailable');
       }
       return msg;
     },
@@ -377,7 +391,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       const processRes = await fetch(`/api/jobs/${createdJobId}/process`, { method: 'POST' });
       if (!processRes.ok) {
         const body = await processRes.json().catch(() => ({}));
-        throw new Error(body.error || t('errorProcessingFailed'));
+        throw new Error(parseApiError(body, t('errorProcessingFailed')));
       }
 
       const processData = await processRes.json();

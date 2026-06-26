@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAiProductionStatus } from '@/lib/ai/config';
 import {
+  getBgRemovalEnvConfig,
   getResolvedBgRemovalModels,
   getResolvedUpscaleModels,
 } from '@/lib/ai/replicate-models';
@@ -30,6 +31,7 @@ export async function GET() {
   const status = getAiProductionStatus();
   const bgModels = getResolvedBgRemovalModels();
   const upscaleModels = getResolvedUpscaleModels();
+  const bgEnv = getBgRemovalEnvConfig();
 
   const uniqueModels = [...new Set([...Object.values(bgModels), ...Object.values(upscaleModels)])];
   const modelChecks =
@@ -37,7 +39,12 @@ export async function GET() {
       ? await Promise.all(
           uniqueModels.map(async (model) => {
             const check = await verifyReplicateModel(model);
-            return { model: check.slug, ok: check.ok, status: check.status };
+            return {
+              model: check.slug,
+              version: check.version,
+              ok: check.ok,
+              status: check.status,
+            };
           })
         )
       : [];
@@ -45,6 +52,8 @@ export async function GET() {
   return NextResponse.json({
     ...status,
     models: { background: bgModels, upscale: upscaleModels },
+    backgroundEnv: bgEnv.envSources,
+    backgroundVersionOverride: bgEnv.versionOverride ?? null,
     modelChecks,
   });
 }

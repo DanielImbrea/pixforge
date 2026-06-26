@@ -39,6 +39,7 @@ export interface ProcessResult {
   bgRemovalRouting?: import('@/lib/ai/bg-removal-routing').BgRemovalRouting;
   providerJobId?: string;
   error?: string;
+  errorKey?: string;
 }
 
 export interface ToolProcessor {
