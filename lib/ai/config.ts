@@ -1,6 +1,5 @@
 import type { ToolCategory } from '@/types';
 import { getResolvedBgRemovalModels } from '@/lib/ai/replicate-models';
-import { getBlurFacesModelFromEnv } from '@/lib/ai/blur-faces-config';
 
 export type AiProviderMode = 'mock' | 'replicate';
 
@@ -35,7 +34,7 @@ export function getReplicateModel(category: ToolCategory): string {
     return getResolvedBgRemovalModels().default;
   }
   if (category === 'faces') {
-    return getBlurFacesModelFromEnv();
+    return 'browser-face-blur';
   }
   throw new Error(`No Replicate model configured for tool category: ${category}`);
 }
@@ -75,11 +74,6 @@ export function getAiProductionStatus(): AiProductionStatus {
   if (provider === 'replicate') {
     if (!replicateTokenConfigured) {
       issues.push('Set REPLICATE_API_TOKEN in environment variables.');
-    }
-    try {
-      getBlurFacesModelFromEnv();
-    } catch {
-      issues.push('Set REPLICATE_BLUR_FACES_MODEL in environment variables.');
     }
     if (appUrl.includes('localhost') || appUrl.startsWith('http://')) {
       issues.push(

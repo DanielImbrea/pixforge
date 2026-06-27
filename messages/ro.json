@@ -223,7 +223,7 @@
     "errorProcessingTimeout": "Procesarea a durat prea mult. Te rugăm să încerci din nou.",
     "errorJobStatus": "Nu s-a putut verifica statusul procesării.",
     "errorAiUnavailable": "Serviciul AI este temporar indisponibil. Te rugăm să încerci din nou în câteva minute.",
-    "errorAiModelConfig": "Eliminarea fundalului nu este configurată corect. Încearcă din nou mai târziu sau contactează suportul.",
+    "errorAiModelConfig": "Uneltele AI nu sunt configurate corect. Încearcă din nou mai târziu sau contactează suportul.",
     "errorAiBilling": "Serviciul AI nu a putut rula această sarcină. Contactează suportul dacă problema persistă.",
     "errorAiAuth": "Serviciul AI nu a putut fi contactat. Te rugăm să încerci din nou mai târziu.",
     "errorTooLarge": "Imaginea este prea mare. Încarcă un fișier sub limita planului tău.",

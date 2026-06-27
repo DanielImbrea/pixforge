@@ -223,7 +223,7 @@
     "errorProcessingTimeout": "Processing took too long. Please try again.",
     "errorJobStatus": "Could not check processing status.",
     "errorAiUnavailable": "The AI service is temporarily unavailable. Please try again in a few minutes.",
-    "errorAiModelConfig": "Background removal is not configured correctly. Please try again later or contact support.",
+    "errorAiModelConfig": "This AI tool is not configured correctly. Please try again later or contact support.",
     "errorAiBilling": "The AI service could not run this job. Please contact support if this continues.",
     "errorAiAuth": "The AI service could not be reached. Please try again later.",
     "errorTooLarge": "Image is too large. Please upload a file under your plan limit.",

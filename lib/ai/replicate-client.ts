@@ -254,6 +254,7 @@ export async function createReplicatePrediction(
     console.error(mapped.logMessage, mapped.logContext);
     throw Object.assign(new Error(mapped.userMessage), {
       errorKey: mapped.errorKey,
+      errorDetail: mapped.errorDetail,
       logContext: mapped.logContext,
     });
   }
@@ -328,10 +329,15 @@ export async function submitReplicateJob(
       err instanceof Error && 'errorKey' in err
         ? (err as Error & { errorKey?: string }).errorKey
         : mapped.errorKey;
+    const errorDetail =
+      err instanceof Error && 'errorDetail' in err
+        ? (err as Error & { errorDetail?: string }).errorDetail
+        : mapped.errorDetail;
     return {
       status: 'failed',
       error: mapped.userMessage,
       errorKey,
+      errorDetail,
     };
   }
 }

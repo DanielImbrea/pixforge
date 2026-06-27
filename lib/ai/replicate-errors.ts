@@ -9,13 +9,25 @@ export interface MappedReplicateError {
   errorKey: ReplicateUserErrorKey;
   logMessage: string;
   logContext: Record<string, unknown>;
+  errorDetail?: string;
+}
+
+function parseReplicateApiDetail(apiBody?: string): string | undefined {
+  if (!apiBody) return undefined;
+  try {
+    const parsed = JSON.parse(apiBody) as { detail?: string; title?: string };
+    const detail = parsed.detail || parsed.title;
+    return detail?.slice(0, 300);
+  } catch {
+    return apiBody.slice(0, 300);
+  }
 }
 
 const USER_MESSAGES: Record<ReplicateUserErrorKey, string> = {
   errorAiUnavailable:
     'The AI service is temporarily unavailable. Please try again in a few minutes.',
   errorAiModelConfig:
-    'Background removal is not configured correctly on the server. Our team has been notified — please try again later.',
+    'This AI tool is not configured correctly on the server. Please try again later or contact support.',
   errorAiBilling:
     'The AI service could not run this job. Please contact support if this continues.',
   errorAiAuth:
@@ -74,6 +86,7 @@ export function mapReplicateError(
     })();
 
   const apiBody = context.apiBody ?? (message.includes('{') ? message : undefined);
+  const errorDetail = parseReplicateApiDetail(apiBody);
   const logContext = {
     jobId: context.jobId,
     toolCategory: context.toolCategory,
@@ -84,12 +97,26 @@ export function mapReplicateError(
     internalMessage: message,
   };
 
+  if (
+    message.includes('REPLICATE_API_TOKEN is required') ||
+    message.includes('Invalid Replicate model slug')
+  ) {
+    return {
+      userMessage: USER_MESSAGES.errorAiAuth,
+      errorKey: 'errorAiAuth',
+      logMessage: '[replicate] missing or invalid configuration',
+      logContext,
+      errorDetail,
+    };
+  }
+
   if (status === 401 || status === 403) {
     return {
       userMessage: USER_MESSAGES.errorAiAuth,
       errorKey: 'errorAiAuth',
       logMessage: `[replicate] auth error status=${status}`,
       logContext,
+      errorDetail,
     };
   }
 
@@ -99,20 +126,24 @@ export function mapReplicateError(
       errorKey: 'errorAiBilling',
       logMessage: `[replicate] billing/payment required status=${status}`,
       logContext,
+      errorDetail,
     };
   }
 
   if (
     status === 404 ||
+    status === 422 ||
     message.includes('not found') ||
     message.includes('background-removal') ||
-    message.includes('no published version')
+    message.includes('no published version') ||
+    apiBody?.toLowerCase().includes('version')
   ) {
     return {
       userMessage: USER_MESSAGES.errorAiModelConfig,
       errorKey: 'errorAiModelConfig',
-      logMessage: `[replicate] model/version not found status=${status ?? 'unknown'}`,
+      logMessage: `[replicate] model/version/input error status=${status ?? 'unknown'}`,
       logContext,
+      errorDetail,
     };
   }
 
@@ -122,6 +153,7 @@ export function mapReplicateError(
       errorKey: 'errorAiUnavailable',
       logMessage: `[replicate] upstream error status=${status}`,
       logContext,
+      errorDetail,
     };
   }
 
@@ -130,5 +162,6 @@ export function mapReplicateError(
     errorKey: 'errorAiUnavailable',
     logMessage: `[replicate] job submission failed`,
     logContext,
+    errorDetail,
   };
 }

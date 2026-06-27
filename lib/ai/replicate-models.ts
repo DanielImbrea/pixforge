@@ -11,7 +11,7 @@ export const PINNED_REPLICATE_VERSIONS: Record<string, string> = {
   '851-labs/background-remover':
     'a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc',
   'nightmareai/real-esrgan':
-    'e1f4a2081605342caf55ba4294914cf266dcdf738397cf8826b48cdae516137c',
+    'f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa',
   'cjwbw/rembg': 'fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003',
   'kharioki/blur-faces': 'bdcc18be6a02a8f2efce1a3f7489f74a1d6729caea9b53061358fe75c93799d2',
 };
