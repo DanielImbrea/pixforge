@@ -404,6 +404,19 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
 
   const parseApiError = useCallback(
     (body: { error?: string; errorKey?: string }, fallback: string) => {
+      const blurFaceErrorKeys = [
+        'blurFacesErrorNoFacesInImage',
+        'blurFacesErrorNoFaceInPortrait',
+        'blurFacesErrorNoMatch',
+        'blurFacesErrorDetectionFailed',
+        'validationBlurFacesReferenceRequired',
+      ] as const;
+      if (
+        body.errorKey &&
+        blurFaceErrorKeys.includes(body.errorKey as (typeof blurFaceErrorKeys)[number])
+      ) {
+        return t(body.errorKey as (typeof blurFaceErrorKeys)[number]);
+      }
       if (
         body.errorKey &&
         [

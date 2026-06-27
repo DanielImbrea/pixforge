@@ -1,12 +1,16 @@
+import fs from 'fs/promises';
 import path from 'path';
+import { TextDecoder, TextEncoder } from 'util';
+import sharp from 'sharp';
 import type * as FaceApiTypes from '@vladmandic/face-api';
 
 let initPromise: Promise<void> | null = null;
 let faceapi: typeof FaceApiTypes | null = null;
 let detectorOptions: FaceApiTypes.SsdMobilenetv1Options | null = null;
+let shimsInstalled = false;
 
 const MODEL_RELATIVE_PATH = 'node_modules/@vladmandic/face-api/model';
-const MATCH_MIN_CONFIDENCE = 0.45;
+const MATCH_MIN_CONFIDENCE = 0.15;
 
 export type FaceWithDescriptor = FaceApiTypes.WithFaceDescriptor<
   FaceApiTypes.WithFaceLandmarks<
@@ -14,6 +18,10 @@ export type FaceWithDescriptor = FaceApiTypes.WithFaceDescriptor<
     FaceApiTypes.FaceLandmarks68
   >
 >;
+
+export type FaceInputTensor = {
+  dispose(): void;
+};
 
 function resolveModelPath(): string {
   return path.join(process.cwd(), MODEL_RELATIVE_PATH);
@@ -23,21 +31,40 @@ export function getFaceMatchThreshold(): number {
   return 0.55;
 }
 
+function installNodeShims(): void {
+  if (shimsInstalled) return;
+
+  const g = globalThis as Record<string, unknown>;
+  g.TextEncoder = TextEncoder;
+  g.TextDecoder = TextDecoder;
+  g.window = globalThis;
+  g.self = globalThis;
+  g.document = { createElement: () => ({}) };
+  g.navigator = { userAgent: 'node' };
+
+  shimsInstalled = true;
+}
+
 async function loadFaceApiModule(): Promise<typeof FaceApiTypes> {
   if (faceapi) return faceapi;
 
-  const { setWasmPaths } = await import('@tensorflow/tfjs-backend-wasm');
-  await import('@tensorflow/tfjs-backend-wasm');
-  const tf = await import('@tensorflow/tfjs');
-
-  setWasmPaths(path.join(process.cwd(), 'node_modules/@tensorflow/tfjs-backend-wasm/dist/'));
-  await tf.setBackend('wasm');
-  await tf.ready();
+  installNodeShims();
 
   faceapi = await import('@vladmandic/face-api/dist/face-api.esm.js');
 
-  const { Canvas, Image, ImageData } = await import('@napi-rs/canvas');
-  faceapi.env.monkeyPatch({ Canvas, Image, ImageData } as unknown as typeof globalThis);
+  const { Canvas, Image } = await import('@napi-rs/canvas');
+  faceapi.env.monkeyPatch({
+    Canvas,
+    Image,
+    readFile: (filePath: string) => fs.readFile(filePath),
+  } as unknown as Parameters<typeof faceapi.env.monkeyPatch>[0]);
+
+  const tf = faceapi.tf as typeof faceapi.tf & {
+    setBackend(name: string): Promise<boolean>;
+    ready(): Promise<void>;
+  };
+  await tf.setBackend('cpu');
+  await tf.ready();
 
   return faceapi;
 }
@@ -61,33 +88,37 @@ export async function ensureFaceApiReady(): Promise<void> {
   return initPromise;
 }
 
-export async function bufferToCanvas(buffer: Buffer) {
-  const { Canvas, loadImage } = await import('@napi-rs/canvas');
-  const img = await loadImage(buffer);
-  const canvas = new Canvas(img.width, img.height);
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0);
-  return canvas;
+export async function bufferToFaceInput(buffer: Buffer): Promise<FaceInputTensor> {
+  const api = await loadFaceApiModule();
+  const { data, info } = await sharp(buffer).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const rgb = await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: info.channels },
+  })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  return api.tf.tensor3d(new Uint8Array(rgb.data), [rgb.info.height, rgb.info.width, 3]);
 }
 
-export async function detectFacesWithDescriptors(
-  canvas: Awaited<ReturnType<typeof bufferToCanvas>>
-): Promise<FaceWithDescriptor[]> {
+export async function detectFacesWithDescriptors(input: FaceInputTensor): Promise<FaceWithDescriptor[]> {
   const api = await loadFaceApiModule();
   if (!detectorOptions) {
     throw new Error('FaceAPI models are not initialized.');
   }
 
-  return api
-    .detectAllFaces(canvas as unknown as HTMLCanvasElement, detectorOptions)
-    .withFaceLandmarks()
-    .withFaceDescriptors();
+  try {
+    return await api
+      .detectAllFaces(input as unknown as HTMLCanvasElement, detectorOptions)
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+  } finally {
+    input.dispose();
+  }
 }
 
-export async function getPrimaryFaceDescriptor(
-  canvas: Awaited<ReturnType<typeof bufferToCanvas>>
-): Promise<Float32Array | null> {
-  const faces = await detectFacesWithDescriptors(canvas);
+export async function getPrimaryFaceDescriptor(input: FaceInputTensor): Promise<Float32Array | null> {
+  const faces = await detectFacesWithDescriptors(input);
   if (faces.length === 0) return null;
 
   if (faces.length === 1) {

@@ -42,34 +42,51 @@ function parseBgRemovalParams(params: Record<string, unknown>): {
   return { subjectMode, edgeQuality };
 }
 
-async function processCustomBlurFaces(
-  job: ProcessInput['job'],
+async function processLocalBlurFaces(
   inputAssetUrl: string,
   params: Record<string, unknown>
 ): Promise<ProcessResult> {
   const routing = resolveBlurFacesRoute(params);
+  const isCustom = isCustomBlurFacesJob(params);
   const referenceUrl = params._referenceAssetUrl as string | undefined;
 
-  if (!referenceUrl) {
+  if (isCustom && !referenceUrl) {
     return {
       status: 'failed',
       error: 'Reference portrait is required for custom detection.',
+      errorKey: 'validationBlurFacesReferenceRequired',
     };
   }
 
   try {
-    const { applyCustomFaceBlur, FaceBlurError } = await import('@/lib/image/blur-faces-custom');
-    const [inputBuffer, referenceBuffer] = await Promise.all([
-      fetchAsBuffer(inputAssetUrl),
-      fetchAsBuffer(referenceUrl),
-    ]);
+    const { applyCustomFaceBlur, applyAutomaticFaceBlur, FaceBlurError } = await import(
+      '@/lib/image/blur-faces-custom'
+    );
+    const inputBuffer = await fetchAsBuffer(inputAssetUrl);
 
-    const { buffer, mimeType, blurredFaceCount } = await applyCustomFaceBlur(
+    if (isCustom) {
+      const referenceBuffer = await fetchAsBuffer(referenceUrl!);
+      const { buffer, mimeType, blurredFaceCount } = await applyCustomFaceBlur(
+        inputBuffer,
+        referenceBuffer,
+        routing
+      );
+      return {
+        status: 'done',
+        outputBuffer: buffer,
+        outputMimeType: mimeType,
+        inputSizeBytes: inputBuffer.byteLength,
+        blurFacesReasonKey: routing.reasonKey,
+        blurFacesModelLabel: routing.modelLabel,
+        blurFacesRouting: routing,
+        blurFacesCount: blurredFaceCount,
+      };
+    }
+
+    const { buffer, mimeType, blurredFaceCount } = await applyAutomaticFaceBlur(
       inputBuffer,
-      referenceBuffer,
       routing
     );
-
     return {
       status: 'done',
       outputBuffer: buffer,
@@ -83,12 +100,13 @@ async function processCustomBlurFaces(
   } catch (err) {
     const { FaceBlurError } = await import('@/lib/image/blur-faces-custom');
     if (err instanceof FaceBlurError) {
-      return { status: 'failed', error: err.userMessage };
+      return { status: 'failed', error: err.userMessage, errorKey: err.errorKey };
     }
-    console.error('[blur-faces] custom pipeline failed', err);
+    console.error('[blur-faces] local pipeline failed', err);
     return {
       status: 'failed',
       error: 'Face detection failed.',
+      errorKey: 'blurFacesErrorDetectionFailed',
     };
   }
 }
@@ -97,14 +115,14 @@ export const aiProcessor: ToolProcessor = {
   async process({ job, tool, inputAssetUrl }: ProcessInput): Promise<ProcessResult> {
     const params = (job.params || {}) as Record<string, unknown>;
 
-    if (tool.category === 'faces' && isCustomBlurFacesJob(params)) {
-      return processCustomBlurFaces(job, inputAssetUrl, params);
+    if (tool.category === 'faces') {
+      return processLocalBlurFaces(inputAssetUrl, params);
     }
 
     let workingJob = job;
     let toolMeta: Partial<ProcessResult> = {};
 
-    if (tool.category === 'upscale' || tool.category === 'background' || tool.category === 'faces') {
+    if (tool.category === 'upscale' || tool.category === 'background') {
       const buffer = await fetchAsBuffer(inputAssetUrl);
       const profile = await classifyImageContent(buffer);
 
@@ -149,21 +167,6 @@ export const aiProcessor: ToolProcessor = {
           bgRemovalEdgeQuality: routing.edgeQuality,
           bgRemovalSmartMode: routing.smartMode,
           bgRemovalRouting: routing,
-        };
-      }
-
-      if (tool.category === 'faces') {
-        const routing = resolveBlurFacesRoute(params);
-
-        workingJob = {
-          ...job,
-          params: { ...params, _blurFacesRouting: routing },
-        };
-
-        toolMeta = {
-          blurFacesReasonKey: routing.reasonKey,
-          blurFacesModelLabel: routing.modelLabel,
-          blurFacesRouting: routing,
         };
       }
     }

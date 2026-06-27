@@ -1,8 +1,10 @@
 'use client';
 
-import { useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BlurFacesParams } from '@/lib/tools/blur-faces-params';
+import { readImageDimensionsFromFile } from '@/lib/tools/resize-params';
+import { PortraitCropStep } from './portrait-crop-step';
 
 interface BlurFacesOptionsProps {
   value: BlurFacesParams;
@@ -22,6 +24,56 @@ export function BlurFacesOptions({
 }: BlurFacesOptionsProps) {
   const t = useTranslations('tool');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingCropUrl, setPendingCropUrl] = useState<string | null>(null);
+  const [pendingCropMeta, setPendingCropMeta] = useState<{
+    width: number;
+    height: number;
+    fileName: string;
+  } | null>(null);
+
+  const clearPendingCrop = useCallback(() => {
+    if (pendingCropUrl) URL.revokeObjectURL(pendingCropUrl);
+    setPendingCropUrl(null);
+    setPendingCropMeta(null);
+  }, [pendingCropUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingCropUrl) URL.revokeObjectURL(pendingCropUrl);
+    };
+  }, [pendingCropUrl]);
+
+  const handlePortraitFilePick = useCallback(
+    async (file: File | null) => {
+      clearPendingCrop();
+      if (!file) return;
+
+      const dimensions = await readImageDimensionsFromFile(file);
+      if (!dimensions) return;
+
+      setPendingCropUrl(URL.createObjectURL(file));
+      setPendingCropMeta({
+        width: dimensions.width,
+        height: dimensions.height,
+        fileName: file.name,
+      });
+    },
+    [clearPendingCrop]
+  );
+
+  const handlePortraitCropConfirm = useCallback(
+    (file: File) => {
+      clearPendingCrop();
+      onReferenceFileChange(file);
+    },
+    [clearPendingCrop, onReferenceFileChange]
+  );
+
+  const handleReplacePortrait = useCallback(() => {
+    onReferenceFileChange(null);
+    clearPendingCrop();
+    fileInputRef.current?.click();
+  }, [clearPendingCrop, onReferenceFileChange]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -63,25 +115,50 @@ export function BlurFacesOptions({
             type="file"
             accept="image/png,image/jpeg,image/webp"
             className="hidden"
-            onChange={(e) => onReferenceFileChange(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              void handlePortraitFilePick(e.target.files?.[0] ?? null);
+              e.target.value = '';
+            }}
           />
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-md border border-border-default px-3 py-2 text-sm text-text-primary hover:border-accent/40"
-            >
-              {t('blurFacesAddPortrait')}
-            </button>
-            {referencePreviewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={referencePreviewUrl}
-                alt=""
-                className="h-16 w-16 rounded-md border border-border-default object-cover"
-              />
-            ) : null}
-          </div>
+
+          {pendingCropUrl && pendingCropMeta ? (
+            <PortraitCropStep
+              imageUrl={pendingCropUrl}
+              imageWidth={pendingCropMeta.width}
+              imageHeight={pendingCropMeta.height}
+              sourceFileName={pendingCropMeta.fileName}
+              onConfirm={handlePortraitCropConfirm}
+              onCancel={clearPendingCrop}
+            />
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-md border border-border-default px-3 py-2 text-sm text-text-primary hover:border-accent/40"
+              >
+                {referencePreviewUrl ? t('blurFacesChangePortrait') : t('blurFacesAddPortrait')}
+              </button>
+              {referencePreviewUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={referencePreviewUrl}
+                    alt=""
+                    className="h-16 w-16 rounded-md border border-border-default object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleReplacePortrait}
+                    className="text-xs text-text-tertiary hover:text-text-primary"
+                  >
+                    {t('blurFacesReplacePortrait')}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
               type="button"

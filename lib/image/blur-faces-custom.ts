@@ -2,10 +2,17 @@ import sharp from 'sharp';
 import type { BlurFacesRouting } from '@/lib/ai/blur-faces-routing';
 import { blurStrengthToSigma, type BlurCustomAction } from '@/lib/tools/blur-faces-params';
 
+export type FaceBlurErrorKey =
+  | 'blurFacesErrorNoFacesInImage'
+  | 'blurFacesErrorNoFaceInPortrait'
+  | 'blurFacesErrorNoMatch'
+  | 'blurFacesErrorDetectionFailed';
+
 export class FaceBlurError extends Error {
   constructor(
     message: string,
-    readonly userMessage: string
+    readonly userMessage: string,
+    readonly errorKey: FaceBlurErrorKey = 'blurFacesErrorDetectionFailed'
   ) {
     super(message);
     this.name = 'FaceBlurError';
@@ -78,19 +85,31 @@ export async function applyCustomFaceBlur(
   const imageHeight = sourceMeta.height ?? 0;
 
   if (imageWidth < 1 || imageHeight < 1) {
-    throw new FaceBlurError('invalid dimensions', 'Face detection failed.');
+    throw new FaceBlurError(
+      'invalid dimensions',
+      'Face detection failed.',
+      'blurFacesErrorDetectionFailed'
+    );
   }
 
-  const referenceCanvas = await faceApi.bufferToCanvas(orientedReference);
-  const referenceDescriptor = await faceApi.getPrimaryFaceDescriptor(referenceCanvas);
+  const referenceInput = await faceApi.bufferToFaceInput(orientedReference);
+  const referenceDescriptor = await faceApi.getPrimaryFaceDescriptor(referenceInput);
   if (!referenceDescriptor) {
-    throw new FaceBlurError('reference face missing', 'Face detection failed.');
+    throw new FaceBlurError(
+      'reference face missing',
+      'No face found in the reference portrait. Upload a clear, front-facing photo of the face.',
+      'blurFacesErrorNoFaceInPortrait'
+    );
   }
 
-  const inputCanvas = await faceApi.bufferToCanvas(orientedInput);
-  const faces = await faceApi.detectFacesWithDescriptors(inputCanvas);
+  const inputTensor = await faceApi.bufferToFaceInput(orientedInput);
+  const faces = await faceApi.detectFacesWithDescriptors(inputTensor);
   if (faces.length === 0) {
-    throw new FaceBlurError('no faces in image', 'No faces were detected.');
+    throw new FaceBlurError(
+      'no faces in image',
+      'No faces were detected in the uploaded photo.',
+      'blurFacesErrorNoFacesInImage'
+    );
   }
 
   const threshold = faceApi.getFaceMatchThreshold();
@@ -101,7 +120,11 @@ export async function applyCustomFaceBlur(
   });
 
   if (facesToBlur.length === 0) {
-    throw new FaceBlurError('no faces matched selection', 'No matching face was found in the image.');
+    throw new FaceBlurError(
+      'no faces matched selection',
+      'No matching face was found in the photo. Try a clearer reference portrait or crop closer to the face.',
+      'blurFacesErrorNoMatch'
+    );
   }
 
   const sigma = blurStrengthToSigma(routing.blurStrength);
@@ -114,4 +137,47 @@ export async function applyCustomFaceBlur(
 
   const encoded = await encodePreservingFormat(working, sourceMeta);
   return { ...encoded, blurredFaceCount: facesToBlur.length };
+}
+
+export async function applyAutomaticFaceBlur(
+  inputBuffer: Buffer,
+  routing: BlurFacesRouting
+): Promise<{ buffer: Buffer; mimeType: string; blurredFaceCount: number }> {
+  const faceApi = await import('@/lib/image/face-api-loader');
+
+  await faceApi.ensureFaceApiReady();
+
+  const orientedInput = await sharp(inputBuffer).rotate().toBuffer();
+  const sourceMeta = await sharp(orientedInput).metadata();
+  const imageWidth = sourceMeta.width ?? 0;
+  const imageHeight = sourceMeta.height ?? 0;
+
+  if (imageWidth < 1 || imageHeight < 1) {
+    throw new FaceBlurError(
+      'invalid dimensions',
+      'Face detection failed.',
+      'blurFacesErrorDetectionFailed'
+    );
+  }
+
+  const inputTensor = await faceApi.bufferToFaceInput(orientedInput);
+  const faces = await faceApi.detectFacesWithDescriptors(inputTensor);
+  if (faces.length === 0) {
+    throw new FaceBlurError(
+      'no faces in image',
+      'No faces were detected in the uploaded photo.',
+      'blurFacesErrorNoFacesInImage'
+    );
+  }
+
+  const sigma = blurStrengthToSigma(routing.blurStrength);
+  let working = orientedInput;
+
+  for (const face of faces) {
+    const region = expandBox(face.detection.box, imageWidth, imageHeight);
+    working = await blurRegion(working, region, sigma);
+  }
+
+  const encoded = await encodePreservingFormat(working, sourceMeta);
+  return { ...encoded, blurredFaceCount: faces.length };
 }

@@ -1,6 +1,5 @@
 import type { BlurCustomAction, BlurDetectionMode, BlurStrength } from '@/lib/tools/blur-faces-params';
 import { blurStrengthToRadius } from '@/lib/tools/blur-faces-params';
-import { getBlurFacesModelFromEnv } from '@/lib/ai/blur-faces-config';
 
 export interface BlurFacesRouting {
   detectionMode: BlurDetectionMode;
@@ -79,11 +78,11 @@ export function resolveBlurFacesRoute(params: Record<string, unknown>): BlurFace
     customAction: parsed.customAction,
     blurStrength: parsed.blurStrength,
     blurRadius: blurStrengthToRadius(parsed.blurStrength),
-    model: getBlurFacesModelFromEnv(),
+    model: 'local-face-detect',
     modelLabel: getModelLabel('automatic', parsed.customAction),
     reasonKey: buildReasonKey('automatic', parsed.customAction),
     referenceAssetId: parsed.referenceAssetId,
-    usesLocalCustomPipeline: false,
+    usesLocalCustomPipeline: true,
   };
 }
 

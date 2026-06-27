@@ -4,22 +4,10 @@ const withNextIntl = createNextIntlPlugin('./i18n.ts');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: [
-    'sharp',
-    '@vladmandic/face-api',
-    '@tensorflow/tfjs',
-    '@tensorflow/tfjs-backend-wasm',
-    '@napi-rs/canvas',
-  ],
+  serverExternalPackages: ['sharp', '@vladmandic/face-api', '@napi-rs/canvas'],
   outputFileTracingIncludes: {
-    '/api/jobs/[id]/process/route': [
-      './node_modules/@vladmandic/face-api/model/**/*',
-      './node_modules/@tensorflow/tfjs-backend-wasm/dist/**/*',
-    ],
-    '/api/upload/route': [
-      './node_modules/@vladmandic/face-api/model/**/*',
-      './node_modules/@tensorflow/tfjs-backend-wasm/dist/**/*',
-    ],
+    '/api/jobs/[id]/process/route': ['./node_modules/@vladmandic/face-api/model/**/*'],
+    '/api/upload/route': ['./node_modules/@vladmandic/face-api/model/**/*'],
   },
   async redirects() {
     return [
