@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { BeforeAfterSlider } from './before-after-slider';
 import { cn } from '@/lib/utils/cn';
 
-type DemoTab = 'upscale' | 'background' | 'compress';
+type DemoTab = 'upscale' | 'background' | 'compress' | 'blur_faces';
 
 const DEMOS: Record<
   DemoTab,
@@ -32,8 +32,12 @@ const DEMOS: Record<
     beforeSrc:
       'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=95',
     afterSrc:
-      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=72',
+      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=600&q=72',
     stat: { before: '2.4 MB', after: '186 KB', reduction: '−92%' },
+  },
+  blur_faces: {
+    beforeSrc: '/demo/blur-faces-before.png',
+    afterSrc: '/demo/blur-faces-after.png',
   },
 };
 
@@ -42,12 +46,15 @@ export function LandingDemoShowcase() {
   const [activeTab, setActiveTab] = useState<DemoTab>('upscale');
   const demo = DEMOS[activeTab];
 
-  const tabs: { id: DemoTab; labelKey: 'demoTabUpscale' | 'demoTabBackground' | 'demoTabCompress' }[] =
-    [
-      { id: 'upscale', labelKey: 'demoTabUpscale' },
-      { id: 'background', labelKey: 'demoTabBackground' },
-      { id: 'compress', labelKey: 'demoTabCompress' },
-    ];
+  const tabs: {
+    id: DemoTab;
+    labelKey: 'demoTabUpscale' | 'demoTabBackground' | 'demoTabCompress' | 'demoTabBlurFaces';
+  }[] = [
+    { id: 'upscale', labelKey: 'demoTabUpscale' },
+    { id: 'background', labelKey: 'demoTabBackground' },
+    { id: 'compress', labelKey: 'demoTabCompress' },
+    { id: 'blur_faces', labelKey: 'demoTabBlurFaces' },
+  ];
 
   return (
     <div className="space-y-6">

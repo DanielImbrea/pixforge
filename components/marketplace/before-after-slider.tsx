@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 
 interface BeforeAfterSliderProps {
@@ -47,12 +47,29 @@ export function BeforeAfterSlider({
   const imageFitClass =
     fit === 'contain'
       ? useIntrinsicSize
-        ? 'object-contain'
-        : 'object-contain p-4 md:p-8'
-      : 'object-cover';
+        ? 'object-contain object-center'
+        : 'object-contain object-center p-4 md:p-8'
+      : 'object-cover object-center';
   const [position, setPosition] = useState(50);
+  const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      setContainerWidth(container.getBoundingClientRect().width);
+    };
+
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
 
   const updatePosition = useCallback((clientX: number) => {
     const container = containerRef.current;
@@ -82,6 +99,14 @@ export function BeforeAfterSlider({
   const handlePointerUp = useCallback(() => {
     isDragging.current = false;
   }, []);
+
+  const sharedImageStyle =
+    containerWidth > 0
+      ? {
+          width: containerWidth,
+          maxWidth: 'none' as const,
+        }
+      : undefined;
 
   return (
     <div
@@ -115,50 +140,52 @@ export function BeforeAfterSlider({
             : undefined
         }
       >
-      <div
-        className="absolute inset-0 bg-background-secondary"
-        style={afterBackground === 'checkerboard' ? CHECKERBOARD_STYLE : undefined}
-      >
-        {afterBackground === 'white' ? <div className="absolute inset-0 bg-white" /> : null}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={afterSrc}
-          alt={afterLabel}
-          className={`absolute inset-0 w-full h-full ${imageFitClass}`}
-          draggable={false}
-        />
-      </div>
-
-      <div
-        className="absolute inset-0 overflow-hidden"
-        style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={beforeSrc}
-          alt={beforeLabel}
-          className={`absolute inset-0 w-full h-full ${imageFitClass}`}
-          draggable={false}
-        />
-      </div>
-
-      <div
-        className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg"
-        style={{ left: `${position}%` }}
-      >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#09090b" strokeWidth="2">
-            <path d="M8 5L3 12L8 19M16 5L21 12L16 19" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        <div
+          className="absolute inset-0 bg-background-secondary"
+          style={afterBackground === 'checkerboard' ? CHECKERBOARD_STYLE : undefined}
+        >
+          {afterBackground === 'white' ? <div className="absolute inset-0 bg-white" /> : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={afterSrc}
+            alt={afterLabel}
+            className={`absolute top-0 left-0 h-full ${imageFitClass}`}
+            style={sharedImageStyle}
+            draggable={false}
+          />
         </div>
-      </div>
 
-      <span className="absolute top-3 left-3 text-xs font-medium bg-black/60 text-white px-2 py-1 rounded">
-        {beforeLabel}
-      </span>
-      <span className="absolute top-3 right-3 text-xs font-medium bg-black/60 text-white px-2 py-1 rounded">
-        {afterLabel}
-      </span>
+        <div
+          className="absolute top-0 left-0 bottom-0 overflow-hidden"
+          style={{ width: `${position}%` }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={beforeSrc}
+            alt={beforeLabel}
+            className={`absolute top-0 left-0 h-full ${imageFitClass}`}
+            style={sharedImageStyle}
+            draggable={false}
+          />
+        </div>
+
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none"
+          style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
+        >
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#09090b" strokeWidth="2">
+              <path d="M8 5L3 12L8 19M16 5L21 12L16 19" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </div>
+
+        <span className="absolute top-3 left-3 text-xs font-medium bg-black/60 text-white px-2 py-1 rounded pointer-events-none">
+          {beforeLabel}
+        </span>
+        <span className="absolute top-3 right-3 text-xs font-medium bg-black/60 text-white px-2 py-1 rounded pointer-events-none">
+          {afterLabel}
+        </span>
       </div>
     </div>
   );

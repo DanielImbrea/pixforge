@@ -1,29 +1,39 @@
 import { getTranslations } from 'next-intl/server';
 import type { Locale } from '@/i18n';
 
-const REASON_KEYS = ['routing', 'quality', 'speed'] as const;
+const REASON_KEYS = ['speed', 'privacy', 'quality', 'aiSharp'] as const;
+
+const REASON_EMOJI: Record<(typeof REASON_KEYS)[number], string> = {
+  speed: '⚡',
+  privacy: '🔒',
+  quality: '🎯',
+  aiSharp: '🧠',
+};
 
 export async function LandingWhy({ locale }: { locale: Locale }) {
   const t = await getTranslations({ locale, namespace: 'home' });
 
   return (
-    <section>
-      <div className="text-center mb-10">
-        <p className="text-xs font-semibold uppercase tracking-wide text-accent mb-2">{t('whyEyebrow')}</p>
-        <h2 className="text-2xl md:text-3xl font-semibold text-text-primary mb-3">{t('whyTitle')}</h2>
-        <p className="text-text-secondary max-w-2xl mx-auto">{t('whySubtitle')}</p>
+    <div>
+      <div className="mb-10 text-center">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-accent">{t('whyEyebrow')}</p>
+        <h2 id="why-heading" className="mb-3 text-2xl font-semibold text-text-primary md:text-3xl">{t('whyTitle')}</h2>
+        <p className="mx-auto max-w-2xl text-text-secondary">{t('whySubtitle')}</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {REASON_KEYS.map((key) => (
-          <div
+          <article
             key={key}
-            className="rounded-lg border border-border-default bg-background-secondary/50 p-6"
+            className="rounded-lg border border-border-default bg-background-secondary/50 p-6 transition-shadow hover:shadow-sm"
           >
-            <h3 className="font-medium text-text-primary mb-2">{t(`why_${key}_title`)}</h3>
+            <p className="mb-3 text-2xl" aria-hidden="true">
+              {REASON_EMOJI[key]}
+            </p>
+            <h3 className="mb-2 font-medium text-text-primary">{t(`why_${key}_title`)}</h3>
             <p className="text-sm text-text-secondary">{t(`why_${key}_body`)}</p>
-          </div>
+          </article>
         ))}
       </div>
-    </section>
+    </div>
   );
 }

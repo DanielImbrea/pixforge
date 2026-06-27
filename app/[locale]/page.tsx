@@ -6,9 +6,10 @@ import type { Locale } from '@/i18n';
 import { getCurrentUser } from '@/lib/supabase/server';
 import { LandingDemoShowcase } from '@/components/marketplace/landing-demo-showcase';
 import { LandingRealExamples } from '@/components/marketplace/landing-real-examples';
-import { LandingKeywordStrip, LandingPopularTools } from '@/components/marketplace/landing-popular-tools';
+import { LandingKeywordStrip } from '@/components/marketplace/landing-popular-tools';
 import { LandingToolGroups } from '@/components/marketplace/landing-tool-groups';
 import { LandingWhy } from '@/components/marketplace/landing-why';
+import { LandingUseCases } from '@/components/marketplace/landing-use-cases';
 import { LandingTrustSection } from '@/components/marketplace/landing-trust';
 import { LandingPricingPreview } from '@/components/marketplace/landing-pricing-preview';
 import { SocialProof } from '@/components/marketplace/social-proof';
@@ -163,25 +164,27 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         <LandingDemoShowcase />
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default">
+      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default" aria-labelledby="examples-heading">
         <LandingRealExamples />
       </section>
 
-      <LandingPopularTools locale={locale} />
+      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default" aria-labelledby="why-heading">
+        <LandingWhy locale={locale} />
+      </section>
 
       <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default">
+        <LandingUseCases locale={locale} />
+      </section>
+
+      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default" aria-labelledby="tools-heading">
         <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-semibold text-text-primary mb-3">{t('toolsHeading')}</h2>
+          <h2 id="tools-heading" className="text-2xl md:text-3xl font-semibold text-text-primary mb-3">{t('toolsHeading')}</h2>
           <p className="text-text-secondary max-w-2xl mx-auto">{t('toolsSubheading')}</p>
         </div>
         <LandingToolGroups locale={locale} />
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 py-16">
-        <LandingWhy locale={locale} />
-      </section>
-
-      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default">
+      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default" aria-labelledby="trust-heading">
         <LandingTrustSection locale={locale} />
       </section>
 

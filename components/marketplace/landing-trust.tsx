@@ -18,7 +18,7 @@ export async function LandingTrustSection({ locale }: { locale: Locale }) {
     <section className="rounded-xl border border-border-default bg-background-secondary/40 p-8 md:p-10">
       <div className="text-center mb-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-accent mb-2">{t('trustEyebrow')}</p>
-        <h2 className="text-2xl md:text-3xl font-semibold text-text-primary mb-3">{t('trustTitle')}</h2>
+        <h2 id="trust-heading" className="text-2xl md:text-3xl font-semibold text-text-primary mb-3">{t('trustTitle')}</h2>
         <p className="text-text-secondary max-w-2xl mx-auto">{t('trustSubtitle')}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
