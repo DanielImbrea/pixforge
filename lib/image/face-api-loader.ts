@@ -1,8 +1,14 @@
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import path from 'path';
 import { TextDecoder, TextEncoder } from 'util';
 import sharp from 'sharp';
 import type * as FaceApiTypes from '@vladmandic/face-api';
+
+const nodeRequire = createRequire(
+  typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url)
+);
 
 let initPromise: Promise<void> | null = null;
 let faceapi: typeof FaceApiTypes | null = null;
@@ -11,6 +17,7 @@ let shimsInstalled = false;
 
 const MODEL_RELATIVE_PATH = 'node_modules/@vladmandic/face-api/model';
 const MATCH_MIN_CONFIDENCE = 0.15;
+const MAX_FACE_DETECT_EDGE = 1600;
 
 export type FaceWithDescriptor = FaceApiTypes.WithFaceDescriptor<
   FaceApiTypes.WithFaceLandmarks<
@@ -20,11 +27,18 @@ export type FaceWithDescriptor = FaceApiTypes.WithFaceDescriptor<
 >;
 
 export type FaceInputTensor = {
-  dispose(): void;
+  tensor: { dispose(): void };
+  /** Detection runs on a possibly downscaled image; multiply box coords by 1/scale for full-res blur. */
+  scale: number;
 };
 
 function resolveModelPath(): string {
-  return path.join(process.cwd(), MODEL_RELATIVE_PATH);
+  try {
+    const pkgJson = nodeRequire.resolve('@vladmandic/face-api/package.json');
+    return path.join(path.dirname(pkgJson), 'model');
+  } catch {
+    return path.join(process.cwd(), MODEL_RELATIVE_PATH);
+  }
 }
 
 export function getFaceMatchThreshold(): number {
@@ -69,36 +83,63 @@ async function loadFaceApiModule(): Promise<typeof FaceApiTypes> {
   return faceapi;
 }
 
+async function loadModels(): Promise<void> {
+  const api = await loadFaceApiModule();
+  const modelPath = resolveModelPath();
+  try {
+    await fs.access(path.join(modelPath, 'ssd_mobilenetv1_model-weights_manifest.json'));
+  } catch {
+    throw new Error(`Face API models not found at ${modelPath}`);
+  }
+
+  await api.nets.ssdMobilenetv1.loadFromDisk(modelPath);
+  await api.nets.faceLandmark68Net.loadFromDisk(modelPath);
+  await api.nets.faceRecognitionNet.loadFromDisk(modelPath);
+
+  detectorOptions = new api.SsdMobilenetv1Options({
+    minConfidence: MATCH_MIN_CONFIDENCE,
+    maxResults: 20,
+  });
+}
+
 export async function ensureFaceApiReady(): Promise<void> {
-  if (initPromise) return initPromise;
-
-  initPromise = (async () => {
-    const api = await loadFaceApiModule();
-    const modelPath = resolveModelPath();
-    await api.nets.ssdMobilenetv1.loadFromDisk(modelPath);
-    await api.nets.faceLandmark68Net.loadFromDisk(modelPath);
-    await api.nets.faceRecognitionNet.loadFromDisk(modelPath);
-
-    detectorOptions = new api.SsdMobilenetv1Options({
-      minConfidence: MATCH_MIN_CONFIDENCE,
-      maxResults: 20,
+  if (!initPromise) {
+    initPromise = loadModels().catch((err) => {
+      initPromise = null;
+      throw err;
     });
-  })();
-
+  }
   return initPromise;
 }
 
 export async function bufferToFaceInput(buffer: Buffer): Promise<FaceInputTensor> {
   const api = await loadFaceApiModule();
-  const { data, info } = await sharp(buffer).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const rgb = await sharp(data, {
-    raw: { width: info.width, height: info.height, channels: info.channels },
-  })
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  const oriented = await sharp(buffer).rotate().toBuffer();
+  const meta = await sharp(oriented).metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
 
-  return api.tf.tensor3d(new Uint8Array(rgb.data), [rgb.info.height, rgb.info.width, 3]);
+  if (width < 1 || height < 1) {
+    throw new Error('Invalid image dimensions for face detection.');
+  }
+
+  const longEdge = Math.max(width, height);
+  const scale = longEdge > MAX_FACE_DETECT_EDGE ? MAX_FACE_DETECT_EDGE / longEdge : 1;
+
+  let pipeline = sharp(oriented).removeAlpha();
+  if (scale < 1) {
+    pipeline = pipeline.resize(Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)), {
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
+
+  const rgb = await pipeline.raw().toBuffer({ resolveWithObject: true });
+
+  return {
+    tensor: api.tf.tensor3d(new Uint8Array(rgb.data), [rgb.info.height, rgb.info.width, 3]),
+    scale,
+  };
 }
 
 export async function detectFacesWithDescriptors(input: FaceInputTensor): Promise<FaceWithDescriptor[]> {
@@ -109,11 +150,11 @@ export async function detectFacesWithDescriptors(input: FaceInputTensor): Promis
 
   try {
     return await api
-      .detectAllFaces(input as unknown as HTMLCanvasElement, detectorOptions)
+      .detectAllFaces(input.tensor as unknown as HTMLCanvasElement, detectorOptions)
       .withFaceLandmarks()
       .withFaceDescriptors();
   } finally {
-    input.dispose();
+    input.tensor.dispose();
   }
 }
 

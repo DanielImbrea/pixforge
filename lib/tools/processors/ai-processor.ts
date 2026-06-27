@@ -7,6 +7,7 @@ import { resolveUpscaleRoute, type UpscaleScaleInput } from '@/lib/ai/upscale-ro
 import type { BgEdgeQuality, BgSubjectModeInput } from '@/lib/tools/bg-removal-params';
 import { classifyImageContent } from '@/lib/image/classify-content';
 import { readImageDimensions } from '@/lib/image/sharp-encode';
+import type { FaceBlurError } from '@/lib/image/blur-faces-custom';
 import type { ProcessInput, ProcessResult, ToolProcessor } from '../processor';
 import { fetchAsBuffer } from '@/lib/ai/fetch-image';
 
@@ -99,10 +100,20 @@ async function processLocalBlurFaces(
     };
   } catch (err) {
     const { FaceBlurError } = await import('@/lib/image/blur-faces-custom');
-    if (err instanceof FaceBlurError) {
-      return { status: 'failed', error: err.userMessage, errorKey: err.errorKey };
+    const isFaceBlur =
+      err instanceof FaceBlurError ||
+      (err instanceof Error &&
+        err.name === 'FaceBlurError' &&
+        'errorKey' in err &&
+        typeof (err as FaceBlurError).errorKey === 'string');
+
+    if (isFaceBlur) {
+      const faceErr = err as FaceBlurError;
+      return { status: 'failed', error: faceErr.userMessage, errorKey: faceErr.errorKey };
     }
-    console.error('[blur-faces] local pipeline failed', err);
+
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[blur-faces] local pipeline failed', message, err);
     return {
       status: 'failed',
       error: 'Face detection failed.',

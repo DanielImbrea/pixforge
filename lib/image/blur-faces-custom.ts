@@ -26,14 +26,22 @@ function shouldBlurFace(isMatch: boolean, customAction: BlurCustomAction): boole
 function expandBox(
   box: { x: number; y: number; width: number; height: number },
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
+  detectionScale = 1
 ): { left: number; top: number; width: number; height: number } {
-  const padX = Math.round(box.width * 0.18);
-  const padY = Math.round(box.height * 0.22);
-  const left = Math.max(0, Math.round(box.x - padX));
-  const top = Math.max(0, Math.round(box.y - padY));
-  const width = Math.min(imageWidth - left, Math.round(box.width + padX * 2));
-  const height = Math.min(imageHeight - top, Math.round(box.height + padY * 2));
+  const invScale = detectionScale > 0 ? 1 / detectionScale : 1;
+  const scaled = {
+    x: box.x * invScale,
+    y: box.y * invScale,
+    width: box.width * invScale,
+    height: box.height * invScale,
+  };
+  const padX = Math.round(scaled.width * 0.18);
+  const padY = Math.round(scaled.height * 0.22);
+  const left = Math.max(0, Math.round(scaled.x - padX));
+  const top = Math.max(0, Math.round(scaled.y - padY));
+  const width = Math.min(imageWidth - left, Math.round(scaled.width + padX * 2));
+  const height = Math.min(imageHeight - top, Math.round(scaled.height + padY * 2));
   return { left, top, width: Math.max(1, width), height: Math.max(1, height) };
 }
 
@@ -131,7 +139,7 @@ export async function applyCustomFaceBlur(
   let working = orientedInput;
 
   for (const face of facesToBlur) {
-    const region = expandBox(face.detection.box, imageWidth, imageHeight);
+    const region = expandBox(face.detection.box, imageWidth, imageHeight, inputTensor.scale);
     working = await blurRegion(working, region, sigma);
   }
 
@@ -174,7 +182,7 @@ export async function applyAutomaticFaceBlur(
   let working = orientedInput;
 
   for (const face of faces) {
-    const region = expandBox(face.detection.box, imageWidth, imageHeight);
+    const region = expandBox(face.detection.box, imageWidth, imageHeight, inputTensor.scale);
     working = await blurRegion(working, region, sigma);
   }
 

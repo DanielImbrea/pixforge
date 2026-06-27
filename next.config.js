@@ -8,6 +8,7 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/jobs/[id]/process/route': ['./node_modules/@vladmandic/face-api/model/**/*'],
     '/api/upload/route': ['./node_modules/@vladmandic/face-api/model/**/*'],
+    '/api/v1/jobs/[id]/route': ['./node_modules/@vladmandic/face-api/model/**/*'],
   },
   async redirects() {
     return [
