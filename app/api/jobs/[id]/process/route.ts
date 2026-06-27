@@ -96,7 +96,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .eq('id', jobRow.id);
     await refundFailedJob(user, jobRow);
     return NextResponse.json(
-      { error: result.error || 'Processing failed.', errorKey: result.errorKey },
+      {
+        error: result.error || 'Processing failed.',
+        errorKey: result.errorKey,
+        ...(result.errorDetail ? { errorDetail: result.errorDetail } : {}),
+      },
       { status: 500 }
     );
   }

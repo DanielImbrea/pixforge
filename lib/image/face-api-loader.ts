@@ -1,5 +1,3 @@
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -7,21 +5,24 @@ import { TextDecoder, TextEncoder } from 'util';
 import sharp from 'sharp';
 import type * as FaceApiTypes from '@vladmandic/face-api';
 
-const nodeRequire = createRequire(
-  typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url)
-);
-
 type FaceApiModule = typeof FaceApiTypes;
 type InitMode = 'detect' | 'full';
+
+type LoadableNet = {
+  loadFromDisk(modelPath: string): Promise<void>;
+  loadFromUri(uri: string): Promise<void>;
+};
 
 let initPromise: Partial<Record<InitMode, Promise<void>>> = {};
 let faceapi: FaceApiModule | null = null;
 let detectorOptions: FaceApiTypes.SsdMobilenetv1Options | null = null;
 let loadedMode: InitMode | null = null;
 
+const IS_VERCEL = Boolean(process.env.VERCEL);
 const VENDOR_MODEL_PATH = path.join(process.cwd(), 'lib/vendor/face-api-model');
 const PUBLIC_MODEL_PATH = path.join(process.cwd(), 'public/face-api-models');
-const MODEL_RELATIVE_PATH = 'node_modules/@vladmandic/face-api/model';
+const MODEL_RELATIVE_PATH = path.join(process.cwd(), 'node_modules/@vladmandic/face-api/model');
+const REMOTE_MODEL_URI = 'https://www.pixiqueai.com/face-api-models';
 const JSDELIVR_MODEL_URI = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model';
 const TMP_MODEL_DIR = path.join(os.tmpdir(), 'pixique-face-api-model');
 const MATCH_MIN_CONFIDENCE = 0.15;
@@ -72,52 +73,26 @@ class NodeImage {
   onload: (() => void) | null = null;
 }
 
-/** Must run before face-api module init (face-api reads TextEncoder at import time). */
+/** face-api reads TextEncoder at import time — set before dynamic import. */
 (function installNodeShimsSync() {
-  const g = globalThis as Record<string, unknown>;
-
-  function safeAssign(key: string, value: unknown) {
+  for (const [key, value] of [
+    ['TextEncoder', TextEncoder],
+    ['TextDecoder', TextDecoder],
+  ] as const) {
     try {
-      const desc = Object.getOwnPropertyDescriptor(g, key);
-      if (desc?.get && !desc.set) return;
-      g[key] = value;
+      Object.defineProperty(globalThis, key, {
+        value,
+        writable: true,
+        configurable: true,
+      });
     } catch {
-      // Vercel/Node may expose read-only globals (e.g. navigator) — skip silently.
+      // Node 20+ already provides these globals.
     }
   }
-
-  safeAssign('TextEncoder', TextEncoder);
-  safeAssign('TextDecoder', TextDecoder);
-  safeAssign('window', globalThis);
-  safeAssign('self', globalThis);
-  safeAssign('document', { createElement: () => ({}) });
-  safeAssign('navigator', { userAgent: 'node' });
 })();
 
-function getRemoteModelBaseUrls(): string[] {
-  const urls: string[] = [];
-  const vercelUrl = process.env.VERCEL_URL?.trim();
-  if (vercelUrl) urls.push(`https://${vercelUrl}/face-api-models`);
-  urls.push('https://www.pixiqueai.com/face-api-models');
-  urls.push(JSDELIVR_MODEL_URI);
-  return urls;
-}
-
 async function resolveLocalModelPath(): Promise<string | null> {
-  const candidates = [
-    VENDOR_MODEL_PATH,
-    PUBLIC_MODEL_PATH,
-    (() => {
-      try {
-        const pkgJson = nodeRequire.resolve('@vladmandic/face-api/package.json');
-        return path.join(path.dirname(pkgJson), 'model');
-      } catch {
-        return path.join(process.cwd(), MODEL_RELATIVE_PATH);
-      }
-    })(),
-  ];
-
-  for (const candidate of candidates) {
+  for (const candidate of [VENDOR_MODEL_PATH, PUBLIC_MODEL_PATH, MODEL_RELATIVE_PATH]) {
     try {
       await fs.access(path.join(candidate, DETECT_MODEL_FILES[0]));
       return candidate;
@@ -125,13 +100,12 @@ async function resolveLocalModelPath(): Promise<string | null> {
       // try next
     }
   }
-
   return null;
 }
 
 async function downloadModelsToTmp(files: readonly string[]): Promise<string> {
   await fs.mkdir(TMP_MODEL_DIR, { recursive: true });
-  const bases = getRemoteModelBaseUrls();
+  const bases = [REMOTE_MODEL_URI, JSDELIVR_MODEL_URI];
 
   for (const file of files) {
     const dest = path.join(TMP_MODEL_DIR, file);
@@ -163,12 +137,32 @@ async function downloadModelsToTmp(files: readonly string[]): Promise<string> {
   return TMP_MODEL_DIR;
 }
 
-async function resolveModelPath(mode: InitMode): Promise<string> {
-  const local = await resolveLocalModelPath();
-  if (local) return local;
+async function loadNetFromRemote(net: LoadableNet, uri: string): Promise<void> {
+  try {
+    await net.loadFromUri(uri);
+  } catch (uriErr) {
+    const files = FULL_MODEL_FILES;
+    const diskPath = await downloadModelsToTmp(files);
+    await net.loadFromDisk(diskPath);
+    if (uriErr instanceof Error) {
+      console.warn('[face-api] loadFromUri failed, used /tmp fallback', uriErr.message);
+    }
+  }
+}
 
-  const files = mode === 'detect' ? DETECT_MODEL_FILES : FULL_MODEL_FILES;
-  return downloadModelsToTmp(files);
+async function loadNet(net: LoadableNet): Promise<void> {
+  if (IS_VERCEL) {
+    await loadNetFromRemote(net, REMOTE_MODEL_URI);
+    return;
+  }
+
+  const local = await resolveLocalModelPath();
+  if (local) {
+    await net.loadFromDisk(local);
+    return;
+  }
+
+  await loadNetFromRemote(net, REMOTE_MODEL_URI);
 }
 
 export function getFaceMatchThreshold(): number {
@@ -200,19 +194,17 @@ async function loadModels(mode: InitMode): Promise<void> {
   const api = await loadFaceApiModule();
 
   if (!loadedMode) {
-    const modelPath = await resolveModelPath(mode === 'full' ? 'full' : 'detect');
-    await api.nets.ssdMobilenetv1.loadFromDisk(modelPath);
+    await loadNet(api.nets.ssdMobilenetv1);
     loadedMode = 'detect';
 
     if (mode === 'full') {
-      await api.nets.faceLandmark68Net.loadFromDisk(modelPath);
-      await api.nets.faceRecognitionNet.loadFromDisk(modelPath);
+      await loadNet(api.nets.faceLandmark68Net);
+      await loadNet(api.nets.faceRecognitionNet);
       loadedMode = 'full';
     }
   } else if (loadedMode === 'detect' && mode === 'full') {
-    const modelPath = await resolveModelPath('full');
-    await api.nets.faceLandmark68Net.loadFromDisk(modelPath);
-    await api.nets.faceRecognitionNet.loadFromDisk(modelPath);
+    await loadNet(api.nets.faceLandmark68Net);
+    await loadNet(api.nets.faceRecognitionNet);
     loadedMode = 'full';
   }
 

@@ -44,6 +44,8 @@ export interface ProcessResult {
   providerJobId?: string;
   error?: string;
   errorKey?: string;
+  /** Internal diagnostic — surfaced in API for blur-faces debugging on production. */
+  errorDetail?: string;
 }
 
 export interface ToolProcessor {

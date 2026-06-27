@@ -119,6 +119,7 @@ async function processLocalBlurFaces(
       status: 'failed',
       error: 'Face detection failed.',
       errorKey: 'blurFacesErrorDetectionFailed',
+      errorDetail: message.slice(0, 300),
     };
   }
 }
