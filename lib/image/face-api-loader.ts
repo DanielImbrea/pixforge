@@ -75,12 +75,23 @@ class NodeImage {
 /** Must run before face-api module init (face-api reads TextEncoder at import time). */
 (function installNodeShimsSync() {
   const g = globalThis as Record<string, unknown>;
-  g.TextEncoder = TextEncoder;
-  g.TextDecoder = TextDecoder;
-  g.window = globalThis;
-  g.self = globalThis;
-  g.document = { createElement: () => ({}) };
-  g.navigator = { userAgent: 'node' };
+
+  function safeAssign(key: string, value: unknown) {
+    try {
+      const desc = Object.getOwnPropertyDescriptor(g, key);
+      if (desc?.get && !desc.set) return;
+      g[key] = value;
+    } catch {
+      // Vercel/Node may expose read-only globals (e.g. navigator) — skip silently.
+    }
+  }
+
+  safeAssign('TextEncoder', TextEncoder);
+  safeAssign('TextDecoder', TextDecoder);
+  safeAssign('window', globalThis);
+  safeAssign('self', globalThis);
+  safeAssign('document', { createElement: () => ({}) });
+  safeAssign('navigator', { userAgent: 'node' });
 })();
 
 function getRemoteModelBaseUrls(): string[] {
