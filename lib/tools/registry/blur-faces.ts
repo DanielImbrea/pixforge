@@ -65,7 +65,7 @@ export const blurFacesTool: ToolDefinition = {
           'Detectează și blur-ează automat fețele din poze pentru confidențialitate. Mod automat sau personalizat.',
         h1: 'Blur Fețe',
         intro:
-          'Protejează confidențialitatea blur-ând fețele din poze. Detecție automată sau mod personalizat pentru o persoană anume.',
+          'Protejează confidențialitatea blurând fețele din poze. Detecție automată sau mod personalizat pentru o persoană anume.',
         howItWorks:
           'Încarcă poza. AI-ul detectează fețele și aplică blur de confidențialitate, păstrând dimensiunile și formatul original.',
         benefits: [
