@@ -19,6 +19,7 @@ let initPromise: Partial<Record<InitMode, Promise<void>>> = {};
 let faceapi: FaceApiModule | null = null;
 let detectorOptions: DetectorOptions | null = null;
 let loadedMode: InitMode | null = null;
+let tfReadyPromise: Promise<void> | null = null;
 
 function shouldBlurFace(isMatch: boolean, customAction: BlurCustomAction): boolean {
   return customAction === 'blur' ? isMatch : !isMatch;
@@ -48,7 +49,23 @@ function expandBox(
 
 async function loadFaceApiModule(): Promise<FaceApiModule> {
   if (faceapi) return faceapi;
-  faceapi = await import('@vladmandic/face-api');
+  // Must use the browser ESM build — default package entry resolves to node build in webpack.
+  faceapi = await import('@vladmandic/face-api/dist/face-api.esm.js');
+  if (!tfReadyPromise) {
+    tfReadyPromise = (async () => {
+      const tf = faceapi!.tf as FaceApiModule['tf'] & {
+        setBackend(name: string): Promise<boolean>;
+        ready(): Promise<void>;
+      };
+      try {
+        await tf.setBackend('webgl');
+      } catch {
+        await tf.setBackend('cpu');
+      }
+      await tf.ready();
+    })();
+  }
+  await tfReadyPromise;
   return faceapi;
 }
 

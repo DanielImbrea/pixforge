@@ -569,7 +569,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     } catch (err) {
       stopProgressSimulation();
       if (err instanceof FaceBlurError) {
-        setErrorMessage(t(err.errorKey));
+        const base = t(err.errorKey);
+        setErrorMessage(err.message && err.message !== err.userMessage ? `${base} (${err.message})` : base);
       } else {
         setErrorMessage(err instanceof Error ? err.message : t('errorGeneric'));
       }

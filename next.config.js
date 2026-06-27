@@ -5,6 +5,15 @@ const withNextIntl = createNextIntlPlugin('./i18n.ts');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ['sharp', '@vladmandic/face-api'],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@vladmandic/face-api': '@vladmandic/face-api/dist/face-api.esm.js',
+      };
+    }
+    return config;
+  },
   outputFileTracingIncludes: {
     '/api/jobs/[id]/process/route': [
       './lib/vendor/face-api-model/**/*',

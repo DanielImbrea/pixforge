@@ -1,5 +1,5 @@
 import { getAiProvider } from '@/lib/ai/config';
-import { resolveBlurFacesRoute, isCustomBlurFacesJob } from '@/lib/ai/blur-faces-routing';
+import { resolveBlurFacesRoute } from '@/lib/ai/blur-faces-routing';
 import { resolveBgRemovalRoute } from '@/lib/ai/bg-removal-routing';
 import { submitMockJob } from '@/lib/ai/mock-provider';
 import { submitReplicateJob } from '@/lib/ai/replicate-client';
@@ -7,7 +7,6 @@ import { resolveUpscaleRoute, type UpscaleScaleInput } from '@/lib/ai/upscale-ro
 import type { BgEdgeQuality, BgSubjectModeInput } from '@/lib/tools/bg-removal-params';
 import { classifyImageContent } from '@/lib/image/classify-content';
 import { readImageDimensions } from '@/lib/image/sharp-encode';
-import type { FaceBlurError } from '@/lib/image/blur-faces-custom';
 import type { ProcessInput, ProcessResult, ToolProcessor } from '../processor';
 import { fetchAsBuffer } from '@/lib/ai/fetch-image';
 
@@ -49,105 +48,37 @@ async function processLocalBlurFaces(
 ): Promise<ProcessResult> {
   const routing = resolveBlurFacesRoute(params);
 
-  if (params.clientProcessed === true) {
-    const inputBuffer = await fetchAsBuffer(inputAssetUrl);
-    const sharp = (await import('sharp')).default;
-    const meta = await sharp(inputBuffer).metadata();
-    const mimeType =
-      meta.format === 'png'
-        ? 'image/png'
-        : meta.format === 'webp'
-          ? 'image/webp'
-          : 'image/jpeg';
-    const blurFacesCount =
-      typeof params.blurFacesCount === 'number' ? params.blurFacesCount : undefined;
-
-    return {
-      status: 'done',
-      outputBuffer: inputBuffer,
-      outputMimeType: mimeType,
-      inputSizeBytes: inputBuffer.byteLength,
-      blurFacesReasonKey: routing.reasonKey,
-      blurFacesModelLabel: routing.modelLabel,
-      blurFacesRouting: routing,
-      blurFacesCount,
-    };
-  }
-
-  const isCustom = isCustomBlurFacesJob(params);
-  const referenceUrl = params._referenceAssetUrl as string | undefined;
-
-  if (isCustom && !referenceUrl) {
+  if (params.clientProcessed !== true) {
     return {
       status: 'failed',
-      error: 'Reference portrait is required for custom detection.',
-      errorKey: 'validationBlurFacesReferenceRequired',
-    };
-  }
-
-  try {
-    const { applyCustomFaceBlur, applyAutomaticFaceBlur, FaceBlurError } = await import(
-      '@/lib/image/blur-faces-custom'
-    );
-    const inputBuffer = await fetchAsBuffer(inputAssetUrl);
-
-    if (isCustom) {
-      const referenceBuffer = await fetchAsBuffer(referenceUrl!);
-      const { buffer, mimeType, blurredFaceCount } = await applyCustomFaceBlur(
-        inputBuffer,
-        referenceBuffer,
-        routing
-      );
-      return {
-        status: 'done',
-        outputBuffer: buffer,
-        outputMimeType: mimeType,
-        inputSizeBytes: inputBuffer.byteLength,
-        blurFacesReasonKey: routing.reasonKey,
-        blurFacesModelLabel: routing.modelLabel,
-        blurFacesRouting: routing,
-        blurFacesCount: blurredFaceCount,
-      };
-    }
-
-    const { buffer, mimeType, blurredFaceCount } = await applyAutomaticFaceBlur(
-      inputBuffer,
-      routing
-    );
-    return {
-      status: 'done',
-      outputBuffer: buffer,
-      outputMimeType: mimeType,
-      inputSizeBytes: inputBuffer.byteLength,
-      blurFacesReasonKey: routing.reasonKey,
-      blurFacesModelLabel: routing.modelLabel,
-      blurFacesRouting: routing,
-      blurFacesCount: blurredFaceCount,
-    };
-  } catch (err) {
-    const { FaceBlurError } = await import('@/lib/image/blur-faces-custom');
-    const isFaceBlur =
-      err instanceof FaceBlurError ||
-      (err instanceof Error &&
-        err.name === 'FaceBlurError' &&
-        'errorKey' in err &&
-        typeof (err as FaceBlurError).errorKey === 'string');
-
-    if (isFaceBlur) {
-      const faceErr = err as FaceBlurError;
-      return { status: 'failed', error: faceErr.userMessage, errorKey: faceErr.errorKey };
-    }
-
-    const message = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : undefined;
-    console.error('[blur-faces] local pipeline failed', { message, stack, err });
-    return {
-      status: 'failed',
-      error: 'Face detection failed.',
+      error: 'Face blur must be processed in your browser before upload.',
       errorKey: 'blurFacesErrorDetectionFailed',
-      errorDetail: message.slice(0, 300),
+      errorDetail: 'Hard-refresh the page (Ctrl+Shift+R) and try again.',
     };
   }
+
+  const inputBuffer = await fetchAsBuffer(inputAssetUrl);
+  const sharp = (await import('sharp')).default;
+  const meta = await sharp(inputBuffer).metadata();
+  const mimeType =
+    meta.format === 'png'
+      ? 'image/png'
+      : meta.format === 'webp'
+        ? 'image/webp'
+        : 'image/jpeg';
+  const blurFacesCount =
+    typeof params.blurFacesCount === 'number' ? params.blurFacesCount : undefined;
+
+  return {
+    status: 'done',
+    outputBuffer: inputBuffer,
+    outputMimeType: mimeType,
+    inputSizeBytes: inputBuffer.byteLength,
+    blurFacesReasonKey: routing.reasonKey,
+    blurFacesModelLabel: routing.modelLabel,
+    blurFacesRouting: routing,
+    blurFacesCount,
+  };
 }
 
 export const aiProcessor: ToolProcessor = {

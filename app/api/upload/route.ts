@@ -214,7 +214,10 @@ export async function POST(req: NextRequest) {
         : parsedParams;
 
     const referenceFile = formData.get('referenceFile');
-    if (referenceFile instanceof File && tool.category === 'faces') {
+    const clientProcessed =
+      tool.category === 'faces' &&
+      jobParams.clientProcessed === true;
+    if (referenceFile instanceof File && tool.category === 'faces' && !clientProcessed) {
       const refBuffer = Buffer.from(await referenceFile.arrayBuffer());
       await validateUploadBuffer(refBuffer, referenceFile.type, user, tool);
       const refNormalized = await normalizeImageBuffer(refBuffer);
@@ -259,7 +262,8 @@ export async function POST(req: NextRequest) {
     if (
       tool.category === 'faces' &&
       jobParams.detectionMode === 'custom' &&
-      !jobParams.referenceAssetId
+      !jobParams.referenceAssetId &&
+      !jobParams.clientProcessed
     ) {
       await refundCredits(user, tool.creditsCost);
       throw new ValidationError('Reference portrait is required for custom detection.');
