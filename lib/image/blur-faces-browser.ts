@@ -3,11 +3,11 @@
 import type { BlurCustomAction, BlurFacesParams, BlurStrength } from '@/lib/tools/blur-faces-params';
 import { blurStrengthToRadius } from '@/lib/tools/blur-faces-params';
 import { FaceBlurError } from '@/lib/image/face-blur-error';
+import { pickFacesToBlur } from '@/lib/image/face-blur-match';
 
 const MODEL_URL = '/face-api-models';
 const MATCH_MIN_CONFIDENCE = 0.15;
 const MAX_FACE_DETECT_EDGE = 1600;
-const FACE_MATCH_THRESHOLD = 0.55;
 
 type InitMode = 'detect' | 'full';
 type FaceApiModule = typeof import('@vladmandic/face-api');
@@ -20,10 +20,6 @@ let faceapi: FaceApiModule | null = null;
 let detectorOptions: DetectorOptions | null = null;
 let loadedMode: InitMode | null = null;
 let tfReadyPromise: Promise<void> | null = null;
-
-function shouldBlurFace(isMatch: boolean, customAction: BlurCustomAction): boolean {
-  return customAction === 'blur' ? isMatch : !isMatch;
-}
 
 function expandBox(
   box: { x: number; y: number; width: number; height: number },
@@ -336,16 +332,24 @@ async function applyCustomBlur(
     );
   }
 
-  const facesToBlur = faces.filter((face) => {
-    const distance = api.euclideanDistance(referenceDescriptor, face.descriptor);
-    const isMatch = distance < FACE_MATCH_THRESHOLD;
-    return shouldBlurFace(isMatch, customAction);
-  });
+  const facesToBlur = pickFacesToBlur(
+    faces,
+    referenceDescriptor,
+    customAction,
+    (a, b) => api.euclideanDistance(a, b)
+  );
 
   if (facesToBlur.length === 0) {
+    if (customAction === 'exclude' && faces.length === 1) {
+      return 0;
+    }
     throw new FaceBlurError(
-      'no faces matched selection',
-      'No matching face was found in the photo. Try a clearer reference portrait or crop closer to the face.',
+      customAction === 'exclude'
+        ? 'reference not found for exclude'
+        : 'no faces matched selection',
+      customAction === 'exclude'
+        ? 'Could not find the reference person in the photo. Try a clearer portrait or crop closer to the face.'
+        : 'No matching face was found in the photo. Try a clearer reference portrait or crop closer to the face.',
       'blurFacesErrorNoMatch'
     );
   }

@@ -1,14 +1,11 @@
 import sharp from 'sharp';
 import type { BlurFacesRouting } from '@/lib/ai/blur-faces-routing';
-import { blurStrengthToSigma, type BlurCustomAction } from '@/lib/tools/blur-faces-params';
+import { blurStrengthToSigma } from '@/lib/tools/blur-faces-params';
 import { FaceBlurError } from '@/lib/image/face-blur-error';
+import { pickFacesToBlur } from '@/lib/image/face-blur-match';
 
 export { FaceBlurError };
 export type { FaceBlurErrorKey } from '@/lib/image/face-blur-error';
-
-function shouldBlurFace(isMatch: boolean, customAction: BlurCustomAction): boolean {
-  return customAction === 'blur' ? isMatch : !isMatch;
-}
 
 function expandBox(
   box: { x: number; y: number; width: number; height: number },
@@ -108,16 +105,24 @@ export async function applyCustomFaceBlur(
   }
 
   const threshold = faceApi.getFaceMatchThreshold();
-  const facesToBlur = faces.filter((face) => {
-    const distance = faceApi.faceDistance(referenceDescriptor, face.descriptor);
-    const isMatch = distance < threshold;
-    return shouldBlurFace(isMatch, routing.customAction);
-  });
+  const facesToBlur = pickFacesToBlur(
+    faces,
+    referenceDescriptor,
+    routing.customAction,
+    (a, b) => faceApi.faceDistance(a, b),
+    threshold
+  );
 
   if (facesToBlur.length === 0) {
+    if (routing.customAction === 'exclude' && faces.length === 1) {
+      const encoded = await encodePreservingFormat(orientedInput, sourceMeta);
+      return { ...encoded, blurredFaceCount: 0 };
+    }
     throw new FaceBlurError(
       'no faces matched selection',
-      'No matching face was found in the photo. Try a clearer reference portrait or crop closer to the face.',
+      routing.customAction === 'exclude'
+        ? 'Could not find the reference person in the photo. Try a clearer portrait or crop closer to the face.'
+        : 'No matching face was found in the photo. Try a clearer reference portrait or crop closer to the face.',
       'blurFacesErrorNoMatch'
     );
   }
