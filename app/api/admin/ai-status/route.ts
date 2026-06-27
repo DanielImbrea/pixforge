@@ -4,6 +4,7 @@ import { getAiProductionStatus } from '@/lib/ai/config';
 import {
   getBgRemovalEnvConfig,
   getResolvedBgRemovalModels,
+  getResolvedBlurFacesModels,
   getResolvedUpscaleModels,
 } from '@/lib/ai/replicate-models';
 import { verifyReplicateModel } from '@/lib/ai/replicate-client';
@@ -31,9 +32,16 @@ export async function GET() {
   const status = getAiProductionStatus();
   const bgModels = getResolvedBgRemovalModels();
   const upscaleModels = getResolvedUpscaleModels();
+  const blurFacesModels = getResolvedBlurFacesModels();
   const bgEnv = getBgRemovalEnvConfig();
 
-  const uniqueModels = [...new Set([...Object.values(bgModels), ...Object.values(upscaleModels)])];
+  const uniqueModels = [
+    ...new Set([
+      ...Object.values(bgModels),
+      ...Object.values(upscaleModels),
+      ...Object.values(blurFacesModels),
+    ]),
+  ];
   const modelChecks =
     status.provider === 'replicate' && status.replicateTokenConfigured
       ? await Promise.all(
@@ -51,7 +59,7 @@ export async function GET() {
 
   return NextResponse.json({
     ...status,
-    models: { background: bgModels, upscale: upscaleModels },
+    models: { background: bgModels, upscale: upscaleModels, blurFaces: blurFacesModels },
     backgroundEnv: bgEnv.envSources,
     backgroundVersionOverride: bgEnv.versionOverride ?? null,
     modelChecks,

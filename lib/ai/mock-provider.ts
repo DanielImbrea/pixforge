@@ -8,6 +8,7 @@ import { getAppUrl } from '@/lib/ai/config';
 function resolveMockModelId(tool: ToolDefinition): string {
   if (tool.category === 'background') return 'mock-bg-removal';
   if (tool.category === 'upscale') return 'mock-upscale';
+  if (tool.category === 'faces') return 'mock-blur-faces';
   return tool.processorConfig.aiModelId || 'mock-default';
 }
 
@@ -59,6 +60,34 @@ export async function applyMockAiTransform(
   if (modelId === 'mock-bg-removal' || modelId.includes('background')) {
     const buffer = await sharp(inputBuffer).ensureAlpha().png().toBuffer();
     return { buffer, mimeType: 'image/png' };
+  }
+
+  if (modelId === 'mock-blur-faces' || modelId.includes('blur-faces')) {
+    const routing = params?._blurFacesRouting as { blurRadius?: number } | undefined;
+    const sigma = Math.max(3, Math.min(20, (routing?.blurRadius ?? 15) / 2));
+    const meta = await sharp(inputBuffer).rotate().metadata();
+    const width = meta.width ?? 512;
+    const height = meta.height ?? 512;
+    const faceWidth = Math.round(width * 0.22);
+    const faceHeight = Math.round(height * 0.28);
+    const left = Math.round(width * 0.39);
+    const top = Math.round(height * 0.28);
+    const blurredFace = await sharp(inputBuffer)
+      .rotate()
+      .extract({ left, top, width: faceWidth, height: faceHeight })
+      .blur(sigma)
+      .toBuffer();
+    const buffer = await sharp(inputBuffer)
+      .rotate()
+      .composite([{ input: blurredFace, left, top }])
+      .toBuffer();
+    const mimeType =
+      meta.format === 'png'
+        ? 'image/png'
+        : meta.format === 'webp'
+          ? 'image/webp'
+          : 'image/jpeg';
+    return { buffer, mimeType };
   }
 
   const scale =

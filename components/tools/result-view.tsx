@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CompressionStats, computeSavedPercent } from './compression-stats';
 import { UpscaleResultCompare } from './upscale-result-compare';
@@ -30,6 +31,8 @@ interface ResultViewProps {
   bgRemovalEdgeQuality?: string | null;
   bgRemovalSmartMode?: boolean;
   bgRemovalShadowRecoveryApplied?: boolean;
+  blurFacesReasonKey?: string | null;
+  blurFacesModelLabel?: string | null;
   isCompressOnly?: boolean;
   compressionLevel?: 'fast' | 'balanced' | 'max' | null;
   sizeCompareOutputLabel?: 'compressed' | 'result';
@@ -91,6 +94,8 @@ export function ResultView({
   bgRemovalEdgeQuality,
   bgRemovalSmartMode = false,
   bgRemovalShadowRecoveryApplied = false,
+  blurFacesReasonKey,
+  blurFacesModelLabel,
   isCompressOnly = false,
   compressionLevel = null,
   sizeCompareOutputLabel = 'compressed',
@@ -110,7 +115,8 @@ export function ResultView({
     !isCompressOnly &&
     Boolean(outputFormatLabel || formatReasonKey || smartFormatSelected) &&
     !upscaleReasonKey &&
-    !bgRemovalReasonKey;
+    !bgRemovalReasonKey &&
+    !blurFacesReasonKey;
   const showCompressionStats =
     (isCompressOnly || isConvertResult) &&
     outputSizeBytes != null &&
@@ -119,7 +125,7 @@ export function ResultView({
     resolvedInputBytes > 0;
   const savedPercent = computeSavedPercent(resolvedInputBytes ?? 0, outputSizeBytes ?? 0);
   const alreadyOptimized = formatReasonKey === 'formatReasonAlreadyOptimized';
-  const showUpscaleCompare = Boolean(upscaleReasonKey && beforePreviewUrl);
+  const showUpscaleCompare = Boolean(beforePreviewUrl && (upscaleReasonKey || blurFacesReasonKey));
 
   return (
     <div className="flex flex-col gap-4">
@@ -168,7 +174,13 @@ export function ResultView({
         />
       )}
 
-      {!isCompressOnly && (dimensionsLabel || sizeLabel || outputFormatLabel || upscaleReasonKey || bgRemovalReasonKey) && (
+      {!isCompressOnly &&
+        (dimensionsLabel ||
+          sizeLabel ||
+          outputFormatLabel ||
+          upscaleReasonKey ||
+          bgRemovalReasonKey ||
+          blurFacesReasonKey) && (
         <div className="text-xs text-text-tertiary text-center space-y-2">
           {(dimensionsLabel || sizeLabel) && (
             <p>{[dimensionsLabel, sizeLabel].filter(Boolean).join(' · ')}</p>
@@ -235,6 +247,16 @@ export function ResultView({
               )}
             </div>
           )}
+          {blurFacesReasonKey && (
+            <div className="rounded-md border border-border-default bg-background-secondary px-3 py-2 text-left space-y-1">
+              <p className="font-medium text-text-primary">
+                {blurFacesModelLabel
+                  ? t('blurFacesSelected', { model: blurFacesModelLabel })
+                  : t('blurFacesComplete')}
+              </p>
+              <p className="text-text-secondary">{t(blurFacesReasonKey as 'blurFacesReasonAutomatic')}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -253,8 +275,9 @@ export function ResultView({
             </Button>
           </>
         )}
-        <Button variant="ghost" onClick={onReset}>
-          ↺
+        <Button variant="ghost" className="gap-2 shrink-0" onClick={onReset}>
+          <RotateCcw className="h-4 w-4" aria-hidden />
+          {t('uploadAnotherPhoto')}
         </Button>
       </div>
     </div>

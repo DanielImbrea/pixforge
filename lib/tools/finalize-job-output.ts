@@ -38,6 +38,8 @@ export interface FinalizeJobOutputInput {
     bgRemovalEdgeQuality?: string;
     bgRemovalSmartMode?: boolean;
     bgRemovalShadowRecoveryApplied?: boolean;
+    blurFacesReasonKey?: string;
+    blurFacesModelLabel?: string;
   };
 }
 

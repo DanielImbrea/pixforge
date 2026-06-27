@@ -34,3 +34,23 @@ export const bgRemovalParamsSchema = z.object({
   edgeQuality: z.enum(['standard', 'high', 'studio']).default('high'),
   shadowRecovery: z.boolean().default(false),
 });
+
+export const cropParamsSchema = z.object({
+  left: z.number().int().min(0).max(10000),
+  top: z.number().int().min(0).max(10000),
+  width: z.number().int().positive().max(10000),
+  height: z.number().int().positive().max(10000),
+  aspectRatio: z
+    .enum(['free', '1:1', '4:3', '3:2', '16:9', '9:16', '4:5', '3:4'])
+    .default('free'),
+  rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0),
+  flipHorizontal: z.boolean().default(false),
+  flipVertical: z.boolean().default(false),
+});
+
+export const blurFacesParamsSchema = z.object({
+  detectionMode: z.enum(['automatic', 'custom']).default('automatic'),
+  blurStrength: z.enum(['low', 'medium', 'strong']).default('medium'),
+  customAction: z.enum(['blur', 'exclude']).default('blur'),
+  referenceAssetId: z.string().uuid().optional(),
+});

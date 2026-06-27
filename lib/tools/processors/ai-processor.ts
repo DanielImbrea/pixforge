@@ -1,4 +1,5 @@
 import { getAiProvider } from '@/lib/ai/config';
+import { resolveBlurFacesRoute, isCustomBlurFacesJob } from '@/lib/ai/blur-faces-routing';
 import { resolveBgRemovalRoute } from '@/lib/ai/bg-removal-routing';
 import { submitMockJob } from '@/lib/ai/mock-provider';
 import { submitReplicateJob } from '@/lib/ai/replicate-client';
@@ -41,15 +42,71 @@ function parseBgRemovalParams(params: Record<string, unknown>): {
   return { subjectMode, edgeQuality };
 }
 
+async function processCustomBlurFaces(
+  job: ProcessInput['job'],
+  inputAssetUrl: string,
+  params: Record<string, unknown>
+): Promise<ProcessResult> {
+  const routing = resolveBlurFacesRoute(params);
+  const referenceUrl = params._referenceAssetUrl as string | undefined;
+
+  if (!referenceUrl) {
+    return {
+      status: 'failed',
+      error: 'Reference portrait is required for custom detection.',
+    };
+  }
+
+  try {
+    const { applyCustomFaceBlur, FaceBlurError } = await import('@/lib/image/blur-faces-custom');
+    const [inputBuffer, referenceBuffer] = await Promise.all([
+      fetchAsBuffer(inputAssetUrl),
+      fetchAsBuffer(referenceUrl),
+    ]);
+
+    const { buffer, mimeType, blurredFaceCount } = await applyCustomFaceBlur(
+      inputBuffer,
+      referenceBuffer,
+      routing
+    );
+
+    return {
+      status: 'done',
+      outputBuffer: buffer,
+      outputMimeType: mimeType,
+      inputSizeBytes: inputBuffer.byteLength,
+      blurFacesReasonKey: routing.reasonKey,
+      blurFacesModelLabel: routing.modelLabel,
+      blurFacesRouting: routing,
+      blurFacesCount: blurredFaceCount,
+    };
+  } catch (err) {
+    const { FaceBlurError } = await import('@/lib/image/blur-faces-custom');
+    if (err instanceof FaceBlurError) {
+      return { status: 'failed', error: err.userMessage };
+    }
+    console.error('[blur-faces] custom pipeline failed', err);
+    return {
+      status: 'failed',
+      error: 'Face detection failed.',
+    };
+  }
+}
+
 export const aiProcessor: ToolProcessor = {
   async process({ job, tool, inputAssetUrl }: ProcessInput): Promise<ProcessResult> {
+    const params = (job.params || {}) as Record<string, unknown>;
+
+    if (tool.category === 'faces' && isCustomBlurFacesJob(params)) {
+      return processCustomBlurFaces(job, inputAssetUrl, params);
+    }
+
     let workingJob = job;
     let toolMeta: Partial<ProcessResult> = {};
 
-    if (tool.category === 'upscale' || tool.category === 'background') {
+    if (tool.category === 'upscale' || tool.category === 'background' || tool.category === 'faces') {
       const buffer = await fetchAsBuffer(inputAssetUrl);
       const profile = await classifyImageContent(buffer);
-      const params = (job.params || {}) as Record<string, unknown>;
 
       if (tool.category === 'upscale') {
         const dimensions = await readImageDimensions(buffer);
@@ -92,6 +149,21 @@ export const aiProcessor: ToolProcessor = {
           bgRemovalEdgeQuality: routing.edgeQuality,
           bgRemovalSmartMode: routing.smartMode,
           bgRemovalRouting: routing,
+        };
+      }
+
+      if (tool.category === 'faces') {
+        const routing = resolveBlurFacesRoute(params);
+
+        workingJob = {
+          ...job,
+          params: { ...params, _blurFacesRouting: routing },
+        };
+
+        toolMeta = {
+          blurFacesReasonKey: routing.reasonKey,
+          blurFacesModelLabel: routing.modelLabel,
+          blurFacesRouting: routing,
         };
       }
     }

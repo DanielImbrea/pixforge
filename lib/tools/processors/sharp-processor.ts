@@ -7,6 +7,7 @@ import {
   resolveQualityForFormat,
   type QualityIntent,
 } from '@/lib/image/quality-intent';
+import { clampCropRect } from '@/lib/tools/crop-params';
 import {
   applyContentAwareEncode,
   applyResize,
@@ -234,6 +235,55 @@ export const sharpProcessor: ToolProcessor = {
           }
 
           enableFallback = formatChoice.format === 'avif';
+          break;
+        }
+        case 'crop': {
+          const rotate =
+            params.rotate === 90 || params.rotate === 180 || params.rotate === 270
+              ? params.rotate
+              : 0;
+          const flipH = Boolean(params.flipHorizontal);
+          const flipV = Boolean(params.flipVertical);
+
+          if (rotate) {
+            pipeline = pipeline.rotate(rotate);
+          }
+          if (flipH) {
+            pipeline = pipeline.flop();
+          }
+          if (flipV) {
+            pipeline = pipeline.flip();
+          }
+
+          const orientedMeta = await pipeline.clone().metadata();
+          const orientedWidth = orientedMeta.width ?? inputMeta.width ?? 1;
+          const orientedHeight = orientedMeta.height ?? inputMeta.height ?? 1;
+
+          const rect = clampCropRect(
+            {
+              left: typeof params.left === 'number' ? params.left : 0,
+              top: typeof params.top === 'number' ? params.top : 0,
+              width:
+                typeof params.width === 'number' && params.width > 0
+                  ? params.width
+                  : orientedWidth,
+              height:
+                typeof params.height === 'number' && params.height > 0
+                  ? params.height
+                  : orientedHeight,
+            },
+            orientedWidth,
+            orientedHeight
+          );
+
+          pipeline = pipeline.extract(rect);
+          outputWidth = rect.width;
+          outputHeight = rect.height;
+
+          const inputSharpMeta = await sharp(buffer).metadata();
+          const originalFormat = formatFromSharpMeta(inputSharpMeta.format);
+          formatChoice = buildPreserveFormatChoice(originalFormat);
+          qualityIntent = 'balanced';
           break;
         }
         case 'compress': {

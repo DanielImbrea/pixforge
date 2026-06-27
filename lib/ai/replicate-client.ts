@@ -15,6 +15,8 @@ import {
 } from '@/lib/ai/replicate-models';
 import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
 import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
+import { resolveBlurFacesPinnedVersion } from '@/lib/ai/blur-faces-config';
+import type { BlurFacesRouting } from '@/lib/ai/blur-faces-routing';
 import type { ProcessResult } from '@/lib/tools/processor';
 
 const REPLICATE_API = 'https://api.replicate.com/v1';
@@ -30,12 +32,16 @@ function resolveModelForJob(tool: ToolDefinition, job: ImageJobRow): string {
   const params = (job.params || {}) as Record<string, unknown>;
   const upscaleRouting = params._upscaleRouting as UpscaleRouting | undefined;
   const bgRouting = params._bgRemovalRouting as BgRemovalRouting | undefined;
+  const blurRouting = params._blurFacesRouting as BlurFacesRouting | undefined;
 
   if (tool.category === 'upscale' && upscaleRouting?.model) {
     return normalizeReplicateModelSlug(upscaleRouting.model);
   }
   if (tool.category === 'background' && bgRouting?.model) {
     return normalizeReplicateModelSlug(bgRouting.model);
+  }
+  if (tool.category === 'faces' && blurRouting?.model) {
+    return normalizeReplicateModelSlug(blurRouting.model);
   }
   return normalizeReplicateModelSlug(getReplicateModel(tool.category));
 }
@@ -80,6 +86,23 @@ function buildReplicateInput(
     };
   }
 
+  if (tool.category === 'faces') {
+    const routing = params._blurFacesRouting as BlurFacesRouting | undefined;
+    const input: Record<string, unknown> = {
+      image: inputAssetUrl,
+      blur: routing?.blurRadius ?? 15,
+    };
+    const referenceUrl = params._referenceAssetUrl as string | undefined;
+    if (routing?.detectionMode === 'custom' && referenceUrl) {
+      input.reference_image = referenceUrl;
+      input.reference = referenceUrl;
+      input.portrait = referenceUrl;
+      input.action = routing.customAction;
+      input.mode = routing.customAction;
+    }
+    return input;
+  }
+
   throw new Error(`Replicate input not defined for category ${tool.category}`);
 }
 
@@ -98,6 +121,13 @@ export async function resolveReplicateVersion(
     const envVersion = getBgRemovalVersionFromEnv();
     if (envVersion) {
       return formatReplicateVersion(parsed.slug, envVersion);
+    }
+  }
+
+  if (options.toolCategory === 'faces') {
+    const pinned = resolveBlurFacesPinnedVersion(parsed.slug, false);
+    if (pinned) {
+      return formatReplicateVersion(parsed.slug, pinned);
     }
   }
 

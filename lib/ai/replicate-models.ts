@@ -13,6 +13,7 @@ export const PINNED_REPLICATE_VERSIONS: Record<string, string> = {
   'nightmareai/real-esrgan':
     'e1f4a2081605342caf55ba4294914cf266dcdf738397cf8826b48cdae516137c',
   'cjwbw/rembg': 'fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003',
+  'kharioki/blur-faces': 'bdcc18be6a02a8f2efce1a3f7489f74a1d6729caea9b53061358fe75c93799d2',
 };
 
 export interface ParsedModelSlug {
@@ -125,5 +126,16 @@ export function getResolvedUpscaleModels(): Record<string, string> {
     photo: readEnv('REPLICATE_UPSCALE_PHOTO_MODEL') ?? fallback,
     ui: readEnv('REPLICATE_UPSCALE_UI_MODEL') ?? fallback,
     art: readEnv('REPLICATE_UPSCALE_ART_MODEL') ?? fallback,
+  };
+}
+
+export function getResolvedBlurFacesModels(): Record<string, string> {
+  const automatic =
+    readEnv('REPLICATE_BLUR_FACES_MODEL') ??
+    readEnv('REPLICATE_BLUR_FACES_MODEL_SLUG') ??
+    'mock-blur-faces';
+
+  return {
+    automatic: normalizeReplicateModelSlug(automatic),
   };
 }

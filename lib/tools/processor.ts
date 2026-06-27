@@ -37,6 +37,10 @@ export interface ProcessResult {
   bgRemovalEdgeQuality?: string;
   bgRemovalSmartMode?: boolean;
   bgRemovalRouting?: import('@/lib/ai/bg-removal-routing').BgRemovalRouting;
+  blurFacesReasonKey?: string;
+  blurFacesModelLabel?: string;
+  blurFacesRouting?: import('@/lib/ai/blur-faces-routing').BlurFacesRouting;
+  blurFacesCount?: number | null;
   providerJobId?: string;
   error?: string;
   errorKey?: string;

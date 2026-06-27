@@ -33,6 +33,8 @@ export async function postProcessOutput(
       .png({ compressionLevel: 9, adaptiveFiltering: true })
       .toBuffer();
     result = { buffer: optimized, mimeType: 'image/png' };
+  } else if (toolCategory === 'faces') {
+    result = { buffer, mimeType };
   } else {
     const optimized = await sharp(buffer).webp({ quality: 88, effort: 4 }).toBuffer();
     result = { buffer: optimized, mimeType: 'image/webp' };

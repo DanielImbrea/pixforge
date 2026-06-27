@@ -1,8 +1,17 @@
 import type { ToolDefinition } from '@/types';
-import { convertParamsSchema, bgRemovalParamsSchema, resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
+import {
+  convertParamsSchema,
+  bgRemovalParamsSchema,
+  resizeParamsSchema,
+  upscaleParamsSchema,
+  cropParamsSchema,
+  blurFacesParamsSchema,
+} from '@/lib/validation/schemas';
 import { DEFAULT_BG_REMOVAL_PARAMS, type BgRemovalParams } from '@/lib/tools/bg-removal-params';
+import { DEFAULT_BLUR_FACES_PARAMS, type BlurFacesParams } from '@/lib/tools/blur-faces-params';
 import { DEFAULT_COMPRESS_PARAMS, type CompressParams } from '@/lib/tools/compress-params';
 import { DEFAULT_CONVERT_PARAMS, type ConvertParams } from '@/lib/tools/convert-params';
+import { DEFAULT_CROP_PARAMS, type CropParams } from '@/lib/tools/crop-params';
 import { DEFAULT_RESIZE_PARAMS, type ResizeParams } from '@/lib/tools/resize-params';
 import { DEFAULT_UPSCALE_PARAMS, type UpscaleParams } from '@/lib/tools/upscale-params';
 
@@ -12,9 +21,15 @@ export interface ToolParamsValidation {
   errorKey?: string;
 }
 
+export interface ValidateToolParamsOptions {
+  /** Client-side upload includes reference portrait before server assigns referenceAssetId. */
+  referenceFilePresent?: boolean;
+}
+
 export function validateToolParams(
   tool: ToolDefinition,
-  raw: Record<string, unknown>
+  raw: Record<string, unknown>,
+  options: ValidateToolParamsOptions = {}
 ): ToolParamsValidation {
   if (tool.category === 'resize') {
     const result = resizeParamsSchema.safeParse(raw);
@@ -35,6 +50,17 @@ export function validateToolParams(
         quality: result.data.quality,
       },
     };
+  }
+
+  if (tool.category === 'crop') {
+    const result = cropParamsSchema.safeParse(raw);
+    if (!result.success) {
+      return { valid: false, params: {}, errorKey: 'validationCropInvalid' };
+    }
+    if (result.data.width < 1 || result.data.height < 1) {
+      return { valid: false, params: {}, errorKey: 'validationCropRequired' };
+    }
+    return { valid: true, params: result.data };
   }
 
   if (tool.category === 'upscale') {
@@ -77,6 +103,19 @@ export function validateToolParams(
     return { valid: true, params: result.data };
   }
 
+  if (tool.category === 'faces') {
+    const result = blurFacesParamsSchema.safeParse(raw);
+    if (!result.success) {
+      return { valid: false, params: {}, errorKey: 'validationBlurFacesInvalid' };
+    }
+    if (result.data.detectionMode === 'custom') {
+      if (!result.data.referenceAssetId && !options.referenceFilePresent) {
+        return { valid: false, params: {}, errorKey: 'validationBlurFacesReferenceRequired' };
+      }
+    }
+    return { valid: true, params: result.data };
+  }
+
   return { valid: true, params: {} };
 }
 
@@ -86,7 +125,9 @@ export function buildToolParams(
   upscaleParams: UpscaleParams = DEFAULT_UPSCALE_PARAMS,
   convertParams: ConvertParams = DEFAULT_CONVERT_PARAMS,
   bgRemovalParams: BgRemovalParams = DEFAULT_BG_REMOVAL_PARAMS,
-  compressParams: CompressParams = DEFAULT_COMPRESS_PARAMS
+  compressParams: CompressParams = DEFAULT_COMPRESS_PARAMS,
+  cropParams: CropParams = DEFAULT_CROP_PARAMS,
+  blurFacesParams: BlurFacesParams = DEFAULT_BLUR_FACES_PARAMS
 ): Record<string, unknown> {
   if (tool.category === 'resize') {
     return {
@@ -95,6 +136,18 @@ export function buildToolParams(
       maintainAspectRatio: resizeParams.maintainAspectRatio,
       targetFormat: resizeParams.targetFormat,
       quality: resizeParams.quality,
+    };
+  }
+  if (tool.category === 'crop') {
+    return {
+      left: cropParams.left,
+      top: cropParams.top,
+      width: cropParams.width,
+      height: cropParams.height,
+      aspectRatio: cropParams.aspectRatio,
+      rotate: cropParams.rotate,
+      flipHorizontal: cropParams.flipHorizontal,
+      flipVertical: cropParams.flipVertical,
     };
   }
   if (tool.category === 'upscale') {
@@ -115,6 +168,16 @@ export function buildToolParams(
       subjectMode: bgRemovalParams.subjectMode,
       edgeQuality: bgRemovalParams.edgeQuality,
       shadowRecovery: bgRemovalParams.shadowRecovery,
+    };
+  }
+  if (tool.category === 'faces') {
+    return {
+      detectionMode: blurFacesParams.detectionMode,
+      blurStrength: blurFacesParams.blurStrength,
+      customAction: blurFacesParams.customAction,
+      ...(blurFacesParams.referenceAssetId
+        ? { referenceAssetId: blurFacesParams.referenceAssetId }
+        : {}),
     };
   }
   return {};

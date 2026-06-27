@@ -89,6 +89,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         bgRemovalEdgeQuality?: string;
         bgRemovalSmartMode?: boolean;
         bgRemovalShadowRecoveryApplied?: boolean;
+        blurFacesReasonKey?: string;
+        blurFacesModelLabel?: string;
       }
     | undefined;
 
@@ -120,5 +122,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     bgRemovalEdgeQuality: delivery?.bgRemovalEdgeQuality,
     bgRemovalSmartMode: delivery?.bgRemovalSmartMode,
     bgRemovalShadowRecoveryApplied: delivery?.bgRemovalShadowRecoveryApplied,
+    blurFacesReasonKey: delivery?.blurFacesReasonKey,
+    blurFacesModelLabel: delivery?.blurFacesModelLabel,
   });
 }

@@ -6,12 +6,17 @@ import { convertTool } from './convert';
 import { upscaleTool } from './upscale';
 import { backgroundRemovalTool } from './background-removal';
 
+import { cropTool } from './crop';
+import { blurFacesTool } from './blur-faces';
+
 export const TOOL_REGISTRY: ToolDefinition[] = [
+  cropTool,
   resizeTool,
   compressTool,
   convertTool,
   upscaleTool,
   backgroundRemovalTool,
+  blurFacesTool,
 ];
 
 export function getEnabledTools(): ToolDefinition[] {

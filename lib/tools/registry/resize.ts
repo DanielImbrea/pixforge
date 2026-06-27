@@ -66,7 +66,7 @@ export const resizeTool: ToolDefinition = {
         title: 'Redimensionare Poze Online Gratuit — Schimbă Dimensiunea în Secunde',
         metaDescription:
           'Redimensionează orice imagine la dimensiuni exacte direct din browser. Rapid, gratuit, fără software. Suportă PNG, JPG, WEBP și AVIF.',
-        h1: 'Redimensionează-ți imaginile instant',
+        h1: 'Redimensionează imaginile instant',
         intro:
           'Încarcă o poză și alege lățimea și înălțimea exactă de care ai nevoie. Unealta noastră păstrează calitatea imaginii în timp ce o adaptează la dimensiunea cerută, ideal pentru web, social media sau print.',
         benefits: [

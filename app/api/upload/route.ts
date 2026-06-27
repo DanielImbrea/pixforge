@@ -8,7 +8,7 @@ import { getMaxResizeQuality } from '@/lib/billing/plan-features';
 import { clampResizeQuality } from '@/lib/tools/resize-params';
 import { uploadBufferToStorage } from '@/lib/supabase/storage';
 import { checkRateLimit, getClientIp, maybeCleanupRateLimitStore } from '@/lib/security/rate-limit';
-import { bgRemovalParamsSchema, convertParamsSchema, resizeParamsSchema, upscaleParamsSchema } from '@/lib/validation/schemas';
+import { bgRemovalParamsSchema, convertParamsSchema, resizeParamsSchema, upscaleParamsSchema, cropParamsSchema, blurFacesParamsSchema } from '@/lib/validation/schemas';
 import sharp from 'sharp';
 import type { ToolDefinition, UserRow } from '@/types';
 
@@ -25,6 +25,9 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
     }
     if (tool.category === 'background') {
       return { subjectMode: 'auto', edgeQuality: 'high' };
+    }
+    if (tool.category === 'faces') {
+      return { detectionMode: 'automatic', blurStrength: 'medium', customAction: 'blur' };
     }
     return {};
   }
@@ -81,6 +84,25 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
       qualityIntent: result.data.qualityIntent,
       backgroundFill: result.data.backgroundFill,
     };
+  }
+
+  if (tool.category === 'crop') {
+    const result = cropParamsSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError('Invalid crop options selected.');
+    }
+    if (result.data.width < 1 || result.data.height < 1) {
+      throw new ValidationError('Crop area is required.');
+    }
+    return result.data;
+  }
+
+  if (tool.category === 'faces') {
+    const result = blurFacesParamsSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError('Invalid blur faces options selected.');
+    }
+    return result.data;
   }
 
   return {};
@@ -183,13 +205,65 @@ export async function POST(req: NextRequest) {
     }
 
     const parsedParams = parseToolParams(tool, formData.get('params'));
-    const jobParams =
+    let jobParams =
       tool.category === 'resize' && typeof parsedParams.quality === 'number'
         ? {
             ...parsedParams,
             quality: clampResizeQuality(parsedParams.quality, getMaxResizeQuality(user.plan)),
           }
         : parsedParams;
+
+    const referenceFile = formData.get('referenceFile');
+    if (referenceFile instanceof File && tool.category === 'faces') {
+      const refBuffer = Buffer.from(await referenceFile.arrayBuffer());
+      await validateUploadBuffer(refBuffer, referenceFile.type, user, tool);
+      const refNormalized = await normalizeImageBuffer(refBuffer);
+      const refMeta = await sharp(refNormalized).metadata();
+      const { storagePath: refPath, bucket: refBucket } = await uploadBufferToStorage(
+        refNormalized,
+        'uploads',
+        user.id,
+        referenceFile.type
+      );
+      const { data: refStorageFile } = await admin
+        .from('storage_files')
+        .insert({
+          user_id: user.id,
+          bucket: refBucket,
+          storage_path: refPath,
+          mime_type: referenceFile.type,
+          size_bytes: refNormalized.byteLength,
+          width_px: refMeta.width,
+          height_px: refMeta.height,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .select('*')
+        .single();
+      if (refStorageFile) {
+        const { data: refAsset } = await admin
+          .from('image_assets')
+          .insert({
+            user_id: user.id,
+            storage_file_id: refStorageFile.id,
+            asset_type: 'input',
+            is_watermarked: false,
+          })
+          .select('*')
+          .single();
+        if (refAsset) {
+          jobParams = { ...jobParams, referenceAssetId: refAsset.id };
+        }
+      }
+    }
+
+    if (
+      tool.category === 'faces' &&
+      jobParams.detectionMode === 'custom' &&
+      !jobParams.referenceAssetId
+    ) {
+      await refundCredits(user, tool.creditsCost);
+      throw new ValidationError('Reference portrait is required for custom detection.');
+    }
 
     let job;
     try {

@@ -63,10 +63,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     inputUrlTtl
   );
 
+  let jobForProcess = jobRow;
+  const existingParams = (jobRow.params || {}) as Record<string, unknown>;
+  if (tool.category === 'faces' && existingParams.referenceAssetId) {
+    const { data: refAsset } = await admin
+      .from('image_assets')
+      .select('*, storage_files(*)')
+      .eq('id', existingParams.referenceAssetId as string)
+      .single();
+    if (refAsset?.storage_files) {
+      const refUrl = await createSignedUrl(
+        refAsset.storage_files.bucket,
+        refAsset.storage_files.storage_path,
+        inputUrlTtl
+      );
+      jobForProcess = {
+        ...jobRow,
+        params: { ...existingParams, _referenceAssetUrl: refUrl },
+      };
+    }
+  }
+
   await admin.from('image_jobs').update({ status: 'processing' }).eq('id', jobRow.id);
 
   const processor = getProcessor(tool);
-  const result = await processor.process({ job: jobRow, tool, inputAssetUrl });
+  const result = await processor.process({ job: jobForProcess, tool, inputAssetUrl });
 
   if (result.status === 'failed') {
     await admin
@@ -85,6 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ...(jobRow.params || {}),
       ...(result.upscaleRouting ? { _upscaleRouting: result.upscaleRouting } : {}),
       ...(result.bgRemovalRouting ? { _bgRemovalRouting: result.bgRemovalRouting } : {}),
+      ...(result.blurFacesRouting ? { _blurFacesRouting: result.blurFacesRouting } : {}),
     };
 
     await admin
@@ -161,6 +183,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       bgRemovalEdgeQuality: result.bgRemovalEdgeQuality,
       bgRemovalSmartMode: result.bgRemovalSmartMode,
       bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
+      blurFacesReasonKey: result.blurFacesReasonKey,
+      blurFacesModelLabel: result.blurFacesModelLabel,
     },
   });
 
@@ -194,5 +218,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     bgRemovalEdgeQuality: result.bgRemovalEdgeQuality,
     bgRemovalSmartMode: result.bgRemovalSmartMode,
     bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
+    blurFacesReasonKey: result.blurFacesReasonKey,
+    blurFacesModelLabel: result.blurFacesModelLabel,
   });
 }

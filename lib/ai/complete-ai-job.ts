@@ -15,7 +15,9 @@ import { finalizeBgRemovalOutput } from '@/lib/ai/bg-removal-post-process';
 import { fetchJobInputBuffer } from '@/lib/ai/fetch-job-input';
 import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
 import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
+import type { BlurFacesRouting } from '@/lib/ai/blur-faces-routing';
 import { getAiProvider } from '@/lib/ai/config';
+import { mapBlurFacesUserError } from '@/lib/ai/replicate-errors';
 import type { ImageJobRow, UserRow } from '@/types';
 
 export async function failAiJob(jobId: string, errorMessage: string): Promise<void> {
@@ -69,6 +71,8 @@ export async function completeAiJobFromOutputBuffer(
   const bgRouting = (jobRow.params as Record<string, unknown> | undefined)?._bgRemovalRouting as
     | BgRemovalRouting
     | undefined;
+  const blurFacesRouting = (jobRow.params as Record<string, unknown> | undefined)
+    ?._blurFacesRouting as BlurFacesRouting | undefined;
 
   let processedBuffer = outputBuffer;
   let bgShadowRecoveryApplied = false;
@@ -94,7 +98,7 @@ export async function completeAiJobFromOutputBuffer(
   }
 
   const deliveryMeta =
-    upscaleRouting || bgRouting
+    upscaleRouting || bgRouting || blurFacesRouting
       ? {
           ...(upscaleRouting
             ? {
@@ -115,6 +119,12 @@ export async function completeAiJobFromOutputBuffer(
                 bgRemovalEdgeQuality: bgRouting.edgeQuality,
                 bgRemovalSmartMode: bgRouting.smartMode,
                 bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
+              }
+            : {}),
+          ...(blurFacesRouting
+            ? {
+                blurFacesReasonKey: blurFacesRouting.reasonKey,
+                blurFacesModelLabel: blurFacesRouting.modelLabel,
               }
             : {}),
         }
@@ -162,7 +172,12 @@ export async function handleReplicatePrediction(
   }
 
   if (prediction.status === 'failed' || prediction.status === 'canceled') {
-    await failAiJob(jobId, prediction.error || 'Replicate prediction failed.');
+    const tool = getToolById(jobRow.tool_id);
+    const errorMessage =
+      tool?.category === 'faces'
+        ? mapBlurFacesUserError(prediction.error)
+        : prediction.error || 'Replicate prediction failed.';
+    await failAiJob(jobId, errorMessage);
     return;
   }
 
@@ -236,7 +251,12 @@ export async function syncMockJobIfComplete(jobRow: ImageJobRow): Promise<void> 
       600
     );
     const inputBuffer = await fetchAsBuffer(inputUrl);
-    const modelId = tool.category === 'background' ? 'mock-bg-removal' : 'mock-upscale';
+    const modelId =
+      tool.category === 'background'
+        ? 'mock-bg-removal'
+        : tool.category === 'faces'
+          ? 'mock-blur-faces'
+          : 'mock-upscale';
     const { buffer, mimeType } = await applyMockAiTransform(
       inputBuffer,
       modelId,

@@ -4,7 +4,14 @@ export type PlanTier = 'free' | 'basic' | 'starter' | 'pro';
 
 export type ToolType = 'sharp' | 'ai';
 
-export type ToolCategory = 'upscale' | 'background' | 'resize' | 'compress' | 'convert';
+export type ToolCategory =
+  | 'upscale'
+  | 'background'
+  | 'resize'
+  | 'compress'
+  | 'convert'
+  | 'crop'
+  | 'faces';
 
 export interface FaqItem {
   question: string;
@@ -35,7 +42,7 @@ export interface ToolLimits {
   maxDimensionPx?: number;
 }
 
-export type SharpOperation = 'resize' | 'compress' | 'convert';
+export type SharpOperation = 'resize' | 'compress' | 'convert' | 'crop';
 
 export interface ToolProcessorConfig {
   sharpOperation?: SharpOperation;

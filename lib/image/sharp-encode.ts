@@ -7,7 +7,7 @@ export { computeFitInsideDimensions };
 
 export type OutputFormat = 'jpeg' | 'png' | 'webp' | 'avif';
 
-export type SharpOperation = 'resize' | 'compress' | 'convert';
+export type SharpOperation = 'resize' | 'compress' | 'convert' | 'crop';
 
 export type SmartFormatReason =
   | 'transparency'
