@@ -23,6 +23,7 @@ import { BlurFacesOptions } from './blur-faces-options';
 import { CropEditor } from './crop-editor';
 import { DEFAULT_BG_REMOVAL_PARAMS } from '@/lib/tools/bg-removal-params';
 import { DEFAULT_BLUR_FACES_PARAMS } from '@/lib/tools/blur-faces-params';
+import { blurFacesInBrowser, FaceBlurError } from '@/lib/image/blur-faces-browser';
 import { DEFAULT_CROP_PARAMS, initCropRectForImage, type CropParams } from '@/lib/tools/crop-params';
 import {
   buildResizeDownloadFilename,
@@ -515,11 +516,24 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     startProgressSimulation();
 
     try {
-      const result = await processSingleFile(
-        selectedFile,
-        validation.params,
-        isFacesTool && blurFacesParams.detectionMode === 'custom' ? referenceFile : null
-      );
+      let fileToProcess = selectedFile;
+      let jobParams: Record<string, unknown> = { ...validation.params };
+
+      if (isFacesTool) {
+        const { file, blurredFaceCount } = await blurFacesInBrowser(
+          selectedFile,
+          blurFacesParams,
+          blurFacesParams.detectionMode === 'custom' ? referenceFile : null
+        );
+        fileToProcess = file;
+        jobParams = {
+          ...validation.params,
+          clientProcessed: true,
+          blurFacesCount: blurredFaceCount,
+        };
+      }
+
+      const result = await processSingleFile(fileToProcess, jobParams, null);
       setJobId(result.jobId);
       stopProgressSimulation();
       setProgress(100);
@@ -554,7 +568,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       setStage('result');
     } catch (err) {
       stopProgressSimulation();
-      setErrorMessage(err instanceof Error ? err.message : t('errorGeneric'));
+      if (err instanceof FaceBlurError) {
+        setErrorMessage(t(err.errorKey));
+      } else {
+        setErrorMessage(err instanceof Error ? err.message : t('errorGeneric'));
+      }
       setStage('error');
     } finally {
       setIsSubmitting(false);
@@ -988,6 +1006,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
           label={processingLabel}
           isAiTool={tool.type === 'ai'}
           isUpscaleTool={isUpscaleTool}
+          isFacesTool={isFacesTool}
         />
       }
       result={

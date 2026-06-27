@@ -48,6 +48,32 @@ async function processLocalBlurFaces(
   params: Record<string, unknown>
 ): Promise<ProcessResult> {
   const routing = resolveBlurFacesRoute(params);
+
+  if (params.clientProcessed === true) {
+    const inputBuffer = await fetchAsBuffer(inputAssetUrl);
+    const sharp = (await import('sharp')).default;
+    const meta = await sharp(inputBuffer).metadata();
+    const mimeType =
+      meta.format === 'png'
+        ? 'image/png'
+        : meta.format === 'webp'
+          ? 'image/webp'
+          : 'image/jpeg';
+    const blurFacesCount =
+      typeof params.blurFacesCount === 'number' ? params.blurFacesCount : undefined;
+
+    return {
+      status: 'done',
+      outputBuffer: inputBuffer,
+      outputMimeType: mimeType,
+      inputSizeBytes: inputBuffer.byteLength,
+      blurFacesReasonKey: routing.reasonKey,
+      blurFacesModelLabel: routing.modelLabel,
+      blurFacesRouting: routing,
+      blurFacesCount,
+    };
+  }
+
   const isCustom = isCustomBlurFacesJob(params);
   const referenceUrl = params._referenceAssetUrl as string | undefined;
 

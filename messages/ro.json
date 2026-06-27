@@ -149,6 +149,8 @@
     "processingUpscaleStep3": "Îmbunătățim claritatea…",
     "processingUpscaleHint": "Enhancement-ul AI durează de obicei 10–30 secunde. Lasă tab-ul deschis.",
     "processingSlowHint": "Încă lucrăm — imaginile mari sau modelele AI pot dura puțin mai mult. Te rugăm să aștepți.",
+    "processingBlurFaces": "Detectăm și blur-ăm fețele…",
+    "processingBlurFacesHint": "Detecția fețelor rulează local în browser. Prima rulare poate dura câteva secunde până se încarcă modelele.",
     "result": "Rezultat",
     "downloadHd": "Descarcă HD",
     "downloadFree": "Descarcă (cu watermark)",

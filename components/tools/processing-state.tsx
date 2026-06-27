@@ -8,6 +8,7 @@ interface ProcessingStateProps {
   label?: string;
   isAiTool?: boolean;
   isUpscaleTool?: boolean;
+  isFacesTool?: boolean;
 }
 
 const SLOW_THRESHOLD_MS = 20_000;
@@ -22,6 +23,7 @@ export function ProcessingState({
   label,
   isAiTool = false,
   isUpscaleTool = false,
+  isFacesTool = false,
 }: ProcessingStateProps) {
   const t = useTranslations('tool');
   const clampedProgress = Math.min(100, Math.max(0, progress));
@@ -43,7 +45,9 @@ export function ProcessingState({
 
   const defaultLabel = isUpscaleTool
     ? t(UPSCALE_MESSAGE_KEYS[upscaleMessageIndex])
-    : t('processing');
+    : isFacesTool
+      ? t('processingBlurFaces')
+      : t('processing');
 
   return (
     <div className="flex flex-col items-center justify-center gap-5 p-12 text-center">
@@ -61,9 +65,13 @@ export function ProcessingState({
       </div>
       <p className="text-sm font-medium text-text-primary">{t('processingKeepOpen')}</p>
       <p className="text-sm text-text-secondary">
-        {isUpscaleTool ? t('processingUpscaleHint') : t('processingHint')}
+        {isUpscaleTool
+          ? t('processingUpscaleHint')
+          : isFacesTool
+            ? t('processingBlurFacesHint')
+            : t('processingHint')}
       </p>
-      {isAiTool && (
+      {isAiTool && !isFacesTool && (
         <p className="text-xs text-text-tertiary">{t('processingAiNote')}</p>
       )}
       {showSlowHint && (

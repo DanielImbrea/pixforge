@@ -149,6 +149,8 @@
     "processingUpscaleStep3": "Improving clarity…",
     "processingUpscaleHint": "AI enhancement usually takes 10–30 seconds. Keep this tab open.",
     "processingSlowHint": "Still working — large images or AI models can take a bit longer. Please wait.",
+    "processingBlurFaces": "Detecting and blurring faces…",
+    "processingBlurFacesHint": "Face detection runs locally in your browser. The first run may take a few seconds while models load.",
     "result": "Result",
     "downloadHd": "Download HD",
     "downloadFree": "Download (watermarked)",

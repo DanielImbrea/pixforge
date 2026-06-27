@@ -1,23 +1,10 @@
 import sharp from 'sharp';
 import type { BlurFacesRouting } from '@/lib/ai/blur-faces-routing';
 import { blurStrengthToSigma, type BlurCustomAction } from '@/lib/tools/blur-faces-params';
+import { FaceBlurError } from '@/lib/image/face-blur-error';
 
-export type FaceBlurErrorKey =
-  | 'blurFacesErrorNoFacesInImage'
-  | 'blurFacesErrorNoFaceInPortrait'
-  | 'blurFacesErrorNoMatch'
-  | 'blurFacesErrorDetectionFailed';
-
-export class FaceBlurError extends Error {
-  constructor(
-    message: string,
-    readonly userMessage: string,
-    readonly errorKey: FaceBlurErrorKey = 'blurFacesErrorDetectionFailed'
-  ) {
-    super(message);
-    this.name = 'FaceBlurError';
-  }
-}
+export { FaceBlurError };
+export type { FaceBlurErrorKey } from '@/lib/image/face-blur-error';
 
 function shouldBlurFace(isMatch: boolean, customAction: BlurCustomAction): boolean {
   return customAction === 'blur' ? isMatch : !isMatch;

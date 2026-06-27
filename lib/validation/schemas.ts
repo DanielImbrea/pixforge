@@ -53,4 +53,7 @@ export const blurFacesParamsSchema = z.object({
   blurStrength: z.enum(['low', 'medium', 'strong']).default('medium'),
   customAction: z.enum(['blur', 'exclude']).default('blur'),
   referenceAssetId: z.string().uuid().optional(),
+  /** Image already blurred in the browser; server only stores and delivers it. */
+  clientProcessed: z.boolean().optional(),
+  blurFacesCount: z.number().int().min(0).optional(),
 });
