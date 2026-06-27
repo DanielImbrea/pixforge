@@ -84,7 +84,7 @@ export async function applyCustomFaceBlur(
 ): Promise<{ buffer: Buffer; mimeType: string; blurredFaceCount: number }> {
   const faceApi = await import('@/lib/image/face-api-loader');
 
-  await faceApi.ensureFaceApiReady();
+  await faceApi.ensureFaceApiReady('full');
 
   const orientedInput = await sharp(inputBuffer).rotate().toBuffer();
   const orientedReference = await sharp(referenceBuffer).rotate().toBuffer();
@@ -153,7 +153,7 @@ export async function applyAutomaticFaceBlur(
 ): Promise<{ buffer: Buffer; mimeType: string; blurredFaceCount: number }> {
   const faceApi = await import('@/lib/image/face-api-loader');
 
-  await faceApi.ensureFaceApiReady();
+  await faceApi.ensureFaceApiReady('detect');
 
   const orientedInput = await sharp(inputBuffer).rotate().toBuffer();
   const sourceMeta = await sharp(orientedInput).metadata();
@@ -169,8 +169,8 @@ export async function applyAutomaticFaceBlur(
   }
 
   const inputTensor = await faceApi.bufferToFaceInput(orientedInput);
-  const faces = await faceApi.detectFacesWithDescriptors(inputTensor);
-  if (faces.length === 0) {
+  const detections = await faceApi.detectFaceBoxes(inputTensor);
+  if (detections.length === 0) {
     throw new FaceBlurError(
       'no faces in image',
       'No faces were detected in the uploaded photo.',
@@ -181,11 +181,11 @@ export async function applyAutomaticFaceBlur(
   const sigma = blurStrengthToSigma(routing.blurStrength);
   let working = orientedInput;
 
-  for (const face of faces) {
-    const region = expandBox(face.detection.box, imageWidth, imageHeight, inputTensor.scale);
+  for (const detection of detections) {
+    const region = expandBox(detection.box, imageWidth, imageHeight, inputTensor.scale);
     working = await blurRegion(working, region, sigma);
   }
 
   const encoded = await encodePreservingFormat(working, sourceMeta);
-  return { ...encoded, blurredFaceCount: faces.length };
+  return { ...encoded, blurredFaceCount: detections.length };
 }

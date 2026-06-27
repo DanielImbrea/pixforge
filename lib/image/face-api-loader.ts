@@ -1,6 +1,7 @@
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { TextDecoder, TextEncoder } from 'util';
 import sharp from 'sharp';
@@ -10,17 +11,35 @@ const nodeRequire = createRequire(
   typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url)
 );
 
-let initPromise: Promise<void> | null = null;
-let faceapi: typeof FaceApiTypes | null = null;
+type FaceApiModule = typeof FaceApiTypes;
+type InitMode = 'detect' | 'full';
+
+let initPromise: Partial<Record<InitMode, Promise<void>>> = {};
+let faceapi: FaceApiModule | null = null;
 let detectorOptions: FaceApiTypes.SsdMobilenetv1Options | null = null;
 let shimsInstalled = false;
+let loadedMode: InitMode | null = null;
 
 const VENDOR_MODEL_PATH = path.join(process.cwd(), 'lib/vendor/face-api-model');
 const MODEL_RELATIVE_PATH = 'node_modules/@vladmandic/face-api/model';
 const FACE_API_MODEL_CDN_URI =
   'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model';
+const TMP_MODEL_DIR = path.join(os.tmpdir(), 'pixique-face-api-model');
 const MATCH_MIN_CONFIDENCE = 0.15;
 const MAX_FACE_DETECT_EDGE = 1600;
+
+const DETECT_MODEL_FILES = [
+  'ssd_mobilenetv1_model-weights_manifest.json',
+  'ssd_mobilenetv1_model.bin',
+] as const;
+
+const FULL_MODEL_FILES = [
+  ...DETECT_MODEL_FILES,
+  'face_landmark_68_model-weights_manifest.json',
+  'face_landmark_68_model.bin',
+  'face_recognition_model-weights_manifest.json',
+  'face_recognition_model.bin',
+] as const;
 
 export type FaceWithDescriptor = FaceApiTypes.WithFaceDescriptor<
   FaceApiTypes.WithFaceLandmarks<
@@ -31,11 +50,9 @@ export type FaceWithDescriptor = FaceApiTypes.WithFaceDescriptor<
 
 export type FaceInputTensor = {
   tensor: { dispose(): void };
-  /** Detection runs on a possibly downscaled image; multiply box coords by 1/scale for full-res blur. */
   scale: number;
 };
 
-/** Minimal stubs — detection uses Sharp tensors, not canvas pixels. Avoids @napi-rs/canvas native binaries on Vercel Linux. */
 class NodeCanvas {
   width = 0;
   height = 0;
@@ -56,7 +73,7 @@ class NodeImage {
   onload: (() => void) | null = null;
 }
 
-async function resolveModelPath(): Promise<string> {
+async function resolveLocalModelPath(): Promise<string | null> {
   const candidates = [
     VENDOR_MODEL_PATH,
     (() => {
@@ -71,16 +88,44 @@ async function resolveModelPath(): Promise<string> {
 
   for (const candidate of candidates) {
     try {
-      await fs.access(path.join(candidate, 'ssd_mobilenetv1_model-weights_manifest.json'));
+      await fs.access(path.join(candidate, DETECT_MODEL_FILES[0]));
       return candidate;
     } catch {
       // try next
     }
   }
 
-  throw new Error(
-    `Face API models not found. Checked: ${candidates.join(', ')}. Run npm install to copy models.`
-  );
+  return null;
+}
+
+async function downloadModelsToTmp(files: readonly string[]): Promise<string> {
+  await fs.mkdir(TMP_MODEL_DIR, { recursive: true });
+
+  for (const file of files) {
+    const dest = path.join(TMP_MODEL_DIR, file);
+    try {
+      await fs.access(dest);
+      continue;
+    } catch {
+      // download
+    }
+
+    const res = await fetch(`${FACE_API_MODEL_CDN_URI}/${file}`);
+    if (!res.ok) {
+      throw new Error(`Failed to download face-api model ${file} (${res.status})`);
+    }
+    await fs.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+  }
+
+  return TMP_MODEL_DIR;
+}
+
+async function resolveModelPath(mode: InitMode): Promise<string> {
+  const local = await resolveLocalModelPath();
+  if (local) return local;
+
+  const files = mode === 'detect' ? DETECT_MODEL_FILES : FULL_MODEL_FILES;
+  return downloadModelsToTmp(files);
 }
 
 export function getFaceMatchThreshold(): number {
@@ -101,12 +146,15 @@ function installNodeShims(): void {
   shimsInstalled = true;
 }
 
-async function loadFaceApiModule(): Promise<typeof FaceApiTypes> {
+async function loadFaceApiModule(): Promise<FaceApiModule> {
   if (faceapi) return faceapi;
 
   installNodeShims();
 
-  faceapi = await import('@vladmandic/face-api/dist/face-api.esm.js');
+  const mod = nodeRequire('@vladmandic/face-api/dist/face-api.esm.js') as FaceApiModule & {
+    default?: FaceApiModule;
+  };
+  faceapi = mod.default ?? mod;
 
   faceapi.env.monkeyPatch({
     Canvas: NodeCanvas as unknown as typeof HTMLCanvasElement,
@@ -124,61 +172,42 @@ async function loadFaceApiModule(): Promise<typeof FaceApiTypes> {
   return faceapi;
 }
 
-async function loadModels(): Promise<void> {
+async function loadModels(mode: InitMode): Promise<void> {
   const api = await loadFaceApiModule();
-  let modelPath: string | null = null;
 
-  try {
-    modelPath = await resolveModelPath();
-  } catch {
-    modelPath = null;
+  if (!loadedMode) {
+    const modelPath = await resolveModelPath(mode === 'full' ? 'full' : 'detect');
+    await api.nets.ssdMobilenetv1.loadFromDisk(modelPath);
+    loadedMode = 'detect';
+
+    if (mode === 'full') {
+      await api.nets.faceLandmark68Net.loadFromDisk(modelPath);
+      await api.nets.faceRecognitionNet.loadFromDisk(modelPath);
+      loadedMode = 'full';
+    }
+  } else if (loadedMode === 'detect' && mode === 'full') {
+    const modelPath = await resolveModelPath('full');
+    await api.nets.faceLandmark68Net.loadFromDisk(modelPath);
+    await api.nets.faceRecognitionNet.loadFromDisk(modelPath);
+    loadedMode = 'full';
   }
 
-  type LoadableNet = {
-    loadFromDisk(modelPath: string): Promise<void>;
-    loadFromUri(uri: string): Promise<void>;
-  };
-
-  const nets: LoadableNet[] = [
-    api.nets.ssdMobilenetv1,
-    api.nets.faceLandmark68Net,
-    api.nets.faceRecognitionNet,
-  ];
-
-  const loadFromDisk = async () => {
-    if (!modelPath) throw new Error('No local model path');
-    for (const net of nets) {
-      await net.loadFromDisk(modelPath);
-    }
-  };
-
-  const loadFromCdn = async () => {
-    for (const net of nets) {
-      await net.loadFromUri(FACE_API_MODEL_CDN_URI);
-    }
-  };
-
-  try {
-    await loadFromDisk();
-  } catch (diskErr) {
-    console.warn('[face-api] local model load failed, falling back to CDN', diskErr);
-    await loadFromCdn();
+  if (!detectorOptions) {
+    detectorOptions = new api.SsdMobilenetv1Options({
+      minConfidence: MATCH_MIN_CONFIDENCE,
+      maxResults: 20,
+    });
   }
-
-  detectorOptions = new api.SsdMobilenetv1Options({
-    minConfidence: MATCH_MIN_CONFIDENCE,
-    maxResults: 20,
-  });
 }
 
-export async function ensureFaceApiReady(): Promise<void> {
-  if (!initPromise) {
-    initPromise = loadModels().catch((err) => {
-      initPromise = null;
+export async function ensureFaceApiReady(mode: InitMode = 'full'): Promise<void> {
+  if (!initPromise[mode]) {
+    initPromise[mode] = loadModels(mode).catch((err) => {
+      initPromise[mode] = undefined;
       throw err;
     });
   }
-  return initPromise;
+  return initPromise[mode]!;
 }
 
 export async function bufferToFaceInput(buffer: Buffer): Promise<FaceInputTensor> {
@@ -209,6 +238,19 @@ export async function bufferToFaceInput(buffer: Buffer): Promise<FaceInputTensor
     tensor: api.tf.tensor3d(new Uint8Array(rgb.data), [rgb.info.height, rgb.info.width, 3]),
     scale,
   };
+}
+
+export async function detectFaceBoxes(input: FaceInputTensor): Promise<FaceApiTypes.FaceDetection[]> {
+  const api = await loadFaceApiModule();
+  if (!detectorOptions) {
+    throw new Error('FaceAPI detector is not initialized.');
+  }
+
+  try {
+    return await api.detectAllFaces(input.tensor as unknown as HTMLCanvasElement, detectorOptions);
+  } finally {
+    input.tensor.dispose();
+  }
 }
 
 export async function detectFacesWithDescriptors(input: FaceInputTensor): Promise<FaceWithDescriptor[]> {

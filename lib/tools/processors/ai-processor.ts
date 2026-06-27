@@ -113,7 +113,8 @@ async function processLocalBlurFaces(
     }
 
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[blur-faces] local pipeline failed', message, err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error('[blur-faces] local pipeline failed', { message, stack, err });
     return {
       status: 'failed',
       error: 'Face detection failed.',
