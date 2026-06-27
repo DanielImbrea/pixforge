@@ -28,31 +28,31 @@ export function ImagePreview({
   }
 
   return (
-    <div className="relative rounded-lg border border-border-default overflow-hidden bg-background-secondary">
+    <div className="rounded-lg border border-border-default overflow-hidden bg-background-secondary">
+      <div className="flex items-start justify-between gap-3 border-b border-border-default bg-background-primary px-3 py-2">
+        <div className="min-w-0 flex flex-col gap-0.5">
+          <p className="truncate text-xs text-text-secondary">{file.name}</p>
+          {originalDimensions && (
+            <p className="text-[11px] tabular-nums text-text-tertiary">
+              {originalDimensions.width} × {originalDimensions.height} px
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-background-secondary hover:text-text-primary"
+          aria-label={t('removeImage')}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={previewUrl}
         alt={t('previewAlt')}
-        className="w-full h-auto max-h-[420px] object-contain"
+        className="h-auto max-h-[420px] w-full object-contain"
       />
-      <div className="absolute top-3 left-3 flex flex-col gap-1">
-        <div className="rounded-md bg-background-primary/90 px-2 py-1 text-xs text-text-secondary backdrop-blur-sm">
-          {file.name}
-        </div>
-        {originalDimensions && (
-          <div className="rounded-md bg-background-primary/90 px-2 py-1 text-[11px] text-text-tertiary backdrop-blur-sm tabular-nums">
-            {originalDimensions.width} × {originalDimensions.height} px
-          </div>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={onClear}
-        className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-md bg-background-primary/90 text-text-secondary hover:text-text-primary backdrop-blur-sm transition-colors"
-        aria-label={t('removeImage')}
-      >
-        <X className="h-4 w-4" />
-      </button>
     </div>
   );
 }
