@@ -7,12 +7,13 @@
   },
   "scripts": {
     "dev": "next dev",
+    "postinstall": "node scripts/copy-face-api-models.mjs",
+    "prebuild": "node scripts/copy-face-api-models.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@napi-rs/canvas": "^1.0.1",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.45.4",
     "@vladmandic/face-api": "^1.7.15",

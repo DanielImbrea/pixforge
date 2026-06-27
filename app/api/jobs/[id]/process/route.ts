@@ -13,7 +13,7 @@ import { chargeJobOnCompletion, canDownloadHd, refundFailedJob } from '@/lib/bil
 import type { ImageJobRow, UserRow } from '@/types';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

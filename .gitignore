@@ -29,5 +29,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# face-api weights copied from node_modules at install/build time
+/lib/vendor/face-api-model/*
+!/lib/vendor/face-api-model/.gitkeep
+
 # typescript
 *.tsbuildinfo

@@ -15,7 +15,10 @@ let faceapi: typeof FaceApiTypes | null = null;
 let detectorOptions: FaceApiTypes.SsdMobilenetv1Options | null = null;
 let shimsInstalled = false;
 
+const VENDOR_MODEL_PATH = path.join(process.cwd(), 'lib/vendor/face-api-model');
 const MODEL_RELATIVE_PATH = 'node_modules/@vladmandic/face-api/model';
+const FACE_API_MODEL_CDN_URI =
+  'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model';
 const MATCH_MIN_CONFIDENCE = 0.15;
 const MAX_FACE_DETECT_EDGE = 1600;
 
@@ -32,13 +35,52 @@ export type FaceInputTensor = {
   scale: number;
 };
 
-function resolveModelPath(): string {
-  try {
-    const pkgJson = nodeRequire.resolve('@vladmandic/face-api/package.json');
-    return path.join(path.dirname(pkgJson), 'model');
-  } catch {
-    return path.join(process.cwd(), MODEL_RELATIVE_PATH);
+/** Minimal stubs — detection uses Sharp tensors, not canvas pixels. Avoids @napi-rs/canvas native binaries on Vercel Linux. */
+class NodeCanvas {
+  width = 0;
+  height = 0;
+  getContext() {
+    return {
+      fillRect: () => undefined,
+      drawImage: () => undefined,
+      getImageData: () => ({ data: new Uint8ClampedArray(0), width: 0, height: 0 }),
+      putImageData: () => undefined,
+    };
   }
+}
+
+class NodeImage {
+  width = 0;
+  height = 0;
+  src = '';
+  onload: (() => void) | null = null;
+}
+
+async function resolveModelPath(): Promise<string> {
+  const candidates = [
+    VENDOR_MODEL_PATH,
+    (() => {
+      try {
+        const pkgJson = nodeRequire.resolve('@vladmandic/face-api/package.json');
+        return path.join(path.dirname(pkgJson), 'model');
+      } catch {
+        return path.join(process.cwd(), MODEL_RELATIVE_PATH);
+      }
+    })(),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(path.join(candidate, 'ssd_mobilenetv1_model-weights_manifest.json'));
+      return candidate;
+    } catch {
+      // try next
+    }
+  }
+
+  throw new Error(
+    `Face API models not found. Checked: ${candidates.join(', ')}. Run npm install to copy models.`
+  );
 }
 
 export function getFaceMatchThreshold(): number {
@@ -66,10 +108,9 @@ async function loadFaceApiModule(): Promise<typeof FaceApiTypes> {
 
   faceapi = await import('@vladmandic/face-api/dist/face-api.esm.js');
 
-  const { Canvas, Image } = await import('@napi-rs/canvas');
   faceapi.env.monkeyPatch({
-    Canvas,
-    Image,
+    Canvas: NodeCanvas as unknown as typeof HTMLCanvasElement,
+    Image: NodeImage as unknown as typeof HTMLImageElement,
     readFile: (filePath: string) => fs.readFile(filePath),
   } as unknown as Parameters<typeof faceapi.env.monkeyPatch>[0]);
 
@@ -85,16 +126,44 @@ async function loadFaceApiModule(): Promise<typeof FaceApiTypes> {
 
 async function loadModels(): Promise<void> {
   const api = await loadFaceApiModule();
-  const modelPath = resolveModelPath();
+  let modelPath: string | null = null;
+
   try {
-    await fs.access(path.join(modelPath, 'ssd_mobilenetv1_model-weights_manifest.json'));
+    modelPath = await resolveModelPath();
   } catch {
-    throw new Error(`Face API models not found at ${modelPath}`);
+    modelPath = null;
   }
 
-  await api.nets.ssdMobilenetv1.loadFromDisk(modelPath);
-  await api.nets.faceLandmark68Net.loadFromDisk(modelPath);
-  await api.nets.faceRecognitionNet.loadFromDisk(modelPath);
+  type LoadableNet = {
+    loadFromDisk(modelPath: string): Promise<void>;
+    loadFromUri(uri: string): Promise<void>;
+  };
+
+  const nets: LoadableNet[] = [
+    api.nets.ssdMobilenetv1,
+    api.nets.faceLandmark68Net,
+    api.nets.faceRecognitionNet,
+  ];
+
+  const loadFromDisk = async () => {
+    if (!modelPath) throw new Error('No local model path');
+    for (const net of nets) {
+      await net.loadFromDisk(modelPath);
+    }
+  };
+
+  const loadFromCdn = async () => {
+    for (const net of nets) {
+      await net.loadFromUri(FACE_API_MODEL_CDN_URI);
+    }
+  };
+
+  try {
+    await loadFromDisk();
+  } catch (diskErr) {
+    console.warn('[face-api] local model load failed, falling back to CDN', diskErr);
+    await loadFromCdn();
+  }
 
   detectorOptions = new api.SsdMobilenetv1Options({
     minConfidence: MATCH_MIN_CONFIDENCE,
