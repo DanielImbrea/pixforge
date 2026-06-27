@@ -4,7 +4,10 @@ import { fileURLToPath } from 'url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = path.join(root, 'node_modules/@vladmandic/face-api/model');
-const dest = path.join(root, 'lib/vendor/face-api-model');
+const targets = [
+  path.join(root, 'lib/vendor/face-api-model'),
+  path.join(root, 'public/face-api-models'),
+];
 
 function copyDir(from, to) {
   fs.mkdirSync(to, { recursive: true });
@@ -24,5 +27,7 @@ if (!fs.existsSync(src)) {
   process.exit(0);
 }
 
-copyDir(src, dest);
-console.log('[copy-face-api-models] copied models to', dest);
+for (const dest of targets) {
+  copyDir(src, dest);
+  console.log('[copy-face-api-models] copied models to', dest);
+}

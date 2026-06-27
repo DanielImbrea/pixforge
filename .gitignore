@@ -32,6 +32,8 @@ yarn-error.log*
 # face-api weights copied from node_modules at install/build time
 /lib/vendor/face-api-model/*
 !/lib/vendor/face-api-model/.gitkeep
+/public/face-api-models/*
+!/public/face-api-models/.gitkeep
 
 # typescript
 *.tsbuildinfo

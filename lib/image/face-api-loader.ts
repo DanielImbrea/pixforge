@@ -17,13 +17,12 @@ type InitMode = 'detect' | 'full';
 let initPromise: Partial<Record<InitMode, Promise<void>>> = {};
 let faceapi: FaceApiModule | null = null;
 let detectorOptions: FaceApiTypes.SsdMobilenetv1Options | null = null;
-let shimsInstalled = false;
 let loadedMode: InitMode | null = null;
 
 const VENDOR_MODEL_PATH = path.join(process.cwd(), 'lib/vendor/face-api-model');
+const PUBLIC_MODEL_PATH = path.join(process.cwd(), 'public/face-api-models');
 const MODEL_RELATIVE_PATH = 'node_modules/@vladmandic/face-api/model';
-const FACE_API_MODEL_CDN_URI =
-  'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model';
+const JSDELIVR_MODEL_URI = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model';
 const TMP_MODEL_DIR = path.join(os.tmpdir(), 'pixique-face-api-model');
 const MATCH_MIN_CONFIDENCE = 0.15;
 const MAX_FACE_DETECT_EDGE = 1600;
@@ -73,9 +72,30 @@ class NodeImage {
   onload: (() => void) | null = null;
 }
 
+/** Must run before face-api module init (face-api reads TextEncoder at import time). */
+(function installNodeShimsSync() {
+  const g = globalThis as Record<string, unknown>;
+  g.TextEncoder = TextEncoder;
+  g.TextDecoder = TextDecoder;
+  g.window = globalThis;
+  g.self = globalThis;
+  g.document = { createElement: () => ({}) };
+  g.navigator = { userAgent: 'node' };
+})();
+
+function getRemoteModelBaseUrls(): string[] {
+  const urls: string[] = [];
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) urls.push(`https://${vercelUrl}/face-api-models`);
+  urls.push('https://www.pixiqueai.com/face-api-models');
+  urls.push(JSDELIVR_MODEL_URI);
+  return urls;
+}
+
 async function resolveLocalModelPath(): Promise<string | null> {
   const candidates = [
     VENDOR_MODEL_PATH,
+    PUBLIC_MODEL_PATH,
     (() => {
       try {
         const pkgJson = nodeRequire.resolve('@vladmandic/face-api/package.json');
@@ -100,6 +120,7 @@ async function resolveLocalModelPath(): Promise<string | null> {
 
 async function downloadModelsToTmp(files: readonly string[]): Promise<string> {
   await fs.mkdir(TMP_MODEL_DIR, { recursive: true });
+  const bases = getRemoteModelBaseUrls();
 
   for (const file of files) {
     const dest = path.join(TMP_MODEL_DIR, file);
@@ -110,11 +131,22 @@ async function downloadModelsToTmp(files: readonly string[]): Promise<string> {
       // download
     }
 
-    const res = await fetch(`${FACE_API_MODEL_CDN_URI}/${file}`);
-    if (!res.ok) {
-      throw new Error(`Failed to download face-api model ${file} (${res.status})`);
+    let lastError: Error | null = null;
+    for (const base of bases) {
+      try {
+        const res = await fetch(`${base}/${file}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await fs.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
     }
-    await fs.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+
+    if (lastError) {
+      throw new Error(`Failed to download face-api model ${file}: ${lastError.message}`);
+    }
   }
 
   return TMP_MODEL_DIR;
@@ -132,29 +164,10 @@ export function getFaceMatchThreshold(): number {
   return 0.55;
 }
 
-function installNodeShims(): void {
-  if (shimsInstalled) return;
-
-  const g = globalThis as Record<string, unknown>;
-  g.TextEncoder = TextEncoder;
-  g.TextDecoder = TextDecoder;
-  g.window = globalThis;
-  g.self = globalThis;
-  g.document = { createElement: () => ({}) };
-  g.navigator = { userAgent: 'node' };
-
-  shimsInstalled = true;
-}
-
 async function loadFaceApiModule(): Promise<FaceApiModule> {
   if (faceapi) return faceapi;
 
-  installNodeShims();
-
-  const mod = nodeRequire('@vladmandic/face-api/dist/face-api.esm.js') as FaceApiModule & {
-    default?: FaceApiModule;
-  };
-  faceapi = mod.default ?? mod;
+  faceapi = await import('@vladmandic/face-api/dist/face-api.esm.js');
 
   faceapi.env.monkeyPatch({
     Canvas: NodeCanvas as unknown as typeof HTMLCanvasElement,
