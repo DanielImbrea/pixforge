@@ -24,8 +24,8 @@ export default async function BlogIndexPage({ params }: { params: Promise<{ loca
       </h1>
       <p className="text-text-secondary mb-10">
         {isRo
-          ? 'Ghiduri practice despre upscalare AI, formate web și eliminare fundal.'
-          : 'Practical guides on AI upscaling, web image formats, and background removal.'}
+          ? 'Ghiduri practice: editare imagini, AI, e-commerce, social media, optimizare web și upscalare.'
+          : 'Practical guides: image editing, AI processing, e-commerce, social media, and web optimization.'}
       </p>
       <ul className="space-y-8">
         {BLOG_POSTS.map((post) => {

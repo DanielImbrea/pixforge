@@ -1,7 +1,7 @@
 import type { Locale } from '@/i18n';
 import type { ToolDefinition } from '@/types';
 import { BRAND_NAME, SITE_URL } from '@/lib/seo/constants';
-import type { BlogPost } from '@/lib/content/blog-posts';
+import type { BlogPost } from '@/lib/content/blog-types';
 
 export function generateHomeJsonLd(
   locale: Locale,
@@ -95,7 +95,7 @@ export function generatePricingJsonLd(locale: Locale) {
 
 export function generateBlogPostJsonLd(post: BlogPost, locale: Locale) {
   const copy = post.translations[locale];
-  return {
+  const article = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: copy.title,
@@ -111,4 +111,23 @@ export function generateBlogPostJsonLd(post: BlogPost, locale: Locale) {
     },
     url: `${SITE_URL}/${locale}/blog/${post.slug}`,
   };
+
+  if (!copy.faq.length) {
+    return article;
+  }
+
+  const faqPage = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: copy.faq.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer,
+      },
+    })),
+  };
+
+  return [article, faqPage];
 }

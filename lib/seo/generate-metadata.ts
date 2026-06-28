@@ -12,11 +12,13 @@ interface PageMetadataInput {
   description: string;
   keywords?: string[];
   ogTitle?: string;
+  ogDescription?: string;
 }
 
 function buildPageMetadata(input: PageMetadataInput & { pathSuffix: string }): Metadata {
   const otherLocale: Locale = input.locale === 'en' ? 'ro' : 'en';
   const ogTitle = input.ogTitle || input.title;
+  const ogDescription = input.ogDescription || input.description;
   const path = `/${input.locale}${input.pathSuffix}`;
 
   return {
@@ -33,7 +35,7 @@ function buildPageMetadata(input: PageMetadataInput & { pathSuffix: string }): M
     },
     openGraph: {
       title: ogTitle,
-      description: input.description,
+      description: ogDescription,
       url: `${SITE_URL}${path}`,
       siteName: BRAND_NAME,
       locale: input.locale === 'en' ? 'en_US' : 'ro_RO',
@@ -44,7 +46,7 @@ function buildPageMetadata(input: PageMetadataInput & { pathSuffix: string }): M
     twitter: {
       card: 'summary_large_image',
       title: ogTitle,
-      description: input.description,
+      description: ogDescription,
       images: [DEFAULT_OG_IMAGE.url],
     },
   };
@@ -166,16 +168,22 @@ export function generateBlogIndexMetadata(locale: Locale): Metadata {
 export function generateBlogPostMetadata(
   locale: Locale,
   slug: string,
-  title: string,
-  description: string,
-  keywords?: string[]
+  input: {
+    seoTitle: string;
+    metaDescription: string;
+    ogTitle?: string;
+    ogDescription?: string;
+    keywords?: string[];
+  }
 ): Metadata {
   return buildPageMetadata({
     locale,
     pathSuffix: `/blog/${slug}`,
-    title: `${title} | PixiqueAi`,
-    description,
-    keywords,
+    title: input.seoTitle.includes('PixiqueAi') ? input.seoTitle : `${input.seoTitle} | PixiqueAi`,
+    description: input.metaDescription,
+    ogTitle: input.ogTitle,
+    ogDescription: input.ogDescription,
+    keywords: input.keywords,
   });
 }
 

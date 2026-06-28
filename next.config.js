@@ -26,7 +26,17 @@ const nextConfig = {
     ],
   },
   async redirects() {
+    const blogRedirects = [
+      ['ai-image-upscaling-guide', 'upscale-low-resolution-images-with-ai'],
+      ['how-to-remove-background', 'remove-background-without-photoshop'],
+      ['image-compression-guide', 'compress-images-without-losing-quality'],
+    ].flatMap(([from, to]) => [
+      { source: `/en/blog/${from}`, destination: `/en/blog/${to}`, permanent: true },
+      { source: `/ro/blog/${from}`, destination: `/ro/blog/${to}`, permanent: true },
+    ]);
+
     return [
+      ...blogRedirects,
       {
         source: '/:locale(en)/image-upscaler',
         destination: '/:locale/ai-image-upscaler',
