@@ -103,7 +103,7 @@
     "planHighlight_free": "Try everything — 3 credits/day with watermarked previews.",
     "planHighlight_basic": "No watermark — 100 credits/month for regular use.",
     "planHighlight_starter": "HD downloads + 200 credits/month for growing teams.",
-    "planHighlight_pro": "Batch processing and API access.",
+    "planHighlight_pro": "Batch processing for up to 10 images at once.",
     "trustEyebrow": "Privacy & security",
     "trustTitle": "Your images stay yours",
     "trustSubtitle": "We process photos for you — not for training AI models. Here's how we protect your files.",
@@ -162,7 +162,6 @@
     "hdDownloads": "HD downloads",
     "standardDownloads": "Standard downloads",
     "batchProcessing": "Batch processing",
-    "apiAccess": "API access",
     "commercialLicense": "Commercial usage license"
   },
   "tool": {

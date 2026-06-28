@@ -103,7 +103,7 @@
     "planHighlight_free": "Testează tot — 3 credite/zi cu preview watermark.",
     "planHighlight_basic": "Fără watermark — 100 credite/lună pentru utilizare regulată.",
     "planHighlight_starter": "Descărcări HD + 200 credite/lună pentru echipe în creștere.",
-    "planHighlight_pro": "Procesare în lot și acces API.",
+    "planHighlight_pro": "Procesare în lot — până la 10 imagini odată.",
     "trustEyebrow": "Confidențialitate & siguranță",
     "trustTitle": "Imaginile tale rămân ale tale",
     "trustSubtitle": "Procesăm pozele pentru tine — nu pentru antrenarea modelelor AI. Iată cum îți protejăm fișierele.",
@@ -162,7 +162,6 @@
     "hdDownloads": "Descărcări HD",
     "standardDownloads": "Descărcări standard",
     "batchProcessing": "Procesare în lot",
-    "apiAccess": "Acces API",
     "commercialLicense": "Licență utilizare comercială"
   },
   "tool": {

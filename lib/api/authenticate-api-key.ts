@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { planHasFeature } from '@/lib/billing/plan-features';
 import type { UserRow } from '@/types';
+
+/** Re-enable when public API is offered in product UI and pricing. */
+const API_ACCESS_ENABLED = false;
 
 export interface ApiAuthResult {
   user: UserRow;
@@ -22,6 +24,8 @@ export function generateApiKeyMaterial(): { rawKey: string; prefix: string; hash
 export async function authenticateApiKey(
   authorizationHeader: string | null
 ): Promise<ApiAuthResult | null> {
+  if (!API_ACCESS_ENABLED) return null;
+
   if (!authorizationHeader?.startsWith('Bearer ')) return null;
 
   const rawKey = authorizationHeader.slice('Bearer '.length).trim();
@@ -43,7 +47,6 @@ export async function authenticateApiKey(
   if (!user) return null;
 
   const profile = user as UserRow;
-  if (!planHasFeature(profile.plan, 'apiAccess')) return null;
 
   await admin
     .from('api_keys')

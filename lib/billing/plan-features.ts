@@ -1,7 +1,7 @@
 import { PLAN_LIMITS, type PlanConfig } from '@/lib/billing/plans';
 import type { PlanTier } from '@/types';
 
-export type PlanFeature = 'batchProcessing' | 'apiAccess' | 'commercialLicense';
+export type PlanFeature = 'batchProcessing' | 'commercialLicense';
 
 export function planHasFeature(plan: PlanTier, feature: PlanFeature): boolean {
   return PLAN_LIMITS[plan][feature];

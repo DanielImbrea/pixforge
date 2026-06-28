@@ -17,7 +17,6 @@ export interface PlanConfig {
   watermark: boolean;
   hdDownloads: boolean;
   batchProcessing: boolean;
-  apiAccess: boolean;
   commercialLicense: boolean;
   maxResizeQuality: number;
 }
@@ -34,7 +33,6 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     watermark: true,
     hdDownloads: false,
     batchProcessing: false,
-    apiAccess: false,
     commercialLicense: false,
     maxResizeQuality: 70,
   },
@@ -47,7 +45,6 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     watermark: false,
     hdDownloads: false,
     batchProcessing: false,
-    apiAccess: false,
     commercialLicense: false,
     maxResizeQuality: 90,
   },
@@ -60,7 +57,6 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     watermark: false,
     hdDownloads: true,
     batchProcessing: false,
-    apiAccess: false,
     commercialLicense: false,
     maxResizeQuality: 100,
   },
@@ -73,7 +69,6 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     watermark: false,
     hdDownloads: true,
     batchProcessing: true,
-    apiAccess: true,
     commercialLicense: false,
     maxResizeQuality: 100,
   },

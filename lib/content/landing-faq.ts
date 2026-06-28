@@ -15,7 +15,7 @@ export const LANDING_FAQ_BY_LOCALE: Record<Locale, LandingFaqItem[]> = {
     {
       question: 'Is it free to try?',
       answer:
-        'Yes. The free plan includes 3 credits per day with no credit card required. Upgrade when you need more credits, watermark-free downloads, batch processing, or API access.',
+        'Yes. The free plan includes 3 credits per day with no credit card required. Upgrade when you need more credits, watermark-free downloads, or batch processing on Pro.',
     },
     {
       question: 'Do I need to install anything?',
@@ -50,7 +50,7 @@ export const LANDING_FAQ_BY_LOCALE: Record<Locale, LandingFaqItem[]> = {
     {
       question: 'What is the difference between Free and paid plans?',
       answer:
-        'Free includes watermarked previews and 3 credits per day. Paid plans remove the watermark, increase monthly credits, raise upload size limits, and unlock higher export quality. Pro adds batch processing (up to 10 images) and API access.',
+        'Free includes watermarked previews and 3 credits per day. Paid plans remove the watermark, increase monthly credits, raise upload size limits, and unlock higher export quality. Pro adds batch processing (up to 10 images).',
     },
     {
       question: 'Can I process many images at once?',
@@ -87,7 +87,7 @@ export const LANDING_FAQ_BY_LOCALE: Record<Locale, LandingFaqItem[]> = {
     {
       question: 'Pot încerca gratuit?',
       answer:
-        'Da. Planul gratuit include 3 credite pe zi, fără card bancar. Fă upgrade când ai nevoie de mai multe credite, descărcări fără watermark, procesare în lot sau acces API.',
+        'Da. Planul gratuit include 3 credite pe zi, fără card bancar. Fă upgrade când ai nevoie de mai multe credite, descărcări fără watermark sau procesare în lot pe Pro.',
     },
     {
       question: 'Trebuie să instalez ceva?',
@@ -122,7 +122,7 @@ export const LANDING_FAQ_BY_LOCALE: Record<Locale, LandingFaqItem[]> = {
     {
       question: 'Care e diferența între planul Gratuit și cel plătit?',
       answer:
-        'Gratuit include preview cu watermark și 3 credite/zi. Planurile plătite elimină watermark-ul, cresc creditele lunare, limitele de upload și calitatea exportului. Pro adaugă procesare în lot (până la 10 imagini) și acces API.',
+        'Gratuit include preview cu watermark și 3 credite/zi. Planurile plătite elimină watermark-ul, cresc creditele lunare, limitele de upload și calitatea exportului. Pro adaugă procesare în lot (până la 10 imagini).',
     },
     {
       question: 'Pot procesa multe imagini odată?',
