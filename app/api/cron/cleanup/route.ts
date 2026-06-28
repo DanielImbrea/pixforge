@@ -7,7 +7,8 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /**
- * Called by Vercel Cron (see vercel.json) hourly. Deletes storage_files rows whose
+ * Called by Vercel Cron (daily on Hobby; hourly requires Pro) or an external
+ * scheduler with Authorization: Bearer CRON_SECRET. Deletes storage_files rows whose
  * expires_at has passed, along with the underlying Storage object. All buckets
  * (uploads, outputs, previews) share the same retention window — see
  * lib/storage/retention.ts.
