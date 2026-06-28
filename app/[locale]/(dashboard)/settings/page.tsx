@@ -4,7 +4,6 @@ import { getCurrentUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPeriodStartForPlan } from '@/lib/billing/plans';
 import { getCreditsLimit, getRemainingCredits } from '@/lib/billing/entitlements';
-import { planHasFeature } from '@/lib/billing/plan-features';
 import { SettingsAccountSection } from '@/components/settings/settings-account-section';
 import { SettingsSubscriptionSection } from '@/components/settings/settings-subscription-section';
 import { SettingsPreferencesSection } from '@/components/settings/settings-preferences-section';
@@ -70,10 +69,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
 
       <SettingsPrivacySection locale={locale} />
 
-      <SettingsLegalSection
-        locale={locale}
-        showCommercialLicense={planHasFeature(user.plan, 'commercialLicense')}
-      />
+      <SettingsLegalSection locale={locale} />
     </div>
   );
 }

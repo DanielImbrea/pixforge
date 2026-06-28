@@ -77,7 +77,7 @@ export const blurFacesTool: ToolDefinition = {
         ],
         faq: [
           {
-            question: 'Toate fețele sunt blur-ate în mod automat?',
+            question: 'Toate fețele sunt blurate în mod automat?',
             answer: 'Da. Modul automat găsește fiecare față umană și aplică blur-ul ales.',
           },
           {

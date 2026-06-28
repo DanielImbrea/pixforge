@@ -7,25 +7,22 @@ import { SettingsSection } from '@/components/settings/settings-section';
 
 interface SettingsLegalSectionProps {
   locale: Locale;
-  showCommercialLicense: boolean;
 }
 
-export async function SettingsLegalSection({ locale, showCommercialLicense }: SettingsLegalSectionProps) {
+export async function SettingsLegalSection({ locale }: SettingsLegalSectionProps) {
   const t = await getTranslations({ locale, namespace: 'settings' });
   const tLegal = await getTranslations({ locale, namespace: 'legal' });
 
   return (
     <SettingsSection icon={Scale} title={t('legalTitle')} description={t('legalDescription')}>
-      {showCommercialLicense ? (
-        <SettingsRow label={t('commercialTitle')} description={t('commercialDescription')}>
-          <Link
-            href={`/${locale}/legal/commercial-license`}
-            className="text-sm text-accent transition-colors hover:text-[color:var(--accent-hover)]"
-          >
-            {t('commercialLink')} →
-          </Link>
-        </SettingsRow>
-      ) : null}
+      <SettingsRow label={t('commercialTitle')} description={t('commercialDescription')}>
+        <Link
+          href={`/${locale}/legal/commercial-license`}
+          className="text-sm text-accent transition-colors hover:text-[color:var(--accent-hover)]"
+        >
+          {t('commercialLink')} →
+        </Link>
+      </SettingsRow>
 
       <SettingsRow label={tLegal('termsTitle')}>
         <Link

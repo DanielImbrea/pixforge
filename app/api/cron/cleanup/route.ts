@@ -7,10 +7,10 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /**
- * Called by Vercel Cron (see vercel.json) on a daily schedule. Deletes any
- * storage_files row whose expires_at has passed, along with the underlying
- * Storage object, implementing the retention policy from the architecture
- * spec: uploads 24h, previews 30d, outputs per-plan.
+ * Called by Vercel Cron (see vercel.json) hourly. Deletes storage_files rows whose
+ * expires_at has passed, along with the underlying Storage object. All buckets
+ * (uploads, outputs, previews) share the same retention window — see
+ * lib/storage/retention.ts.
  */
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     .from('storage_files')
     .select('id, bucket, storage_path')
     .lt('expires_at', nowIso)
-    .limit(500);
+    .limit(2000);
 
   if (error) {
     return NextResponse.json({ error: 'Failed to query expired files.' }, { status: 500 });

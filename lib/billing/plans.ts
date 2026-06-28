@@ -74,7 +74,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     hdDownloads: true,
     batchProcessing: true,
     apiAccess: true,
-    commercialLicense: true,
+    commercialLicense: false,
     maxResizeQuality: 100,
   },
 };

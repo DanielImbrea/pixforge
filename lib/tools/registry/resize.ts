@@ -57,7 +57,12 @@ export const resizeTool: ToolDefinition = {
           },
           {
             question: 'Is batch resizing available?',
-            answer: 'Batch resizing is coming soon on Starter and Pro plans. Single-image resize is available on all plans today.',
+            answer: 'Batch resizing is available on the Pro plan. Single-image resize is available on all plans today.',
+          },
+          {
+            question: 'Do you store uploaded images?',
+            answer:
+              'No. All uploaded and processed files are permanently deleted within 4 hours. Download your results before they expire.',
           },
         ],
         keywords: ['resize image online', 'change image dimensions', 'image resizer', 'resize photo online'],
@@ -94,7 +99,7 @@ export const resizeTool: ToolDefinition = {
           {
             question: 'Stocați imaginile încărcate?',
             answer:
-              'Fișierele originale încărcate sunt șterse automat în 24 de ore de la procesare. Rezultatele procesate urmează politica de retenție a planului tău.',
+              'Nu. Toate fișierele încărcate și procesate sunt șterse permanent în cel mult 4 ore. Descarcă rezultatele înainte să expire.',
           },
         ],
         keywords: ['redimensionare poze', 'schimba dimensiunea imaginii', 'resize poza online'],

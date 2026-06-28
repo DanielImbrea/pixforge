@@ -3,8 +3,11 @@ import type { ToolDefinition } from '@/types';
 import { BRAND_NAME, SITE_URL } from '@/lib/seo/constants';
 import type { BlogPost } from '@/lib/content/blog-posts';
 
-export function generateHomeJsonLd(locale: Locale) {
-  return {
+export function generateHomeJsonLd(
+  locale: Locale,
+  faq?: { question: string; answer: string }[]
+) {
+  const softwareApplication = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name: BRAND_NAME,
@@ -21,6 +24,25 @@ export function generateHomeJsonLd(locale: Locale) {
     },
     url: `${SITE_URL}/${locale}`,
   };
+
+  if (!faq?.length) {
+    return softwareApplication;
+  }
+
+  const faqPage = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer,
+      },
+    })),
+  };
+
+  return [softwareApplication, faqPage];
 }
 
 export function generateToolJsonLd(tool: ToolDefinition, locale: Locale) {

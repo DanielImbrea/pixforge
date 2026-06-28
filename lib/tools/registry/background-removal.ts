@@ -82,7 +82,8 @@ export const backgroundRemovalTool: ToolDefinition = {
           },
           {
             question: 'Can I use cutouts for e-commerce?',
-            answer: 'Yes — product mode is optimized for catalog photography. Pro plan includes a commercial usage license.',
+            answer:
+              'Yes — product mode is optimized for catalog photography. Use outputs in your store, ads, or client projects on any plan.',
           },
         ],
         keywords: ['remove background', 'remove bg online free', 'png transparent background', 'background remover'],
@@ -143,7 +144,8 @@ export const backgroundRemovalTool: ToolDefinition = {
           },
           {
             question: 'Pot folosi decupajele pentru e-commerce?',
-            answer: 'Da — modul produs e optimizat pentru fotografie de catalog. Planul Pro include licență comercială.',
+            answer:
+              'Da — modul produs e optimizat pentru fotografie de catalog. Folosește rezultatele în magazin, reclame sau proiecte pentru clienți, pe orice plan.',
           },
         ],
         keywords: [

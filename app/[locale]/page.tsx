@@ -16,6 +16,7 @@ import { SocialProof } from '@/components/marketplace/social-proof';
 import { LandingFaq } from '@/components/marketplace/landing-faq';
 import { Button } from '@/components/ui/button';
 import { generateHomeMetadata } from '@/lib/seo/generate-metadata';
+import { LANDING_FAQ_BY_LOCALE } from '@/lib/content/landing-faq';
 import { generateHomeJsonLd } from '@/lib/seo/jsonld';
 
 export async function generateMetadata({
@@ -73,49 +74,6 @@ const TESTIMONIALS_BY_LOCALE: Record<
   ],
 };
 
-const LANDING_FAQ_BY_LOCALE: Record<Locale, { question: string; answer: string }[]> = {
-  en: [
-    {
-      question: 'What is PixiqueAi?',
-      answer:
-        'PixiqueAi is an all-in-one AI image toolkit. Upscale, remove backgrounds, compress, convert, and resize images in your browser — no software install required.',
-    },
-    {
-      question: 'Is it free?',
-      answer:
-        'Yes — start with the free plan (3 credits per day, no card required). Upgrade when you need more volume, watermark-free downloads, or batch features.',
-    },
-    {
-      question: 'Do I need installation?',
-      answer: 'No. Upload in your browser, we process in the cloud, and you download the result in seconds.',
-    },
-    {
-      question: 'How do credits work?',
-      answer: 'Sharp tools (resize, compress, convert) cost 1 credit each. AI upscale and background removal cost 5 credits each.',
-    },
-  ],
-  ro: [
-    {
-      question: 'Ce este PixiqueAi?',
-      answer:
-        'PixiqueAi e un toolkit AI all-in-one pentru imagini. Upscale, eliminare fundal, compresie, conversie și redimensionare în browser — fără instalare.',
-    },
-    {
-      question: 'E gratuit?',
-      answer:
-        'Da — planul gratuit oferă 3 credite/zi, fără card. Fă upgrade când ai nevoie de volum mai mare sau descărcări fără watermark.',
-    },
-    {
-      question: 'Trebuie să instalez ceva?',
-      answer: 'Nu. Încarci în browser, procesăm în cloud și descarci rezultatul în câteva secunde.',
-    },
-    {
-      question: 'Cum funcționează creditele?',
-      answer: 'Uneltele Sharp (resize, compress, convert) costă 1 credit fiecare. Upscale AI și eliminare fundal costă 5 credite fiecare.',
-    },
-  ],
-};
-
 export default async function HomePage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
   const user = await getCurrentUser();
@@ -127,7 +85,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
   const t = await getTranslations({ locale, namespace: 'home' });
   const testimonials = TESTIMONIALS_BY_LOCALE[locale];
   const faqItems = LANDING_FAQ_BY_LOCALE[locale];
-  const homeJsonLd = generateHomeJsonLd(locale);
+  const homeJsonLd = generateHomeJsonLd(locale, faqItems);
 
   return (
     <>
@@ -197,14 +155,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
         <SocialProof testimonials={testimonials} />
       </section>
 
-      <section id="faq" className="max-w-3xl mx-auto px-6 py-16">
-        <h2 className="text-2xl font-semibold text-text-primary mb-8 text-center">FAQ</h2>
+      <section id="faq" className="max-w-3xl mx-auto px-6 py-16 border-t border-border-default">
+        <h2 className="text-2xl font-semibold text-text-primary mb-2 text-center">{t('faqHeading')}</h2>
+        <p className="text-sm text-text-secondary mb-8 text-center max-w-2xl mx-auto">{t('faqSubheading')}</p>
         <LandingFaq items={faqItems} />
       </section>
 
-      <section className="max-w-3xl mx-auto px-6 py-24 text-center border-t border-border-default">
-        <h2 className="text-3xl font-semibold text-text-primary mb-3 text-balance">{t('finalCtaTitle')}</h2>
-        <p className="text-text-secondary mb-8">{t('finalCtaSubtitle')}</p>
+      <section className="max-w-3xl mx-auto px-6 py-12 md:py-16 text-center border-t border-border-default">
+        <h2 className="text-2xl md:text-3xl font-semibold text-text-primary mb-3 text-balance">{t('finalCtaTitle')}</h2>
+        <p className="text-text-secondary mb-6 md:mb-8">{t('finalCtaSubtitle')}</p>
         <Link href={`/${locale}/auth/signup`}>
           <Button size="lg">{t('ctaPrimary')}</Button>
         </Link>

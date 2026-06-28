@@ -10,7 +10,7 @@ export async function Footer({ locale }: { locale: Locale }) {
   const tools = getEnabledTools();
 
   return (
-    <footer className="border-t border-border-default mt-24">
+    <footer className="border-t border-border-default mt-8 md:mt-16">
       <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
         <div className="col-span-2 md:col-span-3 lg:col-span-1">
           <BrandLogo href={`/${locale}`} height={52} className="mb-4" />

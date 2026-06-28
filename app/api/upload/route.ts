@@ -7,6 +7,7 @@ import { reserveCredits, QuotaExceededError, PlanRestrictedError, refundCredits 
 import { getMaxResizeQuality } from '@/lib/billing/plan-features';
 import { clampResizeQuality } from '@/lib/tools/resize-params';
 import { uploadBufferToStorage } from '@/lib/supabase/storage';
+import { getFileExpiresAt } from '@/lib/storage/retention';
 import { checkRateLimit, getClientIp, maybeCleanupRateLimitStore } from '@/lib/security/rate-limit';
 import { bgRemovalParamsSchema, convertParamsSchema, resizeParamsSchema, upscaleParamsSchema, cropParamsSchema, blurFacesParamsSchema } from '@/lib/validation/schemas';
 import sharp from 'sharp';
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
         size_bytes: normalizedBuffer.byteLength,
         width_px: metadata.width,
         height_px: metadata.height,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: getFileExpiresAt(),
       })
       .select('*')
       .single();
@@ -238,7 +239,7 @@ export async function POST(req: NextRequest) {
           size_bytes: refNormalized.byteLength,
           width_px: refMeta.width,
           height_px: refMeta.height,
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          expires_at: getFileExpiresAt(),
         })
         .select('*')
         .single();

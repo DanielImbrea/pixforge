@@ -66,7 +66,8 @@ export const upscaleTool: ToolDefinition = {
           },
           {
             question: 'Can I use enhanced images commercially?',
-            answer: 'Pro plan subscribers receive a commercial usage license for all processed images.',
+            answer:
+              'Yes. You may use processed outputs however you need — personal, commercial, client work, or e-commerce. You retain rights to your content.',
           },
         ],
         keywords: ['upscale image online', 'ai image upscaler', 'enhance image quality', 'image upscaler online'],
@@ -111,7 +112,8 @@ export const upscaleTool: ToolDefinition = {
           },
           {
             question: 'Pot folosi imaginile enhance-uite comercial?',
-            answer: 'Abonații planului Pro primesc licență de utilizare comercială pentru toate imaginile procesate.',
+            answer:
+              'Da. Poți folosi rezultatele procesate cum dorești — personal, comercial, proiecte pentru clienți sau e-commerce. Păstrezi drepturile asupra conținutului tău.',
           },
         ],
         keywords: [

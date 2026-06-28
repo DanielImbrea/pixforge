@@ -3,6 +3,7 @@ import { uploadBufferToStorage, createSignedUrl } from '@/lib/supabase/storage';
 import { applyWatermark } from '@/lib/watermark/apply-watermark';
 import { postProcessOutput } from '@/lib/tools/post-process-output';
 import { readImageDimensions } from '@/lib/image/sharp-encode';
+import { getFileExpiresAt } from '@/lib/storage/retention';
 import type { ToolCategory, ToolType } from '@/types';
 
 export interface FinalizeJobOutputInput {
@@ -80,6 +81,7 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
       size_bytes: optimizedBuffer.byteLength,
       width_px: outputMeta.width,
       height_px: outputMeta.height,
+      expires_at: getFileExpiresAt(),
     })
     .select('*')
     .single();
@@ -127,7 +129,7 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
       size_bytes: previewBuffer.byteLength,
       width_px: outputMeta.width,
       height_px: outputMeta.height,
-      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: getFileExpiresAt(),
     })
     .select('*')
     .single();
