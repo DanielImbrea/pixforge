@@ -29,11 +29,9 @@ const DEMOS: Record<
     afterObjectFit: 'cover',
   },
   compress: {
-    beforeSrc:
-      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=95',
-    afterSrc:
-      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=600&q=72',
-    stat: { before: '2.4 MB', after: '186 KB', reduction: '−92%' },
+    beforeSrc: '/demo/compress-before.jpg',
+    afterSrc: '/demo/compress-after.jpg',
+    stat: { before: '3 MB', after: '300 KB', reduction: '−90%' },
   },
   blur_faces: {
     beforeSrc: '/demo/blur-faces-before.png',

@@ -18,10 +18,8 @@ const EXAMPLES = [
   },
   {
     id: 'compress',
-    beforeSrc:
-      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=95',
-    afterSrc:
-      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=600&q=72',
+    beforeSrc: '/demo/compress-before.jpg',
+    afterSrc: '/demo/compress-after.jpg',
     statKey: 'example_compress_stat' as const,
   },
   {
