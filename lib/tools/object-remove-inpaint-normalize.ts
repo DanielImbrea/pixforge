@@ -46,7 +46,26 @@ export async function normalizeObjectRemoveInpaintInputs(
   const originalWidth = meta.width ?? 1;
   const originalHeight = meta.height ?? 1;
 
-  await validateMaskCoverage(maskBuffer);
+  const maskMeta = await sharp(maskBuffer).rotate().metadata();
+  const maskWidth = maskMeta.width ?? 0;
+  const maskHeight = maskMeta.height ?? 0;
+
+  const maskAlignedToImage = await sharp(maskBuffer)
+    .rotate()
+    .resize(originalWidth, originalHeight, { fit: 'fill' })
+    .greyscale()
+    .threshold(128)
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+
+  if (maskWidth !== originalWidth || maskHeight !== originalHeight) {
+    console.warn('[object-remove] mask dimensions adjusted to match image', {
+      image: `${originalWidth}x${originalHeight}`,
+      mask: `${maskWidth}x${maskHeight}`,
+    });
+  }
+
+  await validateMaskCoverage(maskAlignedToImage);
 
   let width = originalWidth;
   let height = originalHeight;
@@ -66,11 +85,8 @@ export async function normalizeObjectRemoveInpaintInputs(
       .resize(alignedWidth, alignedHeight, { fit: 'fill' })
       .jpeg({ quality: 95, mozjpeg: true })
       .toBuffer(),
-    sharp(maskBuffer)
-      .rotate()
+    sharp(maskAlignedToImage)
       .resize(alignedWidth, alignedHeight, { fit: 'fill' })
-      .greyscale()
-      .threshold(128)
       .png({ compressionLevel: 9 })
       .toBuffer(),
   ]);

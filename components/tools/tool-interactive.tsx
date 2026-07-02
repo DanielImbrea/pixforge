@@ -615,13 +615,16 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       return;
     }
 
+    const alignedImageFile =
+      (await objectRemoveEditorRef.current?.exportSourceImageFile()) ?? selectedFile;
+
     setValidationErrorKey(null);
     setErrorMessage(null);
     setObjectRemoveErasing(true);
 
     try {
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      formData.append('file', alignedImageFile);
       formData.append('maskFile', maskFile);
       formData.append('params', JSON.stringify(validation.params));
 
@@ -733,6 +736,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
           stopProgressSimulation();
           return;
         }
+        const alignedImageFile =
+          (await objectRemoveEditorRef.current?.exportSourceImageFile()) ?? selectedFile;
+        fileToProcess = alignedImageFile;
       }
 
       if (isFacesTool) {

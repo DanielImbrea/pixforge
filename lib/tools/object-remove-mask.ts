@@ -67,7 +67,8 @@ export function resizeSamMaskToImage(
   const targetCtx = targetCanvas.getContext('2d');
   if (!targetCtx) return samMask;
 
-  targetCtx.imageSmoothingEnabled = false;
+  targetCtx.imageSmoothingEnabled = true;
+  targetCtx.imageSmoothingQuality = 'high';
   targetCtx.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
   return targetCtx.getImageData(0, 0, targetWidth, targetHeight);
 }

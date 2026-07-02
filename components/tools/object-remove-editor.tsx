@@ -22,13 +22,8 @@ import {
 } from '@/lib/image/sam-segment-browser';
 import { imageToDisplayCoords, pointerToImageCoords } from '@/lib/tools/object-remove-coords';
 import {
-  applyFloodFillToCanvas,
-  floodFillRegion,
-} from '@/lib/tools/object-remove-flood-fill';
-import {
   countMaskPixels,
   drawMaskOutline,
-  mergeSamMaskIntoCanvas,
   setMaskFromSam,
 } from '@/lib/tools/object-remove-mask';
 import {
@@ -38,9 +33,9 @@ import {
   type ObjectRemoveSelectionTool,
 } from '@/lib/tools/object-remove-params';
 
-const FLOOD_FILL_TOLERANCE = 32;
-
 export interface ObjectRemoveEditorHandle {
+  /** JPEG aligned to the same pixel grid as the mask (what the user edited). */
+  exportSourceImageFile: () => Promise<File | null>;
   exportMaskFile: () => Promise<File | null>;
   hasMaskContent: () => boolean;
   clearMask: () => void;
@@ -247,8 +242,6 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
 
     const runSamPrepare = useCallback(() => {
       if (samPrepareStartedRef.current || !imageReady) return;
-      const canvas = sourceCanvasRef.current;
-      if (!canvas) return;
 
       samPrepareStartedRef.current = true;
       setSamLoading(true);
@@ -257,7 +250,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       void (async () => {
         try {
           await preloadSamModels();
-          await prepareSamImage(canvas);
+          await prepareSamImage(imageUrl);
           setSamEmbeddingReady(true);
         } catch (err) {
           setSamError(
@@ -269,37 +262,13 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
           setSamLoading(false);
         }
       })();
-    }, [imageReady]);
+    }, [imageReady, imageUrl]);
 
     useEffect(() => {
       if (imageReady) {
         runSamPrepare();
       }
     }, [imageReady, runSamPrepare]);
-
-    const applyFloodFillClick = useCallback(
-      (point: { x: number; y: number }, subtract: boolean) => {
-        const sourceCanvas = sourceCanvasRef.current;
-        const maskCanvas = maskCanvasRef.current;
-        const overlayCanvas = overlayCanvasRef.current;
-        const sourceCtx = sourceCanvas?.getContext('2d');
-        const maskCtx = maskCanvas?.getContext('2d');
-        const overlayCtx = overlayCanvas?.getContext('2d');
-        if (!sourceCtx || !maskCtx || !overlayCtx) return;
-
-        const imageData = sourceCtx.getImageData(0, 0, imageWidth, imageHeight);
-        const region = floodFillRegion(
-          imageData.data,
-          imageWidth,
-          imageHeight,
-          point.x,
-          point.y,
-          FLOOD_FILL_TOLERANCE
-        );
-        applyFloodFillToCanvas(maskCtx, overlayCtx, region, imageWidth, imageHeight, subtract);
-      },
-      [imageHeight, imageWidth]
-    );
 
     const drawStroke = useCallback(
       (from: { x: number; y: number }, to: { x: number; y: number }) => {
@@ -365,35 +334,31 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         const overlayCtx = overlayCanvas?.getContext('2d');
         if (!sourceCanvas || !maskCtx || !overlayCtx || !imageReady || segmenting) return;
 
+        if (!samEmbeddingReady && !isSamEmbeddingReady()) {
+          setSamError(t('objectRemoveSamNotReady'));
+          return;
+        }
+
         setSegmenting(true);
         setSamError(null);
         setPendingClick(point);
 
-        const subtract = exclude || brushMode === 'erase';
+        const clickType = exclude || brushMode === 'erase' ? 'exclude' : 'include';
 
         try {
-          if (samEmbeddingReady || isSamEmbeddingReady()) {
-            const clickType = subtract ? 'exclude' : 'include';
-            const samMask = await segmentSamAtClick(sourceCanvas, point, clickType);
-            if (samMask) {
-              mergeSamMaskIntoCanvas(maskCtx, overlayCtx, samMask, imageWidth, imageHeight, subtract);
-            }
-          } else {
-            applyFloodFillClick(point, subtract);
-            runSamPrepare();
+          const samMask = await segmentSamAtClick(sourceCanvas, point, clickType);
+          if (samMask) {
+            // SAM session returns the full mask for all clicks — replace, don't merge.
+            setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight);
           }
         } catch (err) {
-          try {
-            applyFloodFillClick(point, subtract);
-          } catch {
-            const message =
-              err instanceof SamSegmentError
+          const message =
+            err instanceof SamSegmentError
+              ? err.message
+              : err instanceof Error
                 ? err.message
-                : err instanceof Error
-                  ? err.message
-                  : 'Smart selection failed.';
-            setSamError(message);
-          }
+                : 'Smart selection failed.';
+          setSamError(message);
         } finally {
           setSegmenting(false);
           setPendingClick(null);
@@ -401,15 +366,14 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         }
       },
       [
-        applyFloodFillClick,
         brushMode,
         imageHeight,
         imageReady,
         imageWidth,
         refreshMaskState,
-        runSamPrepare,
         samEmbeddingReady,
         segmenting,
+        t,
       ]
     );
 
@@ -437,12 +401,60 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       resetMaskCanvases();
     }, [resetMaskCanvases]);
 
-    const exportMaskFile = useCallback(async (): Promise<File | null> => {
-      const maskCanvas = maskCanvasRef.current;
-      if (!maskCanvas || !hasMask) return null;
+    const exportSourceImageFile = useCallback(async (): Promise<File | null> => {
+      const sourceCanvas = sourceCanvasRef.current;
+      if (!sourceCanvas || !imageReady) return null;
 
       return new Promise((resolve) => {
-        maskCanvas.toBlob((blob) => {
+        sourceCanvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(null);
+              return;
+            }
+            resolve(
+              new File([blob], 'object-remove-input.jpg', {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              })
+            );
+          },
+          'image/jpeg',
+          0.95
+        );
+      });
+    }, [imageReady]);
+
+    const exportMaskFile = useCallback(async (): Promise<File | null> => {
+      const maskCanvas = maskCanvasRef.current;
+      if (!maskCanvas) return null;
+
+      const maskCtx = maskCanvas.getContext('2d');
+      if (!maskCtx) return null;
+
+      const { width, height } = maskCanvas;
+      if (countMaskPixels(maskCtx, width, height) === 0) return null;
+
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = width;
+      exportCanvas.height = height;
+      const exportCtx = exportCanvas.getContext('2d');
+      if (!exportCtx) return null;
+
+      const src = maskCtx.getImageData(0, 0, width, height);
+      const out = exportCtx.createImageData(width, height);
+      for (let i = 0; i < src.data.length; i += 4) {
+        const on = src.data[i] > 128;
+        const value = on ? 255 : 0;
+        out.data[i] = value;
+        out.data[i + 1] = value;
+        out.data[i + 2] = value;
+        out.data[i + 3] = 255;
+      }
+      exportCtx.putImageData(out, 0, 0);
+
+      return new Promise((resolve) => {
+        exportCanvas.toBlob((blob) => {
           if (!blob) {
             resolve(null);
             return;
@@ -450,16 +462,17 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
           resolve(new File([blob], 'object-remove-mask.png', { type: 'image/png' }));
         }, 'image/png');
       });
-    }, [hasMask]);
+    }, []);
 
     useImperativeHandle(
       ref,
       () => ({
+        exportSourceImageFile,
         exportMaskFile,
         hasMaskContent: () => hasMask,
         clearMask,
       }),
-      [clearMask, exportMaskFile, hasMask]
+      [clearMask, exportMaskFile, exportSourceImageFile, hasMask]
     );
 
     useEffect(() => {
@@ -602,7 +615,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
                 <p className="text-xs text-text-tertiary">{t('objectRemoveSamReady')}</p>
               ) : null}
               {selectionTool === 'click' && !samEmbeddingReady && !samLoading ? (
-                <p className="text-xs text-text-tertiary">{t('objectRemoveClickFallbackHint')}</p>
+                <p className="text-xs text-text-tertiary">{t('objectRemoveSamPreparing')}</p>
               ) : null}
               {samError ? <p className="text-xs text-danger">{samError}</p> : null}
             </div>
