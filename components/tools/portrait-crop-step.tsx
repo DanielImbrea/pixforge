@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { CropEditor } from './crop-editor';
 import { DEFAULT_CROP_PARAMS, type CropParams } from '@/lib/tools/crop-params';
-import { cropImageUrlToFile } from '@/lib/utils/crop-image-file';
+import { cropImageUrlToFile } from '@/lib/image/crop-image-browser';
 
 function initPortraitCropRect(imageWidth: number, imageHeight: number) {
   const size = Math.round(Math.min(imageWidth, imageHeight) * 0.42);

@@ -43,6 +43,7 @@ import {
   type ResizeParams,
 } from '@/lib/tools/resize-params';
 import { ToolConfigureLayout, ToolLayout } from './tool-layout';
+import { cropImageFileInBrowser } from '@/lib/image/crop-image-browser';
 import { buildToolParams, validateToolParams } from '@/lib/tools/validate-params';
 import { triggerBrowserDownloadPost } from '@/lib/utils/trigger-download';
 import { DownloadModal } from './download-modal';
@@ -758,6 +759,22 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
           ...validation.params,
           clientProcessed: true,
           blurFacesCount: blurredFaceCount,
+        };
+      }
+
+      if (isCropTool) {
+        const cropped = await cropImageFileInBrowser(selectedFile, cropParams);
+        fileToProcess = cropped;
+        jobParams = {
+          ...validation.params,
+          clientProcessed: true,
+          left: 0,
+          top: 0,
+          width: cropParams.width,
+          height: cropParams.height,
+          rotate: 0,
+          flipHorizontal: false,
+          flipVertical: false,
         };
       }
 

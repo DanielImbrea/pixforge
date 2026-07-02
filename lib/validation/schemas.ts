@@ -96,6 +96,8 @@ export const cropParamsSchema = z.object({
   rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0),
   flipHorizontal: z.boolean().default(false),
   flipVertical: z.boolean().default(false),
+  /** Image already cropped in the browser; server only stores and encodes it. */
+  clientProcessed: z.boolean().optional(),
 });
 
 export const blurFacesParamsSchema = z.object({

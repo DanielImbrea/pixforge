@@ -238,6 +238,16 @@ export const sharpProcessor: ToolProcessor = {
           break;
         }
         case 'crop': {
+          if (params.clientProcessed === true) {
+            const inputSharpMeta = await sharp(buffer).metadata();
+            const originalFormat = formatFromSharpMeta(inputSharpMeta.format);
+            formatChoice = buildPreserveFormatChoice(originalFormat);
+            qualityIntent = 'balanced';
+            outputWidth = inputMeta.width ?? null;
+            outputHeight = inputMeta.height ?? null;
+            break;
+          }
+
           const rotate =
             params.rotate === 90 || params.rotate === 180 || params.rotate === 270
               ? params.rotate
