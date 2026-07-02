@@ -18,7 +18,6 @@ let faceapi: FaceApiModule | null = null;
 let detectorOptions: FaceApiTypes.SsdMobilenetv1Options | null = null;
 let loadedMode: InitMode | null = null;
 
-const IS_VERCEL = Boolean(process.env.VERCEL);
 const VENDOR_MODEL_PATH = path.join(process.cwd(), 'lib/vendor/face-api-model');
 const PUBLIC_MODEL_PATH = path.join(process.cwd(), 'public/face-api-models');
 const MODEL_RELATIVE_PATH = path.join(process.cwd(), 'node_modules/@vladmandic/face-api/model');
@@ -137,11 +136,11 @@ async function downloadModelsToTmp(files: readonly string[]): Promise<string> {
   return TMP_MODEL_DIR;
 }
 
-async function loadNetFromRemote(net: LoadableNet, uri: string): Promise<void> {
+async function loadNetFromRemote(net: LoadableNet, uri: string, mode: InitMode): Promise<void> {
   try {
     await net.loadFromUri(uri);
   } catch (uriErr) {
-    const files = FULL_MODEL_FILES;
+    const files = mode === 'full' ? FULL_MODEL_FILES : DETECT_MODEL_FILES;
     const diskPath = await downloadModelsToTmp(files);
     await net.loadFromDisk(diskPath);
     if (uriErr instanceof Error) {
@@ -150,19 +149,14 @@ async function loadNetFromRemote(net: LoadableNet, uri: string): Promise<void> {
   }
 }
 
-async function loadNet(net: LoadableNet): Promise<void> {
-  if (IS_VERCEL) {
-    await loadNetFromRemote(net, REMOTE_MODEL_URI);
-    return;
-  }
-
+async function loadNet(net: LoadableNet, mode: InitMode): Promise<void> {
   const local = await resolveLocalModelPath();
   if (local) {
     await net.loadFromDisk(local);
     return;
   }
 
-  await loadNetFromRemote(net, REMOTE_MODEL_URI);
+  await loadNetFromRemote(net, REMOTE_MODEL_URI, mode);
 }
 
 export function getFaceMatchThreshold(): number {
@@ -194,17 +188,17 @@ async function loadModels(mode: InitMode): Promise<void> {
   const api = await loadFaceApiModule();
 
   if (!loadedMode) {
-    await loadNet(api.nets.ssdMobilenetv1);
+    await loadNet(api.nets.ssdMobilenetv1, mode);
     loadedMode = 'detect';
 
     if (mode === 'full') {
-      await loadNet(api.nets.faceLandmark68Net);
-      await loadNet(api.nets.faceRecognitionNet);
+      await loadNet(api.nets.faceLandmark68Net, 'full');
+      await loadNet(api.nets.faceRecognitionNet, 'full');
       loadedMode = 'full';
     }
   } else if (loadedMode === 'detect' && mode === 'full') {
-    await loadNet(api.nets.faceLandmark68Net);
-    await loadNet(api.nets.faceRecognitionNet);
+    await loadNet(api.nets.faceLandmark68Net, 'full');
+    await loadNet(api.nets.faceRecognitionNet, 'full');
     loadedMode = 'full';
   }
 

@@ -128,9 +128,27 @@ export const aiProcessor: ToolProcessor = {
         }
 
         if (
+          message.includes('Failed to download face-api model') ||
+          message.includes('FaceAPI detector is not initialized') ||
+          message.includes('FaceAPI models are not initialized')
+        ) {
+          console.error('[portrait-enhance] face detection unavailable', {
+            jobId: job.id,
+            message,
+          });
+          return {
+            status: 'failed',
+            error: 'Face detection is temporarily unavailable. Please try again in a moment.',
+            errorDetail: message,
+          };
+        }
+
+        if (
           message.includes('Portrait enhancement failed (') ||
           message.includes('Portrait enhancement did not complete') ||
-          message.includes('Portrait enhancement returned no image')
+          message.includes('Portrait enhancement returned no image') ||
+          message.includes('Model lookup failed') ||
+          message.includes('has no published version')
         ) {
           const mapped = mapReplicateError(err, {
             jobId: job.id,
@@ -154,6 +172,7 @@ export const aiProcessor: ToolProcessor = {
           status: 'failed',
           error:
             'Portrait enhancement could not start for this image. Please try another clear selfie or portrait.',
+          errorDetail: message,
         };
       }
     }
