@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import type { PlanTier, ToolDefinition } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,16 @@ import { DEFAULT_CONVERT_PARAMS } from '@/lib/tools/convert-params';
 import { CompressOptions } from './compress-options';
 import { DEFAULT_UPSCALE_PARAMS } from '@/lib/tools/upscale-params';
 import { BgRemovalOptions } from './bg-removal-options';
+import { BgReplaceOptions } from './bg-replace-options';
+import { ObjectRemoveEditor, type ObjectRemoveEditorHandle } from './object-remove-editor';
+import { ObjectRemoveOptions } from './object-remove-options';
+import { PortraitEnhanceOptions } from './portrait-enhance-options';
 import { BlurFacesOptions } from './blur-faces-options';
 import { CropEditor } from './crop-editor';
 import { DEFAULT_BG_REMOVAL_PARAMS } from '@/lib/tools/bg-removal-params';
+import { DEFAULT_BG_REPLACE_PARAMS } from '@/lib/tools/bg-replace-params';
+import { DEFAULT_OBJECT_REMOVE_PARAMS } from '@/lib/tools/object-remove-params';
+import { DEFAULT_PORTRAIT_ENHANCE_PARAMS } from '@/lib/tools/portrait-enhance-params';
 import { DEFAULT_BLUR_FACES_PARAMS } from '@/lib/tools/blur-faces-params';
 import { blurFacesInBrowser, FaceBlurError } from '@/lib/image/blur-faces-browser';
 import { DEFAULT_CROP_PARAMS, initCropRectForImage, type CropParams } from '@/lib/tools/crop-params';
@@ -29,6 +36,8 @@ import {
   buildResizeDownloadFilename,
   clampResizeQuality,
   DEFAULT_RESIZE_PARAMS,
+  applyResizePreset,
+  getResizePresetById,
   readImageDimensionsFromFile,
   type ResizeParams,
 } from '@/lib/tools/resize-params';
@@ -60,6 +69,13 @@ type JobResultPayload = {
   bgRemovalEdgeQuality: string | null;
   bgRemovalSmartMode: boolean;
   bgRemovalShadowRecoveryApplied: boolean;
+  bgReplaceBackgroundLabel: string | null;
+  bgReplaceUsedAiGeneration: boolean;
+  objectRemoveComplete: boolean;
+  portraitEnhanceReasonKey: string | null;
+  portraitEnhanceWarningKey: string | null;
+  portraitEnhanceModelLabel: string | null;
+  portraitEnhanceStyle: string | null;
   blurFacesReasonKey: string | null;
   blurFacesModelLabel: string | null;
   compressionLevel: 'fast' | 'balanced' | 'max' | null;
@@ -94,6 +110,13 @@ function parseJobResultPayload(data: Record<string, unknown>): JobResultPayload 
     bgRemovalEdgeQuality: (data.bgRemovalEdgeQuality as string | null | undefined) ?? null,
     bgRemovalSmartMode: Boolean(data.bgRemovalSmartMode),
     bgRemovalShadowRecoveryApplied: Boolean(data.bgRemovalShadowRecoveryApplied),
+    bgReplaceBackgroundLabel: (data.bgReplaceBackgroundLabel as string | null | undefined) ?? null,
+    bgReplaceUsedAiGeneration: Boolean(data.bgReplaceUsedAiGeneration),
+    objectRemoveComplete: Boolean(data.objectRemoveComplete),
+    portraitEnhanceReasonKey: (data.portraitEnhanceReasonKey as string | null | undefined) ?? null,
+    portraitEnhanceWarningKey: (data.portraitEnhanceWarningKey as string | null | undefined) ?? null,
+    portraitEnhanceModelLabel: (data.portraitEnhanceModelLabel as string | null | undefined) ?? null,
+    portraitEnhanceStyle: (data.portraitEnhanceStyle as string | null | undefined) ?? null,
     blurFacesReasonKey: (data.blurFacesReasonKey as string | null | undefined) ?? null,
     blurFacesModelLabel: (data.blurFacesModelLabel as string | null | undefined) ?? null,
     compressionLevel:
@@ -131,6 +154,13 @@ function applyJobResultToState(
     setBgRemovalEdgeQuality: (v: string | null) => void;
     setBgRemovalSmartMode: (v: boolean) => void;
     setBgRemovalShadowRecoveryApplied: (v: boolean) => void;
+    setBgReplaceBackgroundLabel: (v: string | null) => void;
+    setBgReplaceUsedAiGeneration: (v: boolean) => void;
+    setObjectRemoveComplete: (v: boolean) => void;
+    setPortraitEnhanceReasonKey: (v: string | null) => void;
+    setPortraitEnhanceWarningKey: (v: string | null) => void;
+    setPortraitEnhanceModelLabel: (v: string | null) => void;
+    setPortraitEnhanceStyle: (v: string | null) => void;
     setBlurFacesReasonKey: (v: string | null) => void;
     setBlurFacesModelLabel: (v: string | null) => void;
     setCompressionLevel: (v: 'fast' | 'balanced' | 'max' | null) => void;
@@ -159,6 +189,13 @@ function applyJobResultToState(
   setters.setBgRemovalEdgeQuality(result.bgRemovalEdgeQuality);
   setters.setBgRemovalSmartMode(result.bgRemovalSmartMode);
   setters.setBgRemovalShadowRecoveryApplied(result.bgRemovalShadowRecoveryApplied);
+  setters.setBgReplaceBackgroundLabel(result.bgReplaceBackgroundLabel);
+  setters.setBgReplaceUsedAiGeneration(result.bgReplaceUsedAiGeneration);
+  setters.setObjectRemoveComplete(result.objectRemoveComplete);
+  setters.setPortraitEnhanceReasonKey(result.portraitEnhanceReasonKey);
+  setters.setPortraitEnhanceWarningKey(result.portraitEnhanceWarningKey);
+  setters.setPortraitEnhanceModelLabel(result.portraitEnhanceModelLabel);
+  setters.setPortraitEnhanceStyle(result.portraitEnhanceStyle);
   setters.setBlurFacesReasonKey(result.blurFacesReasonKey);
   setters.setBlurFacesModelLabel(result.blurFacesModelLabel);
   setters.setCompressionLevel(result.compressionLevel);
@@ -174,6 +211,7 @@ interface ToolInteractiveProps {
 export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const t = useTranslations('tool');
   const params = useParams();
+  const searchParams = useSearchParams();
   const locale = (params?.locale as string) || 'en';
 
   const canBatch = Boolean(userPlan && planHasFeature(userPlan, 'batchProcessing'));
@@ -208,6 +246,13 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [bgRemovalEdgeQuality, setBgRemovalEdgeQuality] = useState<string | null>(null);
   const [bgRemovalSmartMode, setBgRemovalSmartMode] = useState(false);
   const [bgRemovalShadowRecoveryApplied, setBgRemovalShadowRecoveryApplied] = useState(false);
+  const [bgReplaceBackgroundLabel, setBgReplaceBackgroundLabel] = useState<string | null>(null);
+  const [bgReplaceUsedAiGeneration, setBgReplaceUsedAiGeneration] = useState(false);
+  const [objectRemoveComplete, setObjectRemoveComplete] = useState(false);
+  const [portraitEnhanceReasonKey, setPortraitEnhanceReasonKey] = useState<string | null>(null);
+  const [portraitEnhanceWarningKey, setPortraitEnhanceWarningKey] = useState<string | null>(null);
+  const [portraitEnhanceModelLabel, setPortraitEnhanceModelLabel] = useState<string | null>(null);
+  const [portraitEnhanceStyle, setPortraitEnhanceStyle] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [batchResults, setBatchResults] = useState<BatchResultItem[]>([]);
@@ -223,6 +268,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [upscaleParams, setUpscaleParams] = useState(DEFAULT_UPSCALE_PARAMS);
   const [convertParams, setConvertParams] = useState(DEFAULT_CONVERT_PARAMS);
   const [bgRemovalParams, setBgRemovalParams] = useState(DEFAULT_BG_REMOVAL_PARAMS);
+  const [bgReplaceParams, setBgReplaceParams] = useState(DEFAULT_BG_REPLACE_PARAMS);
+  const [objectRemoveParams, setObjectRemoveParams] = useState(DEFAULT_OBJECT_REMOVE_PARAMS);
+  const [portraitEnhanceParams, setPortraitEnhanceParams] = useState(DEFAULT_PORTRAIT_ENHANCE_PARAMS);
+  const [hasObjectRemoveMask, setHasObjectRemoveMask] = useState(false);
+  const objectRemoveEditorRef = useRef<ObjectRemoveEditorHandle>(null);
   const [cropParams, setCropParams] = useState<CropParams>(DEFAULT_CROP_PARAMS);
   const [blurFacesParams, setBlurFacesParams] = useState(DEFAULT_BLUR_FACES_PARAMS);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -241,15 +291,21 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const isConvertTool = tool.category === 'convert';
   const isCompressTool = tool.category === 'compress';
   const isBackgroundTool = tool.category === 'background';
+  const isBgReplaceTool = tool.category === 'background_replace';
+  const isObjectRemoveTool = tool.category === 'object_remove';
+  const isPortraitEnhanceTool = tool.category === 'portrait_enhance';
   const isCropTool = tool.category === 'crop';
   const isFacesTool = tool.category === 'faces';
-  const supportsBatch = canBatch && !isCropTool && !isFacesTool;
+  const supportsBatch = canBatch && !isCropTool && !isFacesTool && !isObjectRemoveTool;
   const hasOptions =
     isResizeTool ||
     isUpscaleTool ||
     isConvertTool ||
     isCompressTool ||
     isBackgroundTool ||
+    isBgReplaceTool ||
+    isObjectRemoveTool ||
+    isPortraitEnhanceTool ||
     isCropTool ||
     isFacesTool;
 
@@ -260,6 +316,19 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       return clamped === current.quality ? current : { ...current, quality: clamped };
     });
   }, [isResizeTool, maxResizeQuality]);
+
+  useEffect(() => {
+    if (!isResizeTool) return;
+    const preset = getResizePresetById(searchParams.get('preset'));
+    if (!preset) return;
+    setResizeParams((current) => {
+      const next = applyResizePreset(current, preset);
+      return {
+        ...next,
+        quality: clampResizeQuality(next.quality, maxResizeQuality),
+      };
+    });
+  }, [isResizeTool, maxResizeQuality, searchParams]);
 
   const stopPolling = useCallback(() => {
     if (pollTimer.current) {
@@ -337,6 +406,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       setFilePreviewUrl(URL.createObjectURL(file));
       setValidationErrorKey(null);
       setErrorMessage(null);
+      setHasObjectRemoveMask(false);
       void readImageDimensionsFromFile(file).then((dimensions) => {
         if (dimensions) {
           setOriginalImageMeta({
@@ -443,7 +513,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   );
 
   const processSingleFile = useCallback(
-    async (file: File, params: Record<string, unknown>, referencePortrait?: File | null) => {
+    async (file: File, params: Record<string, unknown>, referencePortrait?: File | null, maskFile?: File | null) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('toolId', tool.id);
@@ -452,6 +522,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       }
       if (referencePortrait) {
         formData.append('referenceFile', referencePortrait);
+      }
+      if (maskFile) {
+        formData.append('maskFile', maskFile);
       }
 
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -498,10 +571,14 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       bgRemovalParams,
       compressParams,
       cropParams,
-      blurFacesParams
+      blurFacesParams,
+      bgReplaceParams,
+      objectRemoveParams,
+      portraitEnhanceParams
     );
     const validation = validateToolParams(tool, rawParams, {
       referenceFilePresent: Boolean(referenceFile),
+      maskFilePresent: hasObjectRemoveMask,
     });
 
     if (!validation.valid) {
@@ -518,6 +595,18 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     try {
       let fileToProcess = selectedFile;
       let jobParams: Record<string, unknown> = { ...validation.params };
+      let maskFile: File | null = null;
+
+      if (isObjectRemoveTool) {
+        maskFile = (await objectRemoveEditorRef.current?.exportMaskFile()) ?? null;
+        if (!maskFile) {
+          setValidationErrorKey('validationObjectRemoveMaskRequired');
+          setIsSubmitting(false);
+          setStage('configure');
+          stopProgressSimulation();
+          return;
+        }
+      }
 
       if (isFacesTool) {
         const { file, blurredFaceCount } = await blurFacesInBrowser(
@@ -533,7 +622,12 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
         };
       }
 
-      const result = await processSingleFile(fileToProcess, jobParams, null);
+      const result = await processSingleFile(
+        fileToProcess,
+        jobParams,
+        isFacesTool && blurFacesParams.detectionMode === 'custom' ? referenceFile : null,
+        maskFile
+      );
       setJobId(result.jobId);
       stopProgressSimulation();
       setProgress(100);
@@ -561,6 +655,13 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
         setBgRemovalEdgeQuality,
         setBgRemovalSmartMode,
         setBgRemovalShadowRecoveryApplied,
+        setBgReplaceBackgroundLabel,
+        setBgReplaceUsedAiGeneration,
+        setObjectRemoveComplete,
+        setPortraitEnhanceReasonKey,
+        setPortraitEnhanceWarningKey,
+        setPortraitEnhanceModelLabel,
+        setPortraitEnhanceStyle,
         setBlurFacesReasonKey,
         setBlurFacesModelLabel,
         setCompressionLevel,
@@ -586,6 +687,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     upscaleParams,
     convertParams,
     bgRemovalParams,
+    bgReplaceParams,
+    objectRemoveParams,
+    portraitEnhanceParams,
+    hasObjectRemoveMask,
+    isObjectRemoveTool,
     compressParams,
     cropParams,
     blurFacesParams,
@@ -612,10 +718,14 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       bgRemovalParams,
       compressParams,
       cropParams,
-      blurFacesParams
+      blurFacesParams,
+      bgReplaceParams,
+      objectRemoveParams,
+      portraitEnhanceParams
     );
     const validation = validateToolParams(tool, rawParams, {
       referenceFilePresent: Boolean(referenceFile),
+      maskFilePresent: hasObjectRemoveMask,
     });
 
     if (!validation.valid) {
@@ -702,6 +812,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     upscaleParams,
     convertParams,
     bgRemovalParams,
+    bgReplaceParams,
+    objectRemoveParams,
+    portraitEnhanceParams,
+    hasObjectRemoveMask,
+    isObjectRemoveTool,
     compressParams,
     cropParams,
     blurFacesParams,
@@ -792,6 +907,14 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setBgRemovalEdgeQuality(null);
     setBgRemovalSmartMode(false);
     setBgRemovalShadowRecoveryApplied(false);
+    setBgReplaceBackgroundLabel(null);
+    setBgReplaceUsedAiGeneration(false);
+    setObjectRemoveComplete(false);
+    setPortraitEnhanceReasonKey(null);
+    setPortraitEnhanceWarningKey(null);
+    setPortraitEnhanceModelLabel(null);
+    setPortraitEnhanceStyle(null);
+    setHasObjectRemoveMask(false);
     setBlurFacesReasonKey(null);
     setBlurFacesModelLabel(null);
     setCompressionLevel(null);
@@ -805,6 +928,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setUpscaleParams(DEFAULT_UPSCALE_PARAMS);
     setConvertParams(DEFAULT_CONVERT_PARAMS);
     setBgRemovalParams(DEFAULT_BG_REMOVAL_PARAMS);
+    setBgReplaceParams(DEFAULT_BG_REPLACE_PARAMS);
+    setObjectRemoveParams(DEFAULT_OBJECT_REMOVE_PARAMS);
+    setPortraitEnhanceParams(DEFAULT_PORTRAIT_ENHANCE_PARAMS);
     setCropParams(DEFAULT_CROP_PARAMS);
     setBlurFacesParams(DEFAULT_BLUR_FACES_PARAMS);
     clearReferenceFile();
@@ -823,7 +949,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   return (
     <ToolLayout
       stage={stage}
-      className={isCropTool ? 'max-w-5xl' : undefined}
+      className={isCropTool || isObjectRemoveTool ? 'max-w-5xl' : undefined}
       configure={
         <ToolConfigureLayout
           preview={
@@ -846,6 +972,22 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                   </ul>
                 )}
               </div>
+            ) : isObjectRemoveTool && selectedFile && filePreviewUrl && originalImageMeta ? (
+              <ObjectRemoveEditor
+                ref={objectRemoveEditorRef}
+                imageUrl={filePreviewUrl}
+                imageWidth={originalImageMeta.width}
+                imageHeight={originalImageMeta.height}
+                brushSize={objectRemoveParams.brushSize}
+                selectionTool={objectRemoveParams.selectionTool}
+                onBrushSizeChange={(brushSize) =>
+                  setObjectRemoveParams((current) => ({ ...current, brushSize }))
+                }
+                onSelectionToolChange={(selectionTool) =>
+                  setObjectRemoveParams((current) => ({ ...current, selectionTool }))
+                }
+                onMaskChange={setHasObjectRemoveMask}
+              />
             ) : isCropTool && selectedFile && filePreviewUrl && originalImageMeta ? (
               <CropEditor
                 imageUrl={filePreviewUrl}
@@ -925,6 +1067,18 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               {isBackgroundTool && (
                 <BgRemovalOptions value={bgRemovalParams} onChange={setBgRemovalParams} />
               )}
+              {isBgReplaceTool && (
+                <BgReplaceOptions value={bgReplaceParams} onChange={setBgReplaceParams} />
+              )}
+              {isObjectRemoveTool && (
+                <ObjectRemoveOptions value={objectRemoveParams} onChange={setObjectRemoveParams} />
+              )}
+              {isPortraitEnhanceTool && (
+                <PortraitEnhanceOptions
+                  value={portraitEnhanceParams}
+                  onChange={setPortraitEnhanceParams}
+                />
+              )}
               {isFacesTool && (
                 <BlurFacesOptions
                   value={blurFacesParams}
@@ -946,6 +1100,15 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 <p className="text-xs text-danger">{validationMessage}</p>
               )}
               {validationErrorKey === 'validationBgRemovalInvalid' && (
+                <p className="text-xs text-danger">{validationMessage}</p>
+              )}
+              {validationErrorKey?.startsWith('validationBgReplace') && (
+                <p className="text-xs text-danger">{validationMessage}</p>
+              )}
+              {validationErrorKey?.startsWith('validationObjectRemove') && (
+                <p className="text-xs text-danger">{validationMessage}</p>
+              )}
+              {validationErrorKey === 'validationPortraitEnhanceInvalid' && (
                 <p className="text-xs text-danger">{validationMessage}</p>
               )}
               {validationErrorKey?.startsWith('validationCrop') && (
@@ -1054,12 +1217,21 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               bgRemovalEdgeQuality={bgRemovalEdgeQuality}
               bgRemovalSmartMode={bgRemovalSmartMode}
               bgRemovalShadowRecoveryApplied={bgRemovalShadowRecoveryApplied}
+              bgReplaceBackgroundLabel={bgReplaceBackgroundLabel}
+              bgReplaceUsedAiGeneration={bgReplaceUsedAiGeneration}
+              objectRemoveComplete={objectRemoveComplete}
+              portraitEnhanceReasonKey={portraitEnhanceReasonKey}
+              portraitEnhanceWarningKey={portraitEnhanceWarningKey}
+              portraitEnhanceModelLabel={portraitEnhanceModelLabel}
+              portraitEnhanceStyle={portraitEnhanceStyle}
               blurFacesReasonKey={blurFacesReasonKey}
               blurFacesModelLabel={blurFacesModelLabel}
               isCompressOnly={isCompressTool}
               compressionLevel={compressionLevel}
               sizeCompareOutputLabel={isResizeTool ? 'result' : 'compressed'}
-              beforePreviewUrl={isUpscaleTool || isFacesTool ? filePreviewUrl : null}
+              beforePreviewUrl={
+                isUpscaleTool || isFacesTool || isPortraitEnhanceTool ? filePreviewUrl : null
+              }
               inputWidth={originalImageMeta?.width ?? null}
               inputHeight={originalImageMeta?.height ?? null}
               onDownload={() => void handleDownload()}

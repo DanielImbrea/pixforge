@@ -4,6 +4,9 @@ import { getToolById } from '@/lib/tools/registry';
 /** Display order on the home page — AI tools first. */
 export const LANDING_TOOL_IDS = [
   'tool_background_removal',
+  'tool_background_replace',
+  'tool_object_remove',
+  'tool_portrait_enhance',
   'tool_upscale_ai',
   'tool_blur_faces',
   'tool_crop',
@@ -15,6 +18,7 @@ export const LANDING_TOOL_IDS = [
 export type LandingHeroToolKey =
   | 'upscale'
   | 'background'
+  | 'portrait'
   | 'blur_faces'
   | 'crop'
   | 'resize'
@@ -25,6 +29,7 @@ export type LandingHeroToolKey =
 export const LANDING_HERO_TOOLS: { id: (typeof LANDING_TOOL_IDS)[number] | 'tool_convert'; key: LandingHeroToolKey }[] = [
   { id: 'tool_upscale_ai', key: 'upscale' },
   { id: 'tool_background_removal', key: 'background' },
+  { id: 'tool_portrait_enhance', key: 'portrait' },
   { id: 'tool_blur_faces', key: 'blur_faces' },
   { id: 'tool_crop', key: 'crop' },
   { id: 'tool_resize', key: 'resize' },

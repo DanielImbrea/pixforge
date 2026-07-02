@@ -2,12 +2,24 @@ import type { ToolDefinition } from '@/types';
 import {
   convertParamsSchema,
   bgRemovalParamsSchema,
+  bgReplaceParamsSchema,
+  objectRemoveParamsSchema,
+  portraitEnhanceParamsSchema,
   resizeParamsSchema,
   upscaleParamsSchema,
   cropParamsSchema,
   blurFacesParamsSchema,
 } from '@/lib/validation/schemas';
 import { DEFAULT_BG_REMOVAL_PARAMS, type BgRemovalParams } from '@/lib/tools/bg-removal-params';
+import { DEFAULT_BG_REPLACE_PARAMS, type BgReplaceParams } from '@/lib/tools/bg-replace-params';
+import {
+  DEFAULT_OBJECT_REMOVE_PARAMS,
+  type ObjectRemoveParams,
+} from '@/lib/tools/object-remove-params';
+import {
+  DEFAULT_PORTRAIT_ENHANCE_PARAMS,
+  type PortraitEnhanceParams,
+} from '@/lib/tools/portrait-enhance-params';
 import { DEFAULT_BLUR_FACES_PARAMS, type BlurFacesParams } from '@/lib/tools/blur-faces-params';
 import { DEFAULT_COMPRESS_PARAMS, type CompressParams } from '@/lib/tools/compress-params';
 import { DEFAULT_CONVERT_PARAMS, type ConvertParams } from '@/lib/tools/convert-params';
@@ -24,6 +36,8 @@ export interface ToolParamsValidation {
 export interface ValidateToolParamsOptions {
   /** Client-side upload includes reference portrait before server assigns referenceAssetId. */
   referenceFilePresent?: boolean;
+  /** Client-side upload includes brush mask before server assigns maskAssetId. */
+  maskFilePresent?: boolean;
 }
 
 export function validateToolParams(
@@ -103,6 +117,39 @@ export function validateToolParams(
     return { valid: true, params: result.data };
   }
 
+  if (tool.category === 'background_replace') {
+    const result = bgReplaceParamsSchema.safeParse(raw);
+    if (!result.success) {
+      return { valid: false, params: {}, errorKey: 'validationBgReplaceInvalid' };
+    }
+    if (result.data.backgroundPreset === 'custom' && !result.data.backgroundPrompt.trim()) {
+      return { valid: false, params: {}, errorKey: 'validationBgReplacePromptRequired' };
+    }
+    return { valid: true, params: result.data };
+  }
+
+  if (tool.category === 'object_remove') {
+    const result = objectRemoveParamsSchema.safeParse(raw);
+    if (!result.success) {
+      return { valid: false, params: {}, errorKey: 'validationObjectRemoveInvalid' };
+    }
+    if (!result.data.maskAssetId && !options.maskFilePresent) {
+      return { valid: false, params: {}, errorKey: 'validationObjectRemoveMaskRequired' };
+    }
+    if (result.data.editMode === 'replace' && !result.data.inpaintPrompt.trim()) {
+      return { valid: false, params: {}, errorKey: 'validationObjectRemoveReplacePromptRequired' };
+    }
+    return { valid: true, params: result.data };
+  }
+
+  if (tool.category === 'portrait_enhance') {
+    const result = portraitEnhanceParamsSchema.safeParse(raw);
+    if (!result.success) {
+      return { valid: false, params: {}, errorKey: 'validationPortraitEnhanceInvalid' };
+    }
+    return { valid: true, params: result.data };
+  }
+
   if (tool.category === 'faces') {
     const result = blurFacesParamsSchema.safeParse(raw);
     if (!result.success) {
@@ -127,7 +174,10 @@ export function buildToolParams(
   bgRemovalParams: BgRemovalParams = DEFAULT_BG_REMOVAL_PARAMS,
   compressParams: CompressParams = DEFAULT_COMPRESS_PARAMS,
   cropParams: CropParams = DEFAULT_CROP_PARAMS,
-  blurFacesParams: BlurFacesParams = DEFAULT_BLUR_FACES_PARAMS
+  blurFacesParams: BlurFacesParams = DEFAULT_BLUR_FACES_PARAMS,
+  bgReplaceParams: BgReplaceParams = DEFAULT_BG_REPLACE_PARAMS,
+  objectRemoveParams: ObjectRemoveParams = DEFAULT_OBJECT_REMOVE_PARAMS,
+  portraitEnhanceParams: PortraitEnhanceParams = DEFAULT_PORTRAIT_ENHANCE_PARAMS
 ): Record<string, unknown> {
   if (tool.category === 'resize') {
     return {
@@ -169,6 +219,26 @@ export function buildToolParams(
       edgeQuality: bgRemovalParams.edgeQuality,
       shadowRecovery: bgRemovalParams.shadowRecovery,
     };
+  }
+  if (tool.category === 'background_replace') {
+    return {
+      subjectMode: bgReplaceParams.subjectMode,
+      edgeQuality: bgReplaceParams.edgeQuality,
+      backgroundPreset: bgReplaceParams.backgroundPreset,
+      backgroundPrompt: bgReplaceParams.backgroundPrompt,
+    };
+  }
+  if (tool.category === 'object_remove') {
+    return {
+      brushSize: objectRemoveParams.brushSize,
+      editMode: objectRemoveParams.editMode,
+      selectionTool: objectRemoveParams.selectionTool,
+      inpaintPrompt: objectRemoveParams.inpaintPrompt,
+      ...(objectRemoveParams.maskAssetId ? { maskAssetId: objectRemoveParams.maskAssetId } : {}),
+    };
+  }
+  if (tool.category === 'portrait_enhance') {
+    return { enhanceStyle: portraitEnhanceParams.enhanceStyle };
   }
   if (tool.category === 'faces') {
     return {

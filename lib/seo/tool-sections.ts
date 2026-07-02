@@ -17,7 +17,7 @@ const SECTION_LABELS: Record<
     howItWorks: 'Cum funcționează',
     bestFor: 'Ideal pentru',
     useCases: 'Cazuri de utilizare',
-    aiExplanation: 'Cum funcționează enhancement-ul AI',
+    aiExplanation: 'Cum funcționează editarea AI',
     benefits: 'Beneficii',
     faq: 'Întrebări frecvente',
   },

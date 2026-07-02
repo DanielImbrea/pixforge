@@ -13,8 +13,14 @@ export interface ResizeParams {
 export interface ResizePreset {
   id: string;
   labelKey: string;
+  hintKey?: string;
   width: number;
   height: number;
+  group: 'social' | 'ecommerce';
+  defaultFormat?: ResizeTargetFormat;
+  defaultQuality?: number;
+  /** Highlight on landing (e.g. eMAG for RO market). */
+  featured?: boolean;
 }
 
 export const DEFAULT_RESIZE_PARAMS: ResizeParams = {
@@ -23,13 +29,79 @@ export const DEFAULT_RESIZE_PARAMS: ResizeParams = {
   quality: 85,
 };
 
-export const RESIZE_PRESETS: ResizePreset[] = [
-  { id: 'instagram_post', labelKey: 'resizePresetInstagramPost', width: 1080, height: 1080 },
-  { id: 'instagram_story', labelKey: 'resizePresetInstagramStory', width: 1080, height: 1920 },
-  { id: 'facebook_cover', labelKey: 'resizePresetFacebookCover', width: 1640, height: 624 },
-  { id: 'youtube_thumbnail', labelKey: 'resizePresetYoutubeThumbnail', width: 1280, height: 720 },
-  { id: 'twitter_post', labelKey: 'resizePresetTwitterPost', width: 1600, height: 900 },
+export const SOCIAL_RESIZE_PRESETS: ResizePreset[] = [
+  { id: 'instagram_post', labelKey: 'resizePresetInstagramPost', width: 1080, height: 1080, group: 'social' },
+  { id: 'instagram_story', labelKey: 'resizePresetInstagramStory', width: 1080, height: 1920, group: 'social' },
+  { id: 'facebook_cover', labelKey: 'resizePresetFacebookCover', width: 1640, height: 624, group: 'social' },
+  { id: 'youtube_thumbnail', labelKey: 'resizePresetYoutubeThumbnail', width: 1280, height: 720, group: 'social' },
+  { id: 'twitter_post', labelKey: 'resizePresetTwitterPost', width: 1600, height: 900, group: 'social' },
 ];
+
+/** Marketplace listing dimensions — fit inside, aspect ratio preserved (Sharp). */
+export const ECOMMERCE_RESIZE_PRESETS: ResizePreset[] = [
+  {
+    id: 'emag_product',
+    labelKey: 'resizePresetEmag',
+    hintKey: 'resizePresetEmagHint',
+    width: 2000,
+    height: 2000,
+    group: 'ecommerce',
+    defaultFormat: 'jpeg',
+    defaultQuality: 88,
+    featured: true,
+  },
+  {
+    id: 'amazon_product',
+    labelKey: 'resizePresetAmazon',
+    hintKey: 'resizePresetAmazonHint',
+    width: 2000,
+    height: 2000,
+    group: 'ecommerce',
+    defaultFormat: 'jpeg',
+    defaultQuality: 88,
+  },
+  {
+    id: 'shopify_product',
+    labelKey: 'resizePresetShopify',
+    hintKey: 'resizePresetShopifyHint',
+    width: 2048,
+    height: 2048,
+    group: 'ecommerce',
+    defaultFormat: 'jpeg',
+    defaultQuality: 85,
+  },
+  {
+    id: 'etsy_listing',
+    labelKey: 'resizePresetEtsy',
+    hintKey: 'resizePresetEtsyHint',
+    width: 2700,
+    height: 2025,
+    group: 'ecommerce',
+    defaultFormat: 'jpeg',
+    defaultQuality: 88,
+  },
+];
+
+export const RESIZE_PRESETS: ResizePreset[] = [
+  ...ECOMMERCE_RESIZE_PRESETS,
+  ...SOCIAL_RESIZE_PRESETS,
+];
+
+export function getResizePresetById(id: string | null | undefined): ResizePreset | undefined {
+  if (!id) return undefined;
+  return RESIZE_PRESETS.find((preset) => preset.id === id);
+}
+
+export function applyResizePreset(base: ResizeParams, preset: ResizePreset): ResizeParams {
+  return {
+    ...base,
+    width: preset.width,
+    height: preset.height,
+    maintainAspectRatio: true,
+    targetFormat: preset.defaultFormat ?? base.targetFormat,
+    quality: preset.defaultQuality ?? base.quality,
+  };
+}
 
 export const RESIZE_PERCENT_SCALES = [25, 50, 75, 200] as const;
 

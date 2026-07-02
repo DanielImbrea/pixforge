@@ -39,6 +39,13 @@ export interface FinalizeJobOutputInput {
     bgRemovalEdgeQuality?: string;
     bgRemovalSmartMode?: boolean;
     bgRemovalShadowRecoveryApplied?: boolean;
+    bgReplaceBackgroundLabel?: string;
+    bgReplaceUsedAiGeneration?: boolean;
+    objectRemoveComplete?: boolean;
+    portraitEnhanceReasonKey?: string;
+    portraitEnhanceWarningKey?: string;
+    portraitEnhanceModelLabel?: string;
+    portraitEnhanceStyle?: string;
     blurFacesReasonKey?: string;
     blurFacesModelLabel?: string;
   };

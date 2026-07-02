@@ -8,7 +8,7 @@ export interface ToolGroup {
 }
 
 const OPTIMIZE_CATEGORIES = new Set(['crop', 'resize', 'compress', 'convert']);
-const ENHANCE_CATEGORIES = new Set(['upscale', 'background', 'faces']);
+const ENHANCE_CATEGORIES = new Set(['upscale', 'background', 'background_replace', 'object_remove', 'portrait_enhance', 'faces']);
 
 export function groupToolsForLanding(tools: ToolDefinition[]): ToolGroup[] {
   const optimize = tools.filter((tool) => OPTIMIZE_CATEGORIES.has(tool.category));

@@ -31,6 +31,13 @@ interface ResultViewProps {
   bgRemovalEdgeQuality?: string | null;
   bgRemovalSmartMode?: boolean;
   bgRemovalShadowRecoveryApplied?: boolean;
+  bgReplaceBackgroundLabel?: string | null;
+  bgReplaceUsedAiGeneration?: boolean;
+  objectRemoveComplete?: boolean;
+  portraitEnhanceReasonKey?: string | null;
+  portraitEnhanceWarningKey?: string | null;
+  portraitEnhanceModelLabel?: string | null;
+  portraitEnhanceStyle?: string | null;
   blurFacesReasonKey?: string | null;
   blurFacesModelLabel?: string | null;
   isCompressOnly?: boolean;
@@ -94,6 +101,13 @@ export function ResultView({
   bgRemovalEdgeQuality,
   bgRemovalSmartMode = false,
   bgRemovalShadowRecoveryApplied = false,
+  bgReplaceBackgroundLabel,
+  bgReplaceUsedAiGeneration = false,
+  objectRemoveComplete = false,
+  portraitEnhanceReasonKey,
+  portraitEnhanceWarningKey,
+  portraitEnhanceModelLabel,
+  portraitEnhanceStyle,
   blurFacesReasonKey,
   blurFacesModelLabel,
   isCompressOnly = false,
@@ -116,7 +130,9 @@ export function ResultView({
     Boolean(outputFormatLabel || formatReasonKey || smartFormatSelected) &&
     !upscaleReasonKey &&
     !bgRemovalReasonKey &&
-    !blurFacesReasonKey;
+    !blurFacesReasonKey &&
+    !objectRemoveComplete &&
+    !portraitEnhanceReasonKey;
   const showCompressionStats =
     (isCompressOnly || isConvertResult) &&
     outputSizeBytes != null &&
@@ -125,7 +141,9 @@ export function ResultView({
     resolvedInputBytes > 0;
   const savedPercent = computeSavedPercent(resolvedInputBytes ?? 0, outputSizeBytes ?? 0);
   const alreadyOptimized = formatReasonKey === 'formatReasonAlreadyOptimized';
-  const showUpscaleCompare = Boolean(beforePreviewUrl && (upscaleReasonKey || blurFacesReasonKey));
+  const showUpscaleCompare = Boolean(
+    beforePreviewUrl && (upscaleReasonKey || blurFacesReasonKey || portraitEnhanceReasonKey)
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -180,7 +198,9 @@ export function ResultView({
           outputFormatLabel ||
           upscaleReasonKey ||
           bgRemovalReasonKey ||
-          blurFacesReasonKey) && (
+          blurFacesReasonKey ||
+          objectRemoveComplete ||
+          portraitEnhanceReasonKey) && (
         <div className="text-xs text-text-tertiary text-center space-y-2">
           {(dimensionsLabel || sizeLabel) && (
             <p>{[dimensionsLabel, sizeLabel].filter(Boolean).join(' · ')}</p>
@@ -245,6 +265,47 @@ export function ResultView({
               {bgRemovalShadowRecoveryApplied && (
                 <p className="text-text-secondary">{t('bgShadowRecoveryApplied')}</p>
               )}
+              {bgReplaceBackgroundLabel && (
+                <p className="text-text-secondary">
+                  {t('bgReplaceApplied', {
+                    preset: t(`bgReplacePreset_${bgReplaceBackgroundLabel}` as 'bgReplacePreset_white'),
+                  })}
+                  {bgReplaceUsedAiGeneration ? ` · ${t('bgReplaceAiGenerated')}` : ''}
+                </p>
+              )}
+            </div>
+          )}
+          {portraitEnhanceReasonKey && (
+            <div className="rounded-md border border-border-default bg-background-secondary px-3 py-2 text-left space-y-1">
+              <p className="font-medium text-text-primary">
+                {portraitEnhanceModelLabel
+                  ? t('portraitEnhanceSelected', { model: portraitEnhanceModelLabel })
+                  : t('portraitEnhanceComplete')}
+              </p>
+              {portraitEnhanceStyle && (
+                <p className="text-text-tertiary">
+                  {t('portraitEnhanceStyleApplied', {
+                    style:
+                      portraitEnhanceStyle === 'glamour'
+                        ? t('portraitEnhanceGlamour')
+                        : portraitEnhanceStyle === 'restore'
+                          ? t('portraitEnhanceRestore')
+                          : t('portraitEnhanceNatural'),
+                  })}
+                </p>
+              )}
+              <p className="text-text-secondary">
+                {t(portraitEnhanceReasonKey as 'portraitEnhanceReasonNatural')}
+              </p>
+              {portraitEnhanceWarningKey && (
+                <p className="text-warning">{t(portraitEnhanceWarningKey as 'portraitEnhanceWarnNotPhoto')}</p>
+              )}
+            </div>
+          )}
+          {objectRemoveComplete && (
+            <div className="rounded-md border border-border-default bg-background-secondary px-3 py-2 text-left space-y-1">
+              <p className="font-medium text-text-primary">{t('objectRemoveComplete')}</p>
+              <p className="text-text-secondary">{t('objectRemoveCompleteHint')}</p>
             </div>
           )}
           {blurFacesReasonKey && (

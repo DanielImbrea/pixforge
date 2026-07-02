@@ -4,6 +4,9 @@ import { finalizeJobOutput } from '@/lib/tools/finalize-job-output';
 import { getToolById } from '@/lib/tools/registry';
 import { fetchAsBuffer, fetchImageBuffer } from '@/lib/ai/fetch-image';
 import { applyMockAiTransform } from '@/lib/ai/mock-provider';
+import { applyMockPortraitEnhance } from '@/lib/ai/portrait-enhance-process';
+import { applyMockObjectRemove } from '@/lib/ai/object-remove-inpaint';
+import type { PortraitEnhanceRouting } from '@/lib/ai/portrait-enhance-routing';
 import { createSignedUrl } from '@/lib/supabase/storage';
 import {
   extractReplicateOutputUrl,
@@ -12,7 +15,10 @@ import {
 } from '@/lib/ai/replicate-client';
 import { applyUpscalePostProcess } from '@/lib/ai/upscale-post-process';
 import { finalizeBgRemovalOutput } from '@/lib/ai/bg-removal-post-process';
+import { finalizeBgReplaceOutput } from '@/lib/ai/bg-replace-post-process';
 import { fetchJobInputBuffer } from '@/lib/ai/fetch-job-input';
+import { bgReplaceParamsSchema } from '@/lib/validation/schemas';
+import { DEFAULT_BG_REPLACE_PARAMS } from '@/lib/tools/bg-replace-params';
 import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
 import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
 import type { BlurFacesRouting } from '@/lib/ai/blur-faces-routing';
@@ -42,7 +48,7 @@ export async function failAiJob(jobId: string, errorMessage: string): Promise<vo
 export async function completeAiJobFromOutputBuffer(
   jobId: string,
   outputBuffer: Buffer,
-  outputMimeType: string
+  outputMimeTypeInput: string
 ): Promise<boolean> {
   const admin = createAdminClient();
   const { data: job } = await admin.from('image_jobs').select('*').eq('id', jobId).single();
@@ -74,8 +80,14 @@ export async function completeAiJobFromOutputBuffer(
   const blurFacesRouting = (jobRow.params as Record<string, unknown> | undefined)
     ?._blurFacesRouting as BlurFacesRouting | undefined;
 
+  const portraitEnhanceRouting = (jobRow.params as Record<string, unknown> | undefined)
+    ?._portraitEnhanceRouting as import('@/lib/ai/portrait-enhance-routing').PortraitEnhanceRouting | undefined;
+
   let processedBuffer = outputBuffer;
+  let outputMimeType = outputMimeTypeInput;
   let bgShadowRecoveryApplied = false;
+  let bgReplaceBackgroundLabel: string | undefined;
+  let bgReplaceUsedAiGeneration = false;
   if (tool.category === 'upscale' && upscaleRouting) {
     processedBuffer = await applyUpscalePostProcess(processedBuffer, upscaleRouting.postProcess);
   }
@@ -96,9 +108,22 @@ export async function completeAiJobFromOutputBuffer(
     processedBuffer = finalized.buffer;
     bgShadowRecoveryApplied = finalized.shadowRecoveryApplied;
   }
+  if (tool.category === 'background_replace' && bgRouting) {
+    const parsed = bgReplaceParamsSchema.safeParse(jobRow.params || {});
+    const bgReplaceParams = parsed.success ? parsed.data : DEFAULT_BG_REPLACE_PARAMS;
+    const finalized = await finalizeBgReplaceOutput(processedBuffer, bgReplaceParams);
+    processedBuffer = finalized.buffer;
+    outputMimeType = 'image/jpeg';
+    bgReplaceBackgroundLabel = finalized.backgroundLabel;
+    bgReplaceUsedAiGeneration = finalized.usedAiGeneration;
+  }
 
   const deliveryMeta =
-    upscaleRouting || bgRouting || blurFacesRouting
+    upscaleRouting ||
+    bgRouting ||
+    blurFacesRouting ||
+    portraitEnhanceRouting ||
+    tool.category === 'object_remove'
       ? {
           ...(upscaleRouting
             ? {
@@ -119,6 +144,12 @@ export async function completeAiJobFromOutputBuffer(
                 bgRemovalEdgeQuality: bgRouting.edgeQuality,
                 bgRemovalSmartMode: bgRouting.smartMode,
                 bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
+                ...(bgReplaceBackgroundLabel
+                  ? {
+                      bgReplaceBackgroundLabel,
+                      bgReplaceUsedAiGeneration,
+                    }
+                  : {}),
               }
             : {}),
           ...(blurFacesRouting
@@ -127,6 +158,15 @@ export async function completeAiJobFromOutputBuffer(
                 blurFacesModelLabel: blurFacesRouting.modelLabel,
               }
             : {}),
+          ...(portraitEnhanceRouting
+            ? {
+                portraitEnhanceReasonKey: portraitEnhanceRouting.reasonKey,
+                portraitEnhanceWarningKey: portraitEnhanceRouting.warningKey,
+                portraitEnhanceModelLabel: portraitEnhanceRouting.modelLabel,
+                portraitEnhanceStyle: portraitEnhanceRouting.enhanceStyle,
+              }
+            : {}),
+          ...(tool.category === 'object_remove' ? { objectRemoveComplete: true } : {}),
         }
       : undefined;
 
@@ -251,8 +291,54 @@ export async function syncMockJobIfComplete(jobRow: ImageJobRow): Promise<void> 
       600
     );
     const inputBuffer = await fetchAsBuffer(inputUrl);
+
+    if (tool.category === 'object_remove') {
+      const maskAssetId = (jobRow.params as Record<string, unknown> | undefined)?.maskAssetId as
+        | string
+        | undefined;
+      if (!maskAssetId) {
+        await failAiJob(jobRow.id, 'Mask asset missing.');
+        return;
+      }
+      const { data: maskAsset } = await admin
+        .from('image_assets')
+        .select('*, storage_files(*)')
+        .eq('id', maskAssetId)
+        .single();
+      if (!maskAsset?.storage_files) {
+        await failAiJob(jobRow.id, 'Mask asset missing.');
+        return;
+      }
+      const maskUrl = await createSignedUrl(
+        maskAsset.storage_files.bucket,
+        maskAsset.storage_files.storage_path,
+        600
+      );
+      const maskBuffer = await fetchAsBuffer(maskUrl);
+      const buffer = await applyMockObjectRemove(inputBuffer, maskBuffer);
+      await completeAiJobFromOutputBuffer(jobRow.id, buffer, 'image/jpeg');
+      return;
+    }
+
+    if (tool.category === 'portrait_enhance') {
+      const routing = (jobRow.params as Record<string, unknown> | undefined)?._portraitEnhanceRouting as
+        | PortraitEnhanceRouting
+        | undefined;
+      const buffer = await applyMockPortraitEnhance(inputBuffer, routing?.enhanceStyle ?? 'natural');
+      const sharp = (await import('sharp')).default;
+      const meta = await sharp(inputBuffer).rotate().metadata();
+      const mimeType =
+        meta.format === 'png'
+          ? 'image/png'
+          : meta.format === 'webp'
+            ? 'image/webp'
+            : 'image/jpeg';
+      await completeAiJobFromOutputBuffer(jobRow.id, buffer, mimeType);
+      return;
+    }
+
     const modelId =
-      tool.category === 'background'
+      tool.category === 'background' || tool.category === 'background_replace'
         ? 'mock-bg-removal'
         : tool.category === 'faces'
           ? 'mock-blur-faces'

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Locale } from '@/i18n';
 import type { ToolDefinition } from '@/types';
 import { getSeoSectionLabels } from '@/lib/seo/tool-sections';
@@ -17,7 +18,9 @@ export async function ToolPage({ tool, locale }: { tool: ToolDefinition; locale:
       <ToolMetaBadge tool={tool} locale={locale} />
       <p className="text-text-secondary mb-10">{copy.intro}</p>
 
-      <ToolInteractive tool={tool} userPlan={user?.plan ?? null} />
+      <Suspense fallback={<div className="min-h-[320px] rounded-lg border border-border-default bg-background-secondary/30 animate-pulse" />}>
+        <ToolInteractive tool={tool} userPlan={user?.plan ?? null} />
+      </Suspense>
 
       {copy.howItWorks ? (
         <section className="mt-16">

@@ -65,7 +65,7 @@ export const resizeTool: ToolDefinition = {
               'No. All uploaded and processed files are permanently deleted within 4 hours. Download your results before they expire.',
           },
         ],
-        keywords: ['resize image online', 'change image dimensions', 'image resizer', 'resize photo online'],
+        keywords: ['resize image online', 'change image dimensions', 'image resizer', 'resize photo online', 'emag product image', 'amazon product image size', 'shopify product image size', 'etsy image size'],
       },
       ro: {
         title: 'Redimensionare Poze Online Gratuit — Schimbă Dimensiunea în Secunde',
@@ -102,7 +102,7 @@ export const resizeTool: ToolDefinition = {
               'Nu. Toate fișierele încărcate și procesate sunt șterse permanent în cel mult 4 ore. Descarcă rezultatele înainte să expire.',
           },
         ],
-        keywords: ['redimensionare poze', 'schimba dimensiunea imaginii', 'resize poza online'],
+        keywords: ['redimensionare poze', 'schimba dimensiunea imaginii', 'resize poza online', 'dimensiune imagine emag', 'dimensiune imagine amazon', 'dimensiune produs shopify', 'dimensiune imagine etsy'],
       },
     },
   },

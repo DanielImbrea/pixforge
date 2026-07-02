@@ -7,6 +7,9 @@ export type ToolType = 'sharp' | 'ai';
 export type ToolCategory =
   | 'upscale'
   | 'background'
+  | 'background_replace'
+  | 'object_remove'
+  | 'portrait_enhance'
   | 'resize'
   | 'compress'
   | 'convert'

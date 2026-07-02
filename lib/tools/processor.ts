@@ -41,6 +41,11 @@ export interface ProcessResult {
   blurFacesModelLabel?: string;
   blurFacesRouting?: import('@/lib/ai/blur-faces-routing').BlurFacesRouting;
   blurFacesCount?: number | null;
+  portraitEnhanceReasonKey?: string;
+  portraitEnhanceWarningKey?: string;
+  portraitEnhanceModelLabel?: string;
+  portraitEnhanceStyle?: string;
+  portraitEnhanceRouting?: import('@/lib/ai/portrait-enhance-routing').PortraitEnhanceRouting;
   providerJobId?: string;
   error?: string;
   errorKey?: string;

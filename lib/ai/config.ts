@@ -30,11 +30,17 @@ export function getReplicateModel(category: ToolCategory): string {
   if (category === 'upscale') {
     return process.env.REPLICATE_UPSCALE_MODEL?.trim() || 'nightmareai/real-esrgan';
   }
-  if (category === 'background') {
+  if (category === 'background' || category === 'background_replace') {
     return getResolvedBgRemovalModels().default;
   }
   if (category === 'faces') {
     return 'browser-face-blur';
+  }
+  if (category === 'object_remove') {
+    return process.env.REPLICATE_OBJECT_REMOVE_MODEL?.trim() || 'black-forest-labs/flux-fill-dev';
+  }
+  if (category === 'portrait_enhance') {
+    return process.env.REPLICATE_PORTRAIT_ENHANCE_MODEL?.trim() || 'sczhou/codeformer';
   }
   throw new Error(`No Replicate model configured for tool category: ${category}`);
 }

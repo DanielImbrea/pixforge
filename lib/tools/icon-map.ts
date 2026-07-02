@@ -6,6 +6,7 @@ import {
   Eraser,
   Scissors,
   ScanFace,
+  Image,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -17,6 +18,7 @@ export const TOOL_ICONS: Record<string, LucideIcon> = {
   RefreshCw,
   Maximize2,
   Eraser,
+  Image,
 };
 
 export function getToolIcon(name: string): LucideIcon {

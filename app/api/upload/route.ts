@@ -9,7 +9,7 @@ import { clampResizeQuality } from '@/lib/tools/resize-params';
 import { uploadBufferToStorage } from '@/lib/supabase/storage';
 import { getFileExpiresAt } from '@/lib/storage/retention';
 import { checkRateLimit, getClientIp, maybeCleanupRateLimitStore } from '@/lib/security/rate-limit';
-import { bgRemovalParamsSchema, convertParamsSchema, resizeParamsSchema, upscaleParamsSchema, cropParamsSchema, blurFacesParamsSchema } from '@/lib/validation/schemas';
+import { bgRemovalParamsSchema, bgReplaceParamsSchema, objectRemoveParamsSchema, portraitEnhanceParamsSchema, convertParamsSchema, resizeParamsSchema, upscaleParamsSchema, cropParamsSchema, blurFacesParamsSchema } from '@/lib/validation/schemas';
 import sharp from 'sharp';
 import type { ToolDefinition, UserRow } from '@/types';
 
@@ -26,6 +26,20 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
     }
     if (tool.category === 'background') {
       return { subjectMode: 'auto', edgeQuality: 'high' };
+    }
+    if (tool.category === 'background_replace') {
+      return {
+        subjectMode: 'auto',
+        edgeQuality: 'high',
+        backgroundPreset: 'studio_soft',
+        backgroundPrompt: '',
+      };
+    }
+    if (tool.category === 'object_remove') {
+      return { brushSize: 36, editMode: 'remove', selectionTool: 'brush', inpaintPrompt: '' };
+    }
+    if (tool.category === 'portrait_enhance') {
+      return { enhanceStyle: 'natural' };
     }
     if (tool.category === 'faces') {
       return { detectionMode: 'automatic', blurStrength: 'medium', customAction: 'blur' };
@@ -70,6 +84,33 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
     const result = bgRemovalParamsSchema.safeParse(candidate);
     if (!result.success) {
       throw new ValidationError('Invalid background removal options selected.');
+    }
+    return result.data;
+  }
+
+  if (tool.category === 'background_replace') {
+    const result = bgReplaceParamsSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError('Invalid background replace options selected.');
+    }
+    if (result.data.backgroundPreset === 'custom' && !result.data.backgroundPrompt.trim()) {
+      throw new ValidationError('Custom background prompt is required.');
+    }
+    return result.data;
+  }
+
+  if (tool.category === 'object_remove') {
+    const result = objectRemoveParamsSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError('Invalid object removal options selected.');
+    }
+    return result.data;
+  }
+
+  if (tool.category === 'portrait_enhance') {
+    const result = portraitEnhanceParamsSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError('Invalid portrait enhance options selected.');
     }
     return result.data;
   }
@@ -215,6 +256,7 @@ export async function POST(req: NextRequest) {
         : parsedParams;
 
     const referenceFile = formData.get('referenceFile');
+    const maskFile = formData.get('maskFile');
     const clientProcessed =
       tool.category === 'faces' &&
       jobParams.clientProcessed === true;
@@ -258,6 +300,59 @@ export async function POST(req: NextRequest) {
           jobParams = { ...jobParams, referenceAssetId: refAsset.id };
         }
       }
+    }
+
+    if (maskFile instanceof File && tool.category === 'object_remove') {
+      const maskBuffer = Buffer.from(await maskFile.arrayBuffer());
+      if (maskFile.type !== 'image/png') {
+        await refundCredits(user, tool.creditsCost);
+        throw new ValidationError('Mask must be a PNG image.');
+      }
+      await validateUploadBuffer(maskBuffer, 'image/png', user, tool);
+      const maskMeta = await sharp(maskBuffer).metadata();
+      const { storagePath: maskPath, bucket: maskBucket } = await uploadBufferToStorage(
+        maskBuffer,
+        'uploads',
+        user.id,
+        'image/png'
+      );
+      const { data: maskStorageFile } = await admin
+        .from('storage_files')
+        .insert({
+          user_id: user.id,
+          bucket: maskBucket,
+          storage_path: maskPath,
+          mime_type: 'image/png',
+          size_bytes: maskBuffer.byteLength,
+          width_px: maskMeta.width,
+          height_px: maskMeta.height,
+          expires_at: getFileExpiresAt(),
+        })
+        .select('*')
+        .single();
+      if (maskStorageFile) {
+        const { data: maskAsset } = await admin
+          .from('image_assets')
+          .insert({
+            user_id: user.id,
+            storage_file_id: maskStorageFile.id,
+            asset_type: 'input',
+            is_watermarked: false,
+          })
+          .select('*')
+          .single();
+        if (maskAsset) {
+          jobParams = { ...jobParams, maskAssetId: maskAsset.id };
+        }
+      }
+    }
+
+    if (
+      tool.category === 'object_remove' &&
+      !jobParams.maskAssetId
+    ) {
+      await refundCredits(user, tool.creditsCost);
+      throw new ValidationError('Paint a mask over the object to remove before processing.');
     }
 
     if (

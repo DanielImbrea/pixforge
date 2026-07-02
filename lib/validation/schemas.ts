@@ -35,6 +35,36 @@ export const bgRemovalParamsSchema = z.object({
   shadowRecovery: z.boolean().default(false),
 });
 
+export const bgReplaceParamsSchema = z.object({
+  subjectMode: z.enum(['auto', 'product', 'portrait', 'object']).default('auto'),
+  edgeQuality: z.enum(['standard', 'high', 'studio']).default('high'),
+  backgroundPreset: z
+    .enum([
+      'white',
+      'studio_gray',
+      'amazon_white',
+      'studio_soft',
+      'tokyo_night',
+      'nature_jungle',
+      'sunset_beach',
+      'custom',
+    ])
+    .default('studio_soft'),
+  backgroundPrompt: z.string().max(500).default(''),
+});
+
+export const objectRemoveParamsSchema = z.object({
+  brushSize: z.number().int().min(8).max(120).default(36),
+  editMode: z.enum(['remove', 'replace']).default('remove'),
+  selectionTool: z.enum(['brush', 'click', 'select']).transform((v) => (v === 'select' ? 'click' : v)).default('brush'),
+  inpaintPrompt: z.string().max(300).default(''),
+  maskAssetId: z.string().uuid().optional(),
+});
+
+export const portraitEnhanceParamsSchema = z.object({
+  enhanceStyle: z.enum(['natural', 'glamour', 'restore']).default('natural'),
+});
+
 export const cropParamsSchema = z.object({
   left: z.number().int().min(0).max(10000),
   top: z.number().int().min(0).max(10000),

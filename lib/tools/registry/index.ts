@@ -5,6 +5,9 @@ import { compressTool } from './compress';
 import { convertTool } from './convert';
 import { upscaleTool } from './upscale';
 import { backgroundRemovalTool } from './background-removal';
+import { backgroundReplaceTool } from './background-replace';
+import { objectRemoveTool } from './object-remove';
+import { portraitEnhanceTool } from './portrait-enhance';
 
 import { cropTool } from './crop';
 import { blurFacesTool } from './blur-faces';
@@ -16,6 +19,9 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   convertTool,
   upscaleTool,
   backgroundRemovalTool,
+  backgroundReplaceTool,
+  objectRemoveTool,
+  portraitEnhanceTool,
   blurFacesTool,
 ];
 

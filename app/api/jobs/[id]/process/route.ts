@@ -1,5 +1,8 @@
 import { applyUpscalePostProcess } from '@/lib/ai/upscale-post-process';
 import { finalizeBgRemovalOutput } from '@/lib/ai/bg-removal-post-process';
+import { finalizeBgReplaceOutput } from '@/lib/ai/bg-replace-post-process';
+import { bgReplaceParamsSchema } from '@/lib/validation/schemas';
+import { DEFAULT_BG_REPLACE_PARAMS } from '@/lib/tools/bg-replace-params';
 import { fetchAsBuffer } from '@/lib/ai/fetch-image';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
@@ -84,10 +87,38 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
+  if (tool.category === 'object_remove' && existingParams.maskAssetId) {
+    const { data: maskAsset } = await admin
+      .from('image_assets')
+      .select('*, storage_files(*)')
+      .eq('id', existingParams.maskAssetId as string)
+      .single();
+    if (maskAsset?.storage_files) {
+      const maskUrl = await createSignedUrl(
+        maskAsset.storage_files.bucket,
+        maskAsset.storage_files.storage_path,
+        inputUrlTtl
+      );
+      jobForProcess = {
+        ...jobForProcess,
+        params: { ...(jobForProcess.params || {}), _maskAssetUrl: maskUrl },
+      };
+    }
+  }
+
   await admin.from('image_jobs').update({ status: 'processing' }).eq('id', jobRow.id);
 
   const processor = getProcessor(tool);
   const result = await processor.process({ job: jobForProcess, tool, inputAssetUrl });
+
+  if (tool.category === 'object_remove' && !(jobForProcess.params as Record<string, unknown>)?._maskAssetUrl) {
+    await admin
+      .from('image_jobs')
+      .update({ status: 'failed', error_message: 'Mask asset missing for object removal.' })
+      .eq('id', jobRow.id);
+    await refundFailedJob(user, jobRow);
+    return NextResponse.json({ error: 'Mask asset missing for object removal.' }, { status: 400 });
+  }
 
   if (result.status === 'failed') {
     await admin
@@ -111,6 +142,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ...(result.upscaleRouting ? { _upscaleRouting: result.upscaleRouting } : {}),
       ...(result.bgRemovalRouting ? { _bgRemovalRouting: result.bgRemovalRouting } : {}),
       ...(result.blurFacesRouting ? { _blurFacesRouting: result.blurFacesRouting } : {}),
+      ...(result.portraitEnhanceRouting
+        ? { _portraitEnhanceRouting: result.portraitEnhanceRouting }
+        : {}),
     };
 
     await admin
@@ -124,7 +158,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   let outputBuffer = result.outputBuffer;
+  let outputMimeType = result.outputMimeType;
   let bgShadowRecoveryApplied = false;
+  let bgReplaceBackgroundLabel: string | undefined;
+  let bgReplaceUsedAiGeneration = false;
   if (tool.category === 'upscale' && result.upscaleRouting && outputBuffer) {
     outputBuffer = await applyUpscalePostProcess(outputBuffer, result.upscaleRouting.postProcess);
   }
@@ -145,8 +182,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     outputBuffer = finalized.buffer;
     bgShadowRecoveryApplied = finalized.shadowRecoveryApplied;
   }
+  if (tool.category === 'background_replace' && result.bgRemovalRouting && outputBuffer) {
+    const parsed = bgReplaceParamsSchema.safeParse(jobRow.params || {});
+    const bgReplaceParams = parsed.success ? parsed.data : DEFAULT_BG_REPLACE_PARAMS;
+    const finalized = await finalizeBgReplaceOutput(outputBuffer, bgReplaceParams);
+    outputBuffer = finalized.buffer;
+    outputMimeType = 'image/jpeg';
+    bgReplaceBackgroundLabel = finalized.backgroundLabel;
+    bgReplaceUsedAiGeneration = finalized.usedAiGeneration;
+  }
 
-  if (!outputBuffer || !result.outputMimeType) {
+  if (!outputBuffer || !outputMimeType) {
     await admin
       .from('image_jobs')
       .update({ status: 'failed', error_message: 'Processor returned no output.' })
@@ -159,7 +205,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     userId: user.id,
     jobId: jobRow.id,
     outputBuffer,
-    outputMimeType: result.outputMimeType,
+    outputMimeType,
     isFreePlan: user.plan === 'free',
     toolType: tool.type,
     toolCategory: tool.category,
@@ -187,6 +233,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       bgRemovalEdgeQuality: result.bgRemovalEdgeQuality,
       bgRemovalSmartMode: result.bgRemovalSmartMode,
       bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
+      ...(bgReplaceBackgroundLabel
+        ? { bgReplaceBackgroundLabel, bgReplaceUsedAiGeneration }
+        : {}),
+      ...(tool.category === 'object_remove' ? { objectRemoveComplete: true } : {}),
+      portraitEnhanceReasonKey: result.portraitEnhanceReasonKey,
+      portraitEnhanceWarningKey: result.portraitEnhanceWarningKey,
+      portraitEnhanceModelLabel: result.portraitEnhanceModelLabel,
+      portraitEnhanceStyle: result.portraitEnhanceStyle,
       blurFacesReasonKey: result.blurFacesReasonKey,
       blurFacesModelLabel: result.blurFacesModelLabel,
     },
@@ -222,6 +276,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     bgRemovalEdgeQuality: result.bgRemovalEdgeQuality,
     bgRemovalSmartMode: result.bgRemovalSmartMode,
     bgRemovalShadowRecoveryApplied: bgShadowRecoveryApplied,
+    ...(bgReplaceBackgroundLabel ? { bgReplaceBackgroundLabel, bgReplaceUsedAiGeneration } : {}),
+    ...(tool.category === 'object_remove' ? { objectRemoveComplete: true } : {}),
+    portraitEnhanceReasonKey: result.portraitEnhanceReasonKey,
+    portraitEnhanceWarningKey: result.portraitEnhanceWarningKey,
+    portraitEnhanceModelLabel: result.portraitEnhanceModelLabel,
+    portraitEnhanceStyle: result.portraitEnhanceStyle,
     blurFacesReasonKey: result.blurFacesReasonKey,
     blurFacesModelLabel: result.blurFacesModelLabel,
   });

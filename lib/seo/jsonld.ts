@@ -15,8 +15,8 @@ export function generateHomeJsonLd(
     operatingSystem: 'Web',
     description:
       locale === 'ro'
-        ? 'Unelte AI pentru upscalare, compresie, eliminare fundal și conversie format.'
-        : 'AI image tools for upscaling, compression, background removal and conversion.',
+        ? 'Unelte AI pentru upscalare, compresie, eliminare fundal în lot și conversie format.'
+        : 'AI image tools for upscaling, compression, batch background removal and format conversion.',
     offers: {
       '@type': 'Offer',
       price: '0',

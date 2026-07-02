@@ -16,7 +16,9 @@ import {
 import type { UpscaleRouting } from '@/lib/ai/upscale-routing';
 import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
 import { resolveBlurFacesPinnedVersion } from '@/lib/ai/blur-faces-config';
+import type { PortraitEnhanceRouting } from '@/lib/ai/portrait-enhance-routing';
 import type { BlurFacesRouting } from '@/lib/ai/blur-faces-routing';
+import { resolveObjectRemoveInpaintPrompt } from '@/lib/tools/object-remove-params';
 import type { ProcessResult } from '@/lib/tools/processor';
 
 const REPLICATE_API = 'https://api.replicate.com/v1';
@@ -34,14 +36,21 @@ function resolveModelForJob(tool: ToolDefinition, job: ImageJobRow): string {
   const bgRouting = params._bgRemovalRouting as BgRemovalRouting | undefined;
   const blurRouting = params._blurFacesRouting as BlurFacesRouting | undefined;
 
+  const portraitRouting = params._portraitEnhanceRouting as PortraitEnhanceRouting | undefined;
+
   if (tool.category === 'upscale' && upscaleRouting?.model) {
     return normalizeReplicateModelSlug(upscaleRouting.model);
   }
-  if (tool.category === 'background' && bgRouting?.model) {
-    return normalizeReplicateModelSlug(bgRouting.model);
+  if (tool.category === 'background' || tool.category === 'background_replace') {
+    if (bgRouting?.model) {
+      return normalizeReplicateModelSlug(bgRouting.model);
+    }
   }
   if (tool.category === 'faces' && blurRouting?.model) {
     return normalizeReplicateModelSlug(blurRouting.model);
+  }
+  if (tool.category === 'portrait_enhance' && portraitRouting?.model) {
+    return normalizeReplicateModelSlug(portraitRouting.model);
   }
   return normalizeReplicateModelSlug(getReplicateModel(tool.category));
 }
@@ -71,7 +80,7 @@ function buildReplicateInput(
     };
   }
 
-  if (tool.category === 'background') {
+  if (tool.category === 'background' || tool.category === 'background_replace') {
     if (model.includes('rembg') && !model.includes('background-remover')) {
       return { image: inputAssetUrl };
     }
@@ -103,6 +112,52 @@ function buildReplicateInput(
     return input;
   }
 
+  if (tool.category === 'object_remove') {
+    const maskUrl = params._maskAssetUrl as string | undefined;
+    if (!maskUrl) {
+      throw new Error('Mask URL is required for object removal.');
+    }
+    const editMode =
+      params.editMode === 'replace' ? 'replace' : ('remove' as const);
+    const prompt = resolveObjectRemoveInpaintPrompt(
+      editMode,
+      typeof params.inpaintPrompt === 'string' ? params.inpaintPrompt : ''
+    );
+    return {
+      image: inputAssetUrl,
+      mask: maskUrl,
+      prompt,
+      output_format: 'jpg',
+    };
+  }
+
+  if (tool.category === 'portrait_enhance') {
+    const routing = params._portraitEnhanceRouting as PortraitEnhanceRouting | undefined;
+    if (model.includes('codeformer')) {
+      return {
+        image: inputAssetUrl,
+        codeformer_fidelity: routing?.codeformerFidelity ?? 0.55,
+        background_enhance: routing?.backgroundEnhance ?? true,
+        face_upsample: routing?.faceUpsample ?? true,
+        upscale: 1,
+      };
+    }
+    if (model.includes('gfpgan')) {
+      return {
+        img: inputAssetUrl,
+        scale: 2,
+        version: 'v1.4',
+      };
+    }
+    return {
+      image: inputAssetUrl,
+      codeformer_fidelity: routing?.codeformerFidelity ?? 0.55,
+      background_enhance: routing?.backgroundEnhance ?? true,
+      face_upsample: routing?.faceUpsample ?? true,
+      upscale: 1,
+    };
+  }
+
   throw new Error(`Replicate input not defined for category ${tool.category}`);
 }
 
@@ -117,7 +172,7 @@ export async function resolveReplicateVersion(
     return formatReplicateVersion(parsed.slug, parsed.version);
   }
 
-  if (options.toolCategory === 'background') {
+  if (options.toolCategory === 'background' || options.toolCategory === 'background_replace') {
     const envVersion = getBgRemovalVersionFromEnv();
     if (envVersion) {
       return formatReplicateVersion(parsed.slug, envVersion);

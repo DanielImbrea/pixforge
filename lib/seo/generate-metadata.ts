@@ -77,6 +77,7 @@ export function generateHomeMetadata(locale: Locale): Metadata {
         'editare imagini online',
         'upscale poze ai',
         'eliminare fundal',
+        'eliminare fundal in lot',
         'compresie imagini',
       ],
     });
@@ -94,6 +95,8 @@ export function generateHomeMetadata(locale: Locale): Metadata {
       'free ai image tools',
       'photo editor ai',
       'remove background online',
+      'batch background removal',
+      'bulk background remover',
       'image upscaler',
     ],
   });

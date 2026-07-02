@@ -7,9 +7,12 @@ import {
   computeLinkedDimension,
   computeProjectedOutputDimensions,
   estimateOutputFileSize,
+  ECOMMERCE_RESIZE_PRESETS,
   RESIZE_PERCENT_SCALES,
-  RESIZE_PRESETS,
+  SOCIAL_RESIZE_PRESETS,
+  applyResizePreset,
   type ResizeParams,
+  type ResizePreset,
 } from '@/lib/tools/resize-params';
 import { formatBytesPrecise } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
@@ -111,6 +114,41 @@ export function ResizeOptions({
     onChange({ ...value, height });
   };
 
+  const handlePresetClick = (preset: ResizePreset) => {
+    onChange(applyResizePreset(value, preset));
+  };
+
+  const renderPresetGroup = (titleKey: string, presets: ResizePreset[]) => (
+    <div className="flex flex-col gap-2">
+      <label className="text-sm font-medium text-text-primary">{t(titleKey as 'resizePresets')}</label>
+      <div className="flex flex-col gap-2">
+        {presets.map((preset) => {
+          const isActive = value.width === preset.width && value.height === preset.height;
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              className={cn(
+                'rounded-lg border px-3 py-2 text-left text-xs transition-colors',
+                isActive
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border-default text-text-secondary hover:border-border-strong hover:text-text-primary'
+              )}
+              onClick={() => handlePresetClick(preset)}
+            >
+              <span className="block font-medium">{t(preset.labelKey as 'resizePresetInstagramPost')}</span>
+              {preset.hintKey ? (
+                <span className="mt-0.5 block text-[11px] opacity-80">
+                  {t(preset.hintKey as 'resizePresetAmazonHint')}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       {originalDimensions && (
@@ -160,26 +198,9 @@ export function ResizeOptions({
         </label>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-text-primary">{t('resizePresets')}</label>
-        <div className="flex flex-wrap gap-2">
-          {RESIZE_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              className={cn(
-                'rounded-full border px-2.5 py-1 text-[11px] transition-colors',
-                value.width === preset.width && value.height === preset.height
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-border-default text-text-secondary hover:border-border-strong'
-              )}
-              onClick={() => onChange({ ...value, width: preset.width, height: preset.height })}
-            >
-              {t(preset.labelKey as 'resizePresetInstagramPost')}
-            </button>
-          ))}
-        </div>
-      </div>
+      {renderPresetGroup('resizeEcommercePresets', ECOMMERCE_RESIZE_PRESETS)}
+
+      {renderPresetGroup('resizePresets', SOCIAL_RESIZE_PRESETS)}
 
       {originalDimensions && (
         <div className="flex flex-col gap-2">

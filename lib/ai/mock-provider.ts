@@ -3,10 +3,15 @@ import crypto from 'crypto';
 import type { ImageJobRow, ToolDefinition } from '@/types';
 import type { ProcessResult } from '@/lib/tools/processor';
 import { fetchAsBuffer } from '@/lib/ai/fetch-image';
+import { applyMockObjectRemove } from '@/lib/ai/object-remove-inpaint';
+import { applyMockPortraitEnhance } from '@/lib/ai/portrait-enhance-process';
+import type { PortraitEnhanceRouting } from '@/lib/ai/portrait-enhance-routing';
 import { getAppUrl } from '@/lib/ai/config';
 
 function resolveMockModelId(tool: ToolDefinition): string {
-  if (tool.category === 'background') return 'mock-bg-removal';
+  if (tool.category === 'background' || tool.category === 'background_replace') return 'mock-bg-removal';
+  if (tool.category === 'object_remove') return 'mock-object-remove';
+  if (tool.category === 'portrait_enhance') return 'mock-portrait-enhance';
   if (tool.category === 'upscale') return 'mock-upscale';
   if (tool.category === 'faces') return 'mock-blur-faces';
   return tool.processorConfig.aiModelId || 'mock-default';
@@ -113,6 +118,40 @@ export async function submitMockJob(
   inputAssetUrl: string
 ): Promise<ProcessResult> {
   try {
+    if (tool.category === 'object_remove') {
+      const maskUrl = (job.params as Record<string, unknown> | undefined)?._maskAssetUrl as
+        | string
+        | undefined;
+      if (!maskUrl) {
+        return { status: 'failed', error: 'Mask is required for object removal.' };
+      }
+      const [inputBuffer, maskBuffer] = await Promise.all([
+        fetchAsBuffer(inputAssetUrl),
+        fetchAsBuffer(maskUrl),
+      ]);
+      const outputBuffer = await applyMockObjectRemove(inputBuffer, maskBuffer);
+      return { status: 'done', outputBuffer, outputMimeType: 'image/jpeg' };
+    }
+
+    if (tool.category === 'portrait_enhance') {
+      const routing = (job.params as Record<string, unknown> | undefined)?._portraitEnhanceRouting as
+        | PortraitEnhanceRouting
+        | undefined;
+      const inputBuffer = await fetchAsBuffer(inputAssetUrl);
+      const outputBuffer = await applyMockPortraitEnhance(
+        inputBuffer,
+        routing?.enhanceStyle ?? 'natural'
+      );
+      const meta = await (await import('sharp')).default(inputBuffer).rotate().metadata();
+      const mimeType =
+        meta.format === 'png'
+          ? 'image/png'
+          : meta.format === 'webp'
+            ? 'image/webp'
+            : 'image/jpeg';
+      return { status: 'done', outputBuffer, outputMimeType: mimeType };
+    }
+
     const modelId = resolveMockModelId(tool);
     const inputBuffer = await fetchAsBuffer(inputAssetUrl);
     const { buffer, mimeType } = await applyMockAiTransform(

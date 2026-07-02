@@ -3,6 +3,7 @@ import { resolveBlurFacesRoute } from '@/lib/ai/blur-faces-routing';
 import { resolveBgRemovalRoute } from '@/lib/ai/bg-removal-routing';
 import { submitMockJob } from '@/lib/ai/mock-provider';
 import { submitReplicateJob } from '@/lib/ai/replicate-client';
+import { resolvePortraitEnhanceRoute } from '@/lib/ai/portrait-enhance-routing';
 import { resolveUpscaleRoute, type UpscaleScaleInput } from '@/lib/ai/upscale-routing';
 import type { BgEdgeQuality, BgSubjectModeInput } from '@/lib/tools/bg-removal-params';
 import { classifyImageContent } from '@/lib/image/classify-content';
@@ -92,9 +93,32 @@ export const aiProcessor: ToolProcessor = {
     let workingJob = job;
     let toolMeta: Partial<ProcessResult> = {};
 
-    if (tool.category === 'upscale' || tool.category === 'background') {
+    if (
+      tool.category === 'upscale' ||
+      tool.category === 'background' ||
+      tool.category === 'background_replace' ||
+      tool.category === 'portrait_enhance'
+    ) {
       const buffer = await fetchAsBuffer(inputAssetUrl);
       const profile = await classifyImageContent(buffer);
+
+      if (tool.category === 'portrait_enhance') {
+        const routing = resolvePortraitEnhanceRoute(profile, params);
+
+        workingJob = {
+          ...job,
+          params: { ...params, _portraitEnhanceRouting: routing },
+        };
+
+        toolMeta = {
+          contentKind: profile.kind,
+          portraitEnhanceReasonKey: routing.reasonKey,
+          portraitEnhanceWarningKey: routing.warningKey,
+          portraitEnhanceModelLabel: routing.modelLabel,
+          portraitEnhanceStyle: routing.enhanceStyle,
+          portraitEnhanceRouting: routing,
+        };
+      }
 
       if (tool.category === 'upscale') {
         const dimensions = await readImageDimensions(buffer);
@@ -120,7 +144,7 @@ export const aiProcessor: ToolProcessor = {
         };
       }
 
-      if (tool.category === 'background') {
+      if (tool.category === 'background' || tool.category === 'background_replace') {
         const bgParams = parseBgRemovalParams(params);
         const routing = resolveBgRemovalRoute(profile, bgParams);
 

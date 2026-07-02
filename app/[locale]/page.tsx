@@ -4,6 +4,8 @@ import { getTranslations } from 'next-intl/server';
 import type { Metadata } from 'next';
 import type { Locale } from '@/i18n';
 import { getCurrentUser } from '@/lib/supabase/server';
+import { LandingEcommercePresets } from '@/components/marketplace/landing-ecommerce-presets';
+import { LandingBatchBg } from '@/components/marketplace/landing-batch-bg';
 import { LandingDemoShowcase } from '@/components/marketplace/landing-demo-showcase';
 import { LandingRealExamples } from '@/components/marketplace/landing-real-examples';
 import { LandingKeywordStrip } from '@/components/marketplace/landing-popular-tools';
@@ -124,6 +126,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
 
       <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default" aria-labelledby="examples-heading">
         <LandingRealExamples />
+      </section>
+
+      <section className="max-w-6xl mx-auto px-6 pb-16 border-t border-border-default">
+        <LandingBatchBg locale={locale} />
+      </section>
+
+      <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default">
+        <LandingEcommercePresets locale={locale} />
       </section>
 
       <section className="max-w-6xl mx-auto px-6 py-16 border-t border-border-default" aria-labelledby="why-heading">
