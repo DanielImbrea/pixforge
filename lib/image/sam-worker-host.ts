@@ -154,14 +154,20 @@ export async function segmentSamAtClick(
 }
 
 const ASSIST_OFFSETS = [
-  [20, 0],
-  [-20, 0],
-  [0, 20],
-  [0, -20],
-  [14, 14],
-  [-14, -14],
-  [14, -14],
-  [-14, 14],
+  [24, 0],
+  [-24, 0],
+  [0, 24],
+  [0, -24],
+  [0, -60],
+  [0, 60],
+  [0, -120],
+  [0, 120],
+  [40, 0],
+  [-40, 0],
+  [18, 18],
+  [-18, -18],
+  [18, -18],
+  [-18, 18],
 ] as const;
 
 /**
@@ -192,6 +198,27 @@ export async function segmentSamAtClickWithAssist(
       quality = retry.quality;
     }
     if (retry.quality.acceptable) break;
+  }
+
+  if (!quality.acceptable) {
+    const bodyOffsets = [
+      [0, -160],
+      [0, 160],
+      [0, -240],
+      [0, 240],
+    ] as const;
+    for (const [dx, dy] of bodyOffsets) {
+      const nx = Math.max(0, Math.min(imageWidth - 1, point.x + dx));
+      const ny = Math.max(0, Math.min(imageHeight - 1, point.y + dy));
+      mask = await segmentSamAtClick(source, { x: nx, y: ny }, 'include');
+      if (!mask) continue;
+      const retryScaled = resizeSamMaskToImage(mask, imageWidth, imageHeight);
+      const retry = postprocessSamMask(retryScaled, point);
+      if (retry.quality.score > quality.score) {
+        quality = retry.quality;
+      }
+      if (retry.quality.acceptable) break;
+    }
   }
 
   return mask;

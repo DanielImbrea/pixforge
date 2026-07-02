@@ -4,7 +4,7 @@ import {
   countBinaryPixels,
   dilateBinary,
   fillHolesBinary,
-  keepComponentAtPoint,
+  keepObjectClusterAtClick,
   removeSmallComponents,
   samAlphaToBinary,
   type MaskMorphGrid,
@@ -29,11 +29,17 @@ export interface PostprocessSamMaskOptions {
   aggressive?: boolean;
 }
 
-const DEFAULT_CLOSE = 3;
-const AGGRESSIVE_CLOSE = 5;
-const DEFAULT_PREVIEW_DILATE = 2;
-const MIN_COVERAGE_RATIO = 0.0008;
-const MIN_CLICK_COVERAGE = 0.0003;
+const DEFAULT_CLOSE = 5;
+const AGGRESSIVE_CLOSE = 10;
+const DEFAULT_PREVIEW_DILATE = 3;
+const MIN_COVERAGE_RATIO = 0.0012;
+const MIN_CLICK_COVERAGE = 0.0005;
+
+function resolveCloseRadius(width: number, height: number, aggressive: boolean): number {
+  const scaled = Math.max(5, Math.round(Math.min(width, height) * 0.012));
+  const capped = Math.min(aggressive ? 22 : 16, scaled);
+  return aggressive ? Math.max(capped, AGGRESSIVE_CLOSE) : Math.max(capped, DEFAULT_CLOSE);
+}
 
 function assessQuality(
   mask: MaskMorphGrid,
@@ -62,19 +68,20 @@ function runPipeline(
   options: PostprocessSamMaskOptions
 ): MaskMorphGrid {
   const { width, height } = samMask;
-  const minComponent = options.minComponentArea ?? Math.max(48, Math.round(width * height * 0.00015));
-  const closeRadius = options.aggressive
-    ? (options.closeRadius ?? AGGRESSIVE_CLOSE)
-    : (options.closeRadius ?? DEFAULT_CLOSE);
+  const minComponent = options.minComponentArea ?? Math.max(32, Math.round(width * height * 0.00008));
+  const closeRadius =
+    options.closeRadius ??
+    resolveCloseRadius(width, height, Boolean(options.aggressive));
   const previewDilate = options.previewDilatePx ?? DEFAULT_PREVIEW_DILATE;
 
   let grid = samAlphaToBinary(samMask.data, width, height);
   grid = closeBinary(grid, closeRadius);
   grid = fillHolesBinary(grid);
-  grid = keepComponentAtPoint(grid, click.x, click.y);
+  grid = closeBinary(grid, Math.max(2, Math.round(closeRadius * 0.6)));
+  grid = keepObjectClusterAtClick(grid, click.x, click.y);
   grid = removeSmallComponents(grid, minComponent);
   grid = fillHolesBinary(grid);
-  grid = closeBinary(grid, Math.max(1, closeRadius - 1));
+  grid = closeBinary(grid, Math.max(2, Math.round(closeRadius * 0.5)));
 
   if (previewDilate > 0) {
     grid = dilateBinary(grid, previewDilate);
@@ -96,7 +103,7 @@ export function postprocessSamMask(
   let quality = assessQuality(grid, click);
 
   if (!quality.acceptable) {
-    grid = runPipeline(samMask, click, { ...options, aggressive: true, closeRadius: AGGRESSIVE_CLOSE });
+    grid = runPipeline(samMask, click, { ...options, aggressive: true });
     const retryQuality = assessQuality(grid, click);
     if (retryQuality.score >= quality.score) {
       quality = retryQuality;

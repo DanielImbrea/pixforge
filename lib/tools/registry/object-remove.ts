@@ -17,7 +17,7 @@ export const objectRemoveTool: ToolDefinition = {
   enabledOnPlans: ['free', 'basic', 'starter', 'pro'],
   processorConfig: {
     aiProvider: 'replicate',
-    aiModelId: 'black-forest-labs/flux-fill-dev',
+    aiModelId: 'black-forest-labs/flux-fill-pro',
     aiWebhookPath: '/api/webhooks/ai-provider',
   },
   limits: {

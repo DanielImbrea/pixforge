@@ -7,7 +7,7 @@ import { resolveReplicateVersion, extractReplicateOutputUrl, runReplicatePredict
 import { createSignedUrl, deleteFromStorage, uploadBufferToStorage } from '@/lib/supabase/storage';
 
 function getObjectRemoveModel(): string {
-  return process.env.REPLICATE_OBJECT_REMOVE_MODEL?.trim() || 'black-forest-labs/flux-fill-dev';
+  return process.env.REPLICATE_OBJECT_REMOVE_MODEL?.trim() || 'black-forest-labs/flux-fill-pro';
 }
 
 export async function applyMockObjectRemove(imageBuffer: Buffer, maskBuffer: Buffer): Promise<Buffer> {

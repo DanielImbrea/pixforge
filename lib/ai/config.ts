@@ -37,7 +37,7 @@ export function getReplicateModel(category: ToolCategory): string {
     return 'browser-face-blur';
   }
   if (category === 'object_remove') {
-    return process.env.REPLICATE_OBJECT_REMOVE_MODEL?.trim() || 'black-forest-labs/flux-fill-dev';
+    return process.env.REPLICATE_OBJECT_REMOVE_MODEL?.trim() || 'black-forest-labs/flux-fill-pro';
   }
   if (category === 'portrait_enhance') {
     return process.env.REPLICATE_PORTRAIT_ENHANCE_MODEL?.trim() || 'sczhou/codeformer';

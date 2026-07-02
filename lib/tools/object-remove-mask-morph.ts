@@ -174,19 +174,128 @@ export function keepComponentAtPoint(mask: MaskMorphGrid, x: number, y: number):
   const py = Math.max(0, Math.min(height - 1, Math.round(y)));
   const start = py * width + px;
 
-  if (!data[start]) {
-    return { data: new Uint8Array(data.length), width, height };
+  const labels = labelComponents(mask);
+
+  let target = data[start] ? labels[start] : 0;
+  if (!target) {
+    const searchR = Math.max(24, Math.round(Math.min(width, height) * 0.04));
+    let bestDist = searchR * searchR + 1;
+    for (let dy = -searchR; dy <= searchR; dy++) {
+      for (let dx = -searchR; dx <= searchR; dx++) {
+        const nx = px + dx;
+        const ny = py + dy;
+        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+        const i = ny * width + nx;
+        if (!data[i]) continue;
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          target = labels[i];
+        }
+      }
+    }
   }
 
-  const labels = labelComponents(mask);
-  const target = labels[start];
-  if (target === 0) {
+  if (!target) {
     return { data: new Uint8Array(data.length), width, height };
   }
 
   const out = new Uint8Array(data.length);
   for (let i = 0; i < data.length; i++) {
     out[i] = labels[i] === target ? 1 : 0;
+  }
+  return { data: out, width, height };
+}
+
+interface BBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+function componentBboxes(
+  labels: Int32Array,
+  width: number,
+  height: number
+): Map<number, BBox> {
+  const boxes = new Map<number, BBox>();
+  for (let i = 0; i < labels.length; i++) {
+    const label = labels[i];
+    if (label === 0) continue;
+    const x = i % width;
+    const y = (i / width) | 0;
+    const box = boxes.get(label);
+    if (!box) {
+      boxes.set(label, { minX: x, minY: y, maxX: x, maxY: y });
+      continue;
+    }
+    box.minX = Math.min(box.minX, x);
+    box.minY = Math.min(box.minY, y);
+    box.maxX = Math.max(box.maxX, x);
+    box.maxY = Math.max(box.maxY, y);
+  }
+  return boxes;
+}
+
+function bboxesOverlap(a: BBox, b: BBox): boolean {
+  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+}
+
+function expandBBox(box: BBox, pad: number, width: number, height: number): BBox {
+  return {
+    minX: Math.max(0, box.minX - pad),
+    minY: Math.max(0, box.minY - pad),
+    maxX: Math.min(width - 1, box.maxX + pad),
+    maxY: Math.min(height - 1, box.maxY + pad),
+  };
+}
+
+/**
+ * Keep the clicked component plus nearby fragments (e.g. vacuum wand + body).
+ * Bridges thin gaps via prior morphological close, then unions intersecting bboxes.
+ */
+export function keepObjectClusterAtClick(
+  mask: MaskMorphGrid,
+  x: number,
+  y: number
+): MaskMorphGrid {
+  const { width, height, data } = mask;
+  const core = keepComponentAtPoint(mask, x, y);
+  if (countBinaryPixels(core) === 0) return core;
+
+  const labels = labelComponents(mask);
+  const boxes = componentBboxes(labels, width, height);
+
+  let primaryLabel = 0;
+  const px = Math.max(0, Math.min(width - 1, Math.round(x)));
+  const py = Math.max(0, Math.min(height - 1, Math.round(y)));
+  if (data[py * width + px]) {
+    primaryLabel = labels[py * width + px];
+  } else {
+    for (let i = 0; i < data.length; i++) {
+      if (core.data[i]) {
+        primaryLabel = labels[i];
+        break;
+      }
+    }
+  }
+
+  const primaryBox = primaryLabel ? boxes.get(primaryLabel) : undefined;
+  if (!primaryBox) return core;
+
+  const pad = Math.max(64, Math.round(Math.min(width, height) * 0.22));
+  const searchBox = expandBBox(primaryBox, pad, width, height);
+
+  const keep = new Set<number>();
+  for (const [label, box] of boxes) {
+    if (bboxesOverlap(box, searchBox)) keep.add(label);
+  }
+
+  const out = new Uint8Array(data.length);
+  for (let i = 0; i < data.length; i++) {
+    const label = labels[i];
+    out[i] = label > 0 && keep.has(label) ? 1 : 0;
   }
   return { data: out, width, height };
 }

@@ -211,7 +211,7 @@ export const aiProcessor: ToolProcessor = {
         const mapped = mapReplicateError(err, {
           jobId: job.id,
           toolCategory: tool.category,
-          model: process.env.REPLICATE_OBJECT_REMOVE_MODEL || 'black-forest-labs/flux-fill-dev',
+          model: process.env.REPLICATE_OBJECT_REMOVE_MODEL || 'black-forest-labs/flux-fill-pro',
         });
         console.error(mapped.logMessage, mapped.logContext);
         return {
