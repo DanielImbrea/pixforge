@@ -166,7 +166,8 @@ export function getFaceMatchThreshold(): number {
 async function loadFaceApiModule(): Promise<FaceApiModule> {
   if (faceapi) return faceapi;
 
-  faceapi = await import('@vladmandic/face-api/dist/face-api.esm.js');
+  const mod = await import('@vladmandic/face-api');
+  faceapi = ((mod as { default?: FaceApiModule }).default ?? mod) as FaceApiModule;
 
   faceapi.env.monkeyPatch({
     Canvas: NodeCanvas as unknown as typeof HTMLCanvasElement,

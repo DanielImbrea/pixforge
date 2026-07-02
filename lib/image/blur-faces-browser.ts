@@ -46,7 +46,9 @@ function expandBox(
 async function loadFaceApiModule(): Promise<FaceApiModule> {
   if (faceapi) return faceapi;
   // Must use the browser ESM build — default package entry resolves to node build in webpack.
-  faceapi = await import('@vladmandic/face-api/dist/face-api.esm.js');
+  faceapi = await import('@vladmandic/face-api');
+  const api = ((faceapi as { default?: FaceApiModule }).default ?? faceapi) as FaceApiModule;
+  faceapi = api;
   if (!tfReadyPromise) {
     tfReadyPromise = (async () => {
       const tf = faceapi!.tf as FaceApiModule['tf'] & {
