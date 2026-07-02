@@ -2,8 +2,7 @@
 
 import { SamSegmentError } from '@/lib/image/sam-segment-error';
 
-import { postprocessSamMask } from '@/lib/tools/object-remove-sam-postprocess';
-import { resizeSamMaskToImage } from '@/lib/tools/object-remove-mask';
+import { postprocessSamMask, postprocessSamMaskForHover } from '@/lib/tools/object-remove-sam-postprocess';
 
 export type SamClickType = 'include' | 'exclude';
 
@@ -14,6 +13,7 @@ let minisamModule: MinisamModule | null = null;
 let initPromise: Promise<void> | null = null;
 let samImage: HTMLImageElement | null = null;
 let activeSession: SegmentationSession | null = null;
+let hoverSession: SegmentationSession | null = null;
 let embeddingReady = false;
 
 const SAM_INIT_TIMEOUT_MS = 60_000;
@@ -100,6 +100,8 @@ export async function prepareSamImage(imageUrl: string): Promise<void> {
   mod.clearAllSessions();
   activeSession?.dispose();
   activeSession = null;
+  hoverSession?.dispose();
+  hoverSession = null;
 
   await withTimeout(
     mod.precomputeEmbedding(img),
@@ -114,6 +116,8 @@ export function resetSamSession(): void {
   samImage = null;
   activeSession?.dispose();
   activeSession = null;
+  hoverSession?.dispose();
+  hoverSession = null;
   clearSamHoverCache();
   if (minisamModule) {
     minisamModule.clearEmbeddingCache();
@@ -154,8 +158,7 @@ export function commitSamClickForUndo(
 }
 
 /**
- * Stateless hover segment — does not mutate the committed click session.
- * Uses cell cache + generation token for cancel / skip redraw.
+ * Hover segment via dedicated session — reuses cached embedding, no click-session pollution.
  */
 export async function segmentSamAtHover(
   point: { x: number; y: number },
@@ -169,8 +172,12 @@ export async function segmentSamAtHover(
   const cellKey = hoverCellKey(point.x, point.y);
 
   if (hoverSegmentCache?.cellKey === cellKey) {
-    const scaled = resizeSamMaskToImage(hoverSegmentCache.rawMask, imageWidth, imageHeight);
-    const { mask: processed } = postprocessSamMask(scaled, point);
+    const processed = postprocessSamMaskForHover(
+      hoverSegmentCache.rawMask,
+      point,
+      imageWidth,
+      imageHeight
+    );
     return { processed, point };
   }
 
@@ -180,20 +187,22 @@ export async function segmentSamAtHover(
 
   if (generation !== hoverGeneration) return null;
 
+  if (!hoverSession) {
+    hoverSession = mod.createSession(samImage);
+  }
+  hoverSession.reset();
+  hoverSession.addClick(Math.round(point.x), Math.round(point.y), 'include');
+
   const rawMask = await withTimeout(
-    mod.segment({
-      image: samImage,
-      clicks: [{ x: Math.round(point.x), y: Math.round(point.y), clickType: 1 }],
-    }),
+    hoverSession.segment(samImage),
     SAM_SEGMENT_TIMEOUT_MS,
     'Smart selection preview timed out.'
   );
 
-  if (generation !== hoverGeneration) return null;
+  if (generation !== hoverGeneration || !rawMask) return null;
 
   hoverSegmentCache = { cellKey, rawMask };
-  const scaled = resizeSamMaskToImage(rawMask, imageWidth, imageHeight);
-  const { mask: processed } = postprocessSamMask(scaled, point);
+  const processed = postprocessSamMaskForHover(rawMask, point, imageWidth, imageHeight);
   return { processed, point };
 }
 
@@ -229,18 +238,10 @@ export async function segmentSamAtClick(
 const ASSIST_OFFSETS = [
   [24, 0],
   [-24, 0],
-  [0, 24],
-  [0, -24],
-  [0, -60],
-  [0, 60],
-  [0, -120],
-  [0, 120],
-  [40, 0],
-  [-40, 0],
-  [18, 18],
-  [-18, -18],
-  [18, -18],
-  [-18, 18],
+  [0, -48],
+  [0, 48],
+  [0, -100],
+  [0, 100],
 ] as const;
 
 /**
@@ -256,8 +257,10 @@ export async function segmentSamAtClickWithAssist(
   let mask = await segmentSamAtClick(source, point, clickType);
   if (!mask || clickType === 'exclude') return mask;
 
-  const scaled = resizeSamMaskToImage(mask, imageWidth, imageHeight);
-  let { quality } = postprocessSamMask(scaled, point);
+  const { quality } = postprocessSamMask(mask, point, {
+    targetWidth: imageWidth,
+    targetHeight: imageHeight,
+  });
   if (quality.acceptable) return mask;
 
   for (const [dx, dy] of ASSIST_OFFSETS) {
@@ -265,33 +268,11 @@ export async function segmentSamAtClickWithAssist(
     const ny = Math.max(0, Math.min(imageHeight - 1, point.y + dy));
     mask = await segmentSamAtClick(source, { x: nx, y: ny }, 'include');
     if (!mask) continue;
-    const retryScaled = resizeSamMaskToImage(mask, imageWidth, imageHeight);
-    const retry = postprocessSamMask(retryScaled, point);
-    if (retry.quality.score > quality.score) {
-      quality = retry.quality;
-    }
+    const retry = postprocessSamMask(mask, point, {
+      targetWidth: imageWidth,
+      targetHeight: imageHeight,
+    });
     if (retry.quality.acceptable) break;
-  }
-
-  if (!quality.acceptable) {
-    const bodyOffsets = [
-      [0, -160],
-      [0, 160],
-      [0, -240],
-      [0, 240],
-    ] as const;
-    for (const [dx, dy] of bodyOffsets) {
-      const nx = Math.max(0, Math.min(imageWidth - 1, point.x + dx));
-      const ny = Math.max(0, Math.min(imageHeight - 1, point.y + dy));
-      mask = await segmentSamAtClick(source, { x: nx, y: ny }, 'include');
-      if (!mask) continue;
-      const retryScaled = resizeSamMaskToImage(mask, imageWidth, imageHeight);
-      const retry = postprocessSamMask(retryScaled, point);
-      if (retry.quality.score > quality.score) {
-        quality = retry.quality;
-      }
-      if (retry.quality.acceptable) break;
-    }
   }
 
   return mask;

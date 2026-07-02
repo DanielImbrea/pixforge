@@ -151,7 +151,8 @@ export const backgroundReplaceTool: ToolDefinition = {
     },
   },
   icon: 'Image',
-  enabled: true,
+  /** Hidden from production until background replace quality is ready — set to true to re-enable. */
+  enabled: false,
   order: 7,
   badge: 'new',
 };

@@ -287,6 +287,8 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       void (async () => {
         try {
           await preloadSamModels();
+          // Let the image paint before the heavy embedding pass blocks the main thread.
+          await new Promise<void>((resolve) => setTimeout(resolve, 80));
           await prepareSamImage(imageUrl);
           setSamEmbeddingReady(true);
         } catch (err) {
@@ -318,8 +320,8 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         if (
           selectionTool !== 'click' ||
           isEditingDisabled ||
-          !samEmbeddingReady ||
-          segmenting
+          brushMode === 'erase' ||
+          (!samEmbeddingReady && !isSamEmbeddingReady())
         ) {
           return;
         }
@@ -365,11 +367,11 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         }, HOVER_DEBOUNCE_MS);
       },
       [
+        brushMode,
         imageHeight,
         imageWidth,
         isEditingDisabled,
         samEmbeddingReady,
-        segmenting,
         selectionTool,
       ]
     );
@@ -661,6 +663,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
 
     const handlePointerDown = (event: React.PointerEvent) => {
       if (event.button !== 0 || isEditingDisabled) return;
+      if (selectionTool === 'click' && samLoading) return;
       event.preventDefault();
       const point = toImageCoords(event.clientX, event.clientY);
 
@@ -903,6 +906,14 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
           {isErasing ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35">
               <Loader2 className="h-8 w-8 animate-spin text-white" aria-hidden />
+            </div>
+          ) : null}
+          {!isPreviewing && selectionTool === 'click' && samLoading ? (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/25">
+              <Loader2 className="h-6 w-6 animate-spin text-white" aria-hidden />
+              <p className="rounded-full bg-black/55 px-3 py-1 text-xs text-white">
+                {t('objectRemoveSamLoading')}
+              </p>
             </div>
           ) : null}
           <canvas ref={maskCanvasRef} className="hidden" aria-hidden />

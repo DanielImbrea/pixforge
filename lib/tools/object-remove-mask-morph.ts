@@ -284,7 +284,7 @@ export function keepObjectClusterAtClick(
   const primaryBox = primaryLabel ? boxes.get(primaryLabel) : undefined;
   if (!primaryBox) return core;
 
-  const pad = Math.max(64, Math.round(Math.min(width, height) * 0.22));
+  const pad = Math.max(40, Math.round(Math.min(width, height) * 0.1));
   const searchBox = expandBBox(primaryBox, pad, width, height);
 
   const keep = new Set<number>();

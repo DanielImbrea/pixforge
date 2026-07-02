@@ -4,7 +4,7 @@ import { getToolById } from '@/lib/tools/registry';
 /** Display order on the home page — AI tools first. */
 export const LANDING_TOOL_IDS = [
   'tool_background_removal',
-  'tool_background_replace',
+  // 'tool_background_replace', // Temporarily hidden — WIP, re-enable when ready
   'tool_object_remove',
   'tool_portrait_enhance',
   'tool_upscale_ai',
@@ -40,6 +40,6 @@ export const LANDING_HERO_TOOLS: { id: (typeof LANDING_TOOL_IDS)[number] | 'tool
 
 export function getLandingToolsOrdered(): ToolDefinition[] {
   return LANDING_TOOL_IDS.map((id) => getToolById(id)).filter(
-    (tool): tool is ToolDefinition => Boolean(tool)
+    (tool): tool is ToolDefinition => Boolean(tool?.enabled)
   );
 }
