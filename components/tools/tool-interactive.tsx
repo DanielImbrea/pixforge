@@ -272,7 +272,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [objectRemoveParams, setObjectRemoveParams] = useState(DEFAULT_OBJECT_REMOVE_PARAMS);
   const [portraitEnhanceParams, setPortraitEnhanceParams] = useState(DEFAULT_PORTRAIT_ENHANCE_PARAMS);
   const [hasObjectRemoveMask, setHasObjectRemoveMask] = useState(false);
-  const [hasObjectRemoveSelectionLocked, setHasObjectRemoveSelectionLocked] = useState(false);
+  const [objectRemovePreviewUrl, setObjectRemovePreviewUrl] = useState<string | null>(null);
+  const [objectRemoveErasing, setObjectRemoveErasing] = useState(false);
+  const objectRemovePreviewUrlRef = useRef<string | null>(null);
   const objectRemoveEditorRef = useRef<ObjectRemoveEditorHandle>(null);
   const [cropParams, setCropParams] = useState<CropParams>(DEFAULT_CROP_PARAMS);
   const [blurFacesParams, setBlurFacesParams] = useState(DEFAULT_BLUR_FACES_PARAMS);
@@ -394,6 +396,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
 
   const clearSelectedFile = useCallback(() => {
     if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    if (objectRemovePreviewUrlRef.current) {
+      URL.revokeObjectURL(objectRemovePreviewUrlRef.current);
+      objectRemovePreviewUrlRef.current = null;
+    }
+    setObjectRemovePreviewUrl(null);
     setSelectedFile(null);
     setFilePreviewUrl(null);
     setOriginalImageMeta(null);
@@ -408,7 +415,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       setValidationErrorKey(null);
       setErrorMessage(null);
       setHasObjectRemoveMask(false);
-      setHasObjectRemoveSelectionLocked(false);
+      if (objectRemovePreviewUrlRef.current) {
+        URL.revokeObjectURL(objectRemovePreviewUrlRef.current);
+        objectRemovePreviewUrlRef.current = null;
+      }
+      setObjectRemovePreviewUrl(null);
       void readImageDimensionsFromFile(file).then((dimensions) => {
         if (dimensions) {
           setOriginalImageMeta({
@@ -558,6 +569,111 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     [tool.id, t, waitForJobDone, parseApiError]
   );
 
+  const revokeObjectRemovePreview = useCallback(() => {
+    if (objectRemovePreviewUrlRef.current) {
+      URL.revokeObjectURL(objectRemovePreviewUrlRef.current);
+      objectRemovePreviewUrlRef.current = null;
+    }
+    setObjectRemovePreviewUrl(null);
+  }, []);
+
+  const handleObjectRemoveErase = useCallback(async () => {
+    if (!selectedFile || objectRemoveErasing || objectRemovePreviewUrl) return;
+
+    const rawParams = buildToolParams(
+      tool,
+      resizeParams,
+      upscaleParams,
+      convertParams,
+      bgRemovalParams,
+      compressParams,
+      cropParams,
+      blurFacesParams,
+      bgReplaceParams,
+      objectRemoveParams,
+      portraitEnhanceParams
+    );
+    const validation = validateToolParams(tool, rawParams, {
+      referenceFilePresent: Boolean(referenceFile),
+      maskFilePresent: hasObjectRemoveMask,
+    });
+
+    if (!validation.valid) {
+      setValidationErrorKey(validation.errorKey || 'validationGeneric');
+      return;
+    }
+
+    const maskFile = (await objectRemoveEditorRef.current?.exportMaskFile()) ?? null;
+    if (!maskFile) {
+      setValidationErrorKey('validationObjectRemoveMaskRequired');
+      return;
+    }
+
+    setValidationErrorKey(null);
+    setErrorMessage(null);
+    setObjectRemoveErasing(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('maskFile', maskFile);
+      formData.append('params', JSON.stringify(validation.params));
+
+      const previewRes = await fetch('/api/object-remove/preview', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!previewRes.ok) {
+        const body = await previewRes.json().catch(() => ({}));
+        throw new Error(parseApiError(body, t('errorProcessingFailed')));
+      }
+
+      const blob = await previewRes.blob();
+      revokeObjectRemovePreview();
+      const url = URL.createObjectURL(blob);
+      objectRemovePreviewUrlRef.current = url;
+      setObjectRemovePreviewUrl(url);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : t('errorGeneric'));
+    } finally {
+      setObjectRemoveErasing(false);
+    }
+  }, [
+    selectedFile,
+    objectRemoveErasing,
+    objectRemovePreviewUrl,
+    tool,
+    resizeParams,
+    upscaleParams,
+    convertParams,
+    bgRemovalParams,
+    compressParams,
+    cropParams,
+    blurFacesParams,
+    bgReplaceParams,
+    objectRemoveParams,
+    portraitEnhanceParams,
+    referenceFile,
+    hasObjectRemoveMask,
+    parseApiError,
+    revokeObjectRemovePreview,
+    t,
+  ]);
+
+  const handleObjectRemoveRevert = useCallback(() => {
+    revokeObjectRemovePreview();
+  }, [revokeObjectRemovePreview]);
+
+  const handleObjectRemovePreviewDownload = useCallback(() => {
+    if (!objectRemovePreviewUrl || !selectedFile) return;
+    const baseName = selectedFile.name.replace(/\.[^.]+$/, '') || 'image';
+    const link = document.createElement('a');
+    link.href = objectRemovePreviewUrl;
+    link.download = `${baseName}-removed.jpg`;
+    link.click();
+  }, [objectRemovePreviewUrl, selectedFile]);
+
   const handleProcess = useCallback(async () => {
     if (isSubmitting) return;
     if (!selectedFile) {
@@ -581,7 +697,6 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     const validation = validateToolParams(tool, rawParams, {
       referenceFilePresent: Boolean(referenceFile),
       maskFilePresent: hasObjectRemoveMask,
-      maskSelectionLocked: isObjectRemoveTool ? hasObjectRemoveSelectionLocked : undefined,
     });
 
     if (!validation.valid) {
@@ -601,13 +716,6 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       let maskFile: File | null = null;
 
       if (isObjectRemoveTool) {
-        if (!objectRemoveEditorRef.current?.isSelectionLocked()) {
-          setValidationErrorKey('validationObjectRemoveSelectionNotLocked');
-          setIsSubmitting(false);
-          setStage('configure');
-          stopProgressSimulation();
-          return;
-        }
         maskFile = (await objectRemoveEditorRef.current?.exportMaskFile()) ?? null;
         if (!maskFile) {
           setValidationErrorKey('validationObjectRemoveMaskRequired');
@@ -701,7 +809,6 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     objectRemoveParams,
     portraitEnhanceParams,
     hasObjectRemoveMask,
-    hasObjectRemoveSelectionLocked,
     isObjectRemoveTool,
     compressParams,
     cropParams,
@@ -737,7 +844,6 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     const validation = validateToolParams(tool, rawParams, {
       referenceFilePresent: Boolean(referenceFile),
       maskFilePresent: hasObjectRemoveMask,
-      maskSelectionLocked: isObjectRemoveTool ? hasObjectRemoveSelectionLocked : undefined,
     });
 
     if (!validation.valid) {
@@ -828,7 +934,6 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     objectRemoveParams,
     portraitEnhanceParams,
     hasObjectRemoveMask,
-    hasObjectRemoveSelectionLocked,
     isObjectRemoveTool,
     compressParams,
     cropParams,
@@ -928,7 +1033,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setPortraitEnhanceModelLabel(null);
     setPortraitEnhanceStyle(null);
     setHasObjectRemoveMask(false);
-    setHasObjectRemoveSelectionLocked(false);
+    if (objectRemovePreviewUrlRef.current) {
+      URL.revokeObjectURL(objectRemovePreviewUrlRef.current);
+      objectRemovePreviewUrlRef.current = null;
+    }
+    setObjectRemovePreviewUrl(null);
     setBlurFacesReasonKey(null);
     setBlurFacesModelLabel(null);
     setCompressionLevel(null);
@@ -994,6 +1103,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 imageHeight={originalImageMeta.height}
                 brushSize={objectRemoveParams.brushSize}
                 selectionTool={objectRemoveParams.selectionTool}
+                previewImageUrl={objectRemovePreviewUrl}
+                isErasing={objectRemoveErasing}
                 onBrushSizeChange={(brushSize) =>
                   setObjectRemoveParams((current) => ({ ...current, brushSize }))
                 }
@@ -1001,7 +1112,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                   setObjectRemoveParams((current) => ({ ...current, selectionTool }))
                 }
                 onMaskChange={setHasObjectRemoveMask}
-                onSelectionLockedChange={setHasObjectRemoveSelectionLocked}
+                onEraseHotkey={() => void handleObjectRemoveErase()}
               />
             ) : isCropTool && selectedFile && filePreviewUrl && originalImageMeta ? (
               <CropEditor
@@ -1139,23 +1250,69 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
           }
           actions={
             <div className="space-y-2">
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                disabled={
-                  isSubmitting ||
-                  (batchMode ? batchFiles.length === 0 : !selectedFile) ||
-                  (isObjectRemoveTool && Boolean(selectedFile) && !hasObjectRemoveSelectionLocked)
-                }
-                onClick={() => void (batchMode ? handleBatchProcess() : handleProcess())}
-              >
-                {isSubmitting
-                  ? t('processingButton')
-                  : batchMode
-                    ? t('batchProcessButton', { count: batchFiles.length || 0 })
-                    : t('processButton')}
-              </Button>
+              {isObjectRemoveTool && selectedFile ? (
+                objectRemovePreviewUrl ? (
+                  <>
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      className="w-full"
+                      onClick={handleObjectRemovePreviewDownload}
+                    >
+                      {t('objectRemoveDownloadPreview')}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      className="w-full"
+                      disabled={objectRemoveErasing}
+                      onClick={handleObjectRemoveRevert}
+                    >
+                      {t('objectRemoveRevert')}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      className="w-full"
+                      disabled={isSubmitting}
+                      onClick={() => void handleProcess()}
+                    >
+                      {isSubmitting ? t('processingButton') : t('objectRemoveSaveToGallery')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      className="w-full"
+                      disabled={isSubmitting || objectRemoveErasing || !hasObjectRemoveMask}
+                      onClick={() => void handleObjectRemoveErase()}
+                    >
+                      {objectRemoveErasing ? t('objectRemoveErasing') : t('objectRemoveErase')}
+                    </Button>
+                    <p className="text-center text-xs text-text-tertiary">
+                      {t('objectRemoveEraseHint')}
+                    </p>
+                  </>
+                )
+              ) : (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  disabled={
+                    isSubmitting || (batchMode ? batchFiles.length === 0 : !selectedFile)
+                  }
+                  onClick={() => void (batchMode ? handleBatchProcess() : handleProcess())}
+                >
+                  {isSubmitting
+                    ? t('processingButton')
+                    : batchMode
+                      ? t('batchProcessButton', { count: batchFiles.length || 0 })
+                      : t('processButton')}
+                </Button>
+              )}
               {batchMode && batchFiles.length > 0 ? (
                 <div className="space-y-1 text-center text-xs text-text-tertiary">
                   <p>
@@ -1168,11 +1325,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 </div>
               ) : (
                 !batchMode &&
-                selectedFile && (
+                selectedFile &&
+                !isObjectRemoveTool && (
                   <div className="space-y-1 text-center text-xs text-text-tertiary">
-                    {isObjectRemoveTool && !hasObjectRemoveSelectionLocked ? (
-                      <p className="text-text-secondary">{t('objectRemoveConfirmBeforeProcess')}</p>
-                    ) : null}
                     <p>
                       {isUpscaleTool || isBackgroundTool || isFacesTool
                         ? t('creditsAiToolHint', { cost: tool.creditsCost })
@@ -1181,6 +1336,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                   </div>
                 )
               )}
+              {!batchMode && selectedFile && isObjectRemoveTool && objectRemovePreviewUrl ? (
+                <p className="text-center text-xs text-text-tertiary">
+                  {t('creditsPerImageHint', { cost: tool.creditsCost })}
+                </p>
+              ) : null}
             </div>
           }
         />

@@ -1,14 +1,12 @@
 import sharp from 'sharp';
 import { requireReplicateToken } from '@/lib/ai/config';
 import { fetchImageBuffer } from '@/lib/ai/fetch-image';
-import { extractReplicateOutputUrl, resolveReplicateVersion } from '@/lib/ai/replicate-client';
+import { extractReplicateOutputUrl, resolveReplicateVersion, runReplicatePredictionAndWait } from '@/lib/ai/replicate-client';
 import type { PortraitEnhanceRouting } from '@/lib/ai/portrait-enhance-routing';
 import type { PortraitEnhanceStyle } from '@/lib/tools/portrait-enhance-params';
 import { createSignedUrl, deleteFromStorage, uploadBufferToStorage } from '@/lib/supabase/storage';
-import type { ReplicatePrediction } from '@/lib/ai/replicate-client';
 import { applyMockPortraitEnhance } from '@/lib/ai/portrait-enhance-process';
 
-const REPLICATE_API = 'https://api.replicate.com/v1';
 const MAX_FACES = 4;
 const MIN_FACE_AREA_RATIO = 0.015;
 
@@ -102,15 +100,10 @@ async function runCodeformerOnCrop(
   const temp = await uploadTempImage(cropBuffer, userId);
 
   try {
-    const res = await fetch(`${REPLICATE_API}/predictions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Prefer: 'wait=120',
-      },
-      body: JSON.stringify({
-        version: versionId,
+    let prediction;
+    try {
+      prediction = await runReplicatePredictionAndWait({
+        versionId,
         input: {
           image: temp.signedUrl,
           codeformer_fidelity: routing.codeformerFidelity,
@@ -118,15 +111,18 @@ async function runCodeformerOnCrop(
           face_upsample: false,
           upscale: 1,
         },
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Portrait enhancement failed (${res.status}): ${body.slice(0, 200)}`);
+        token,
+        pollTimeoutMs: 45_000,
+      });
+    } catch (err) {
+      const status =
+        err && typeof err === 'object' && 'httpStatus' in err
+          ? (err as { httpStatus: number }).httpStatus
+          : 0;
+      const message = err instanceof Error ? err.message : 'Portrait enhancement failed.';
+      throw new Error(`Portrait enhancement failed (${status || 'error'}): ${message.slice(0, 200)}`);
     }
 
-    const prediction = (await res.json()) as ReplicatePrediction;
     if (prediction.status !== 'succeeded') {
       throw new Error(prediction.error || 'Portrait enhancement did not complete.');
     }

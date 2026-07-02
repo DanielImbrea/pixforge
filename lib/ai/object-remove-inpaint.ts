@@ -2,10 +2,8 @@ import sharp from 'sharp';
 import { resolveObjectRemoveInpaintPrompt } from '@/lib/tools/object-remove-params';
 import { getAiProvider, requireReplicateToken } from '@/lib/ai/config';
 import { fetchImageBuffer } from '@/lib/ai/fetch-image';
-import { resolveReplicateVersion, extractReplicateOutputUrl } from '@/lib/ai/replicate-client';
-import type { ReplicatePrediction } from '@/lib/ai/replicate-client';
-
-const REPLICATE_API = 'https://api.replicate.com/v1';
+import { resolveReplicateVersion, extractReplicateOutputUrl, runReplicatePredictionAndWait } from '@/lib/ai/replicate-client';
+import { createSignedUrl, deleteFromStorage, uploadBufferToStorage } from '@/lib/supabase/storage';
 
 function getObjectRemoveModel(): string {
   return process.env.REPLICATE_OBJECT_REMOVE_MODEL?.trim() || 'black-forest-labs/flux-fill-dev';
@@ -59,30 +57,26 @@ async function runReplicateInpaint(
   });
   const versionId = versionFull.includes(':') ? versionFull.split(':')[1] : versionFull;
 
-  const res = await fetch(`${REPLICATE_API}/predictions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Prefer: 'wait=120',
-    },
-    body: JSON.stringify({
-      version: versionId,
+  let prediction;
+  try {
+    prediction = await runReplicatePredictionAndWait({
+      versionId,
       input: {
         image: imageUrl,
         mask: maskUrl,
         prompt: prompt || 'seamless natural background, photorealistic',
         output_format: 'jpg',
       },
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Object removal failed (${res.status}): ${body.slice(0, 200)}`);
+      token,
+    });
+  } catch (err) {
+    const status =
+      err && typeof err === 'object' && 'httpStatus' in err
+        ? (err as { httpStatus: number }).httpStatus
+        : 0;
+    const message = err instanceof Error ? err.message : 'Object removal failed.';
+    throw new Error(`Object removal failed (${status || 'error'}): ${message.slice(0, 200)}`);
   }
-
-  const prediction = (await res.json()) as ReplicatePrediction;
   if (prediction.status !== 'succeeded') {
     throw new Error(prediction.error || 'Object removal did not complete.');
   }
@@ -96,11 +90,30 @@ async function runReplicateInpaint(
   return buffer;
 }
 
+async function uploadTempForInpaint(
+  imageBuffer: Buffer,
+  maskBuffer: Buffer,
+  userId: string
+): Promise<{ imageUrl: string; maskUrl: string; paths: string[] }> {
+  const imageUpload = await uploadBufferToStorage(imageBuffer, 'uploads', userId, 'image/jpeg');
+  const maskUpload = await uploadBufferToStorage(maskBuffer, 'uploads', userId, 'image/png');
+  const [imageUrl, maskUrl] = await Promise.all([
+    createSignedUrl('uploads', imageUpload.storagePath, 900),
+    createSignedUrl('uploads', maskUpload.storagePath, 900),
+  ]);
+  return { imageUrl, maskUrl, paths: [imageUpload.storagePath, maskUpload.storagePath] };
+}
+
+async function cleanupTempPaths(paths: string[]): Promise<void> {
+  await Promise.all(paths.map((path) => deleteFromStorage('uploads', path).catch(() => undefined)));
+}
+
 export async function runObjectRemoveInpaint(params: {
   imageBuffer: Buffer;
   maskBuffer: Buffer;
   imageUrl?: string;
   maskUrl?: string;
+  userId?: string;
   editMode?: 'remove' | 'replace';
   prompt?: string;
 }): Promise<Buffer> {
@@ -108,16 +121,29 @@ export async function runObjectRemoveInpaint(params: {
     return applyMockObjectRemove(params.imageBuffer, params.maskBuffer);
   }
 
-  if (!params.imageUrl || !params.maskUrl) {
-    throw new Error('Signed image and mask URLs are required for object removal.');
+  const prompt = resolveObjectRemoveInpaintPrompt(params.editMode ?? 'remove', params.prompt);
+  let imageUrl = params.imageUrl;
+  let maskUrl = params.maskUrl;
+  let tempPaths: string[] = [];
+
+  if (!imageUrl || !maskUrl) {
+    if (!params.userId) {
+      throw new Error('Signed image and mask URLs are required for object removal.');
+    }
+    const temp = await uploadTempForInpaint(params.imageBuffer, params.maskBuffer, params.userId);
+    imageUrl = temp.imageUrl;
+    maskUrl = temp.maskUrl;
+    tempPaths = temp.paths;
   }
 
-  const prompt = resolveObjectRemoveInpaintPrompt(params.editMode ?? 'remove', params.prompt);
-
   try {
-    return await runReplicateInpaint(params.imageUrl, params.maskUrl, prompt);
+    return await runReplicateInpaint(imageUrl, maskUrl, prompt);
   } catch (err) {
     console.warn('[object-remove] Replicate inpaint failed, using mock fallback', err);
     return applyMockObjectRemove(params.imageBuffer, params.maskBuffer);
+  } finally {
+    if (tempPaths.length > 0) {
+      await cleanupTempPaths(tempPaths);
+    }
   }
 }

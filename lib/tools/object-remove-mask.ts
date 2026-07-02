@@ -88,7 +88,7 @@ export function applySamMaskToCanvas(
   drawMaskOutline(maskCtx, overlayCtx, width, height);
 }
 
-/** Replace mask entirely from SAM output (all accumulated smart clicks). */
+/** Replace mask entirely from SAM output (used when undoing smart clicks). */
 export function setMaskFromSam(
   maskCtx: CanvasRenderingContext2D,
   overlayCtx: CanvasRenderingContext2D,
@@ -100,6 +100,18 @@ export function setMaskFromSam(
   maskCtx.fillRect(0, 0, width, height);
   overlayCtx.clearRect(0, 0, width, height);
   applySamMaskToCanvas(maskCtx, overlayCtx, samMask, width, height, false);
+}
+
+/** Union or subtract a SAM mask into the existing brush/click selection. */
+export function mergeSamMaskIntoCanvas(
+  maskCtx: CanvasRenderingContext2D,
+  overlayCtx: CanvasRenderingContext2D,
+  samMask: ImageData,
+  width: number,
+  height: number,
+  subtract = false
+) {
+  applySamMaskToCanvas(maskCtx, overlayCtx, samMask, width, height, subtract);
 }
 
 /** Draw semi-transparent fill + white contour on masked pixels. */

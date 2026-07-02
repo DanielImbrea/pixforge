@@ -1,11 +1,8 @@
 import sharp from 'sharp';
 import { getAiProvider, requireReplicateToken } from '@/lib/ai/config';
 import { fetchImageBuffer } from '@/lib/ai/fetch-image';
-import { resolveReplicateVersion, extractReplicateOutputUrl } from '@/lib/ai/replicate-client';
-import type { ReplicatePrediction } from '@/lib/ai/replicate-client';
+import { resolveReplicateVersion, extractReplicateOutputUrl, runReplicatePredictionAndWait } from '@/lib/ai/replicate-client';
 import { parseModelSlug } from '@/lib/ai/replicate-models';
-
-const REPLICATE_API = 'https://api.replicate.com/v1';
 
 function getBgReplaceModel(): string {
   return process.env.REPLICATE_BG_REPLACE_MODEL?.trim() || 'black-forest-labs/flux-schnell';
@@ -47,30 +44,16 @@ async function runReplicateFluxPlate(
   const versionFull = await resolveReplicateVersion(model, token, {});
   const versionId = versionFull.includes(':') ? versionFull.split(':')[1] : versionFull;
 
-  const res = await fetch(`${REPLICATE_API}/predictions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Prefer: 'wait=120',
+  const prediction = await runReplicatePredictionAndWait({
+    versionId,
+    input: {
+      prompt: `${prompt}, premium commercial background plate, realistic studio-grade lighting, clean depth separation, natural color harmony, no people, no text, no watermark, no logo, no extra product, no framing border`,
+      aspect_ratio: aspectRatioForSize(width, height),
+      output_format: 'jpg',
+      output_quality: 92,
     },
-    body: JSON.stringify({
-      version: versionId,
-      input: {
-        prompt: `${prompt}, premium commercial background plate, realistic studio-grade lighting, clean depth separation, natural color harmony, no people, no text, no watermark, no logo, no extra product, no framing border`,
-        aspect_ratio: aspectRatioForSize(width, height),
-        output_format: 'jpg',
-        output_quality: 92,
-      },
-    }),
+    token,
   });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Background generation failed (${res.status}): ${body.slice(0, 200)}`);
-  }
-
-  const prediction = (await res.json()) as ReplicatePrediction;
   if (prediction.status !== 'succeeded') {
     throw new Error(prediction.error || 'Background generation did not complete.');
   }

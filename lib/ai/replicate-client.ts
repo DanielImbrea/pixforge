@@ -23,6 +23,66 @@ import type { ProcessResult } from '@/lib/tools/processor';
 
 const REPLICATE_API = 'https://api.replicate.com/v1';
 
+/** Replicate allows Prefer: wait between 1 and 60 seconds (inclusive). */
+export const REPLICATE_SYNC_WAIT_MAX_SECONDS = 60;
+
+const DEFAULT_POLL_INTERVAL_MS = 2000;
+const DEFAULT_POLL_TIMEOUT_MS = 90_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function runReplicatePredictionAndWait(params: {
+  versionId: string;
+  input: Record<string, unknown>;
+  token?: string;
+  waitSeconds?: number;
+  pollTimeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<ReplicatePrediction> {
+  const token = params.token ?? requireReplicateToken();
+  const waitSeconds = Math.min(
+    REPLICATE_SYNC_WAIT_MAX_SECONDS,
+    Math.max(1, params.waitSeconds ?? REPLICATE_SYNC_WAIT_MAX_SECONDS)
+  );
+
+  const res = await fetch(`${REPLICATE_API}/predictions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Prefer: `wait=${waitSeconds}`,
+    },
+    body: JSON.stringify({
+      version: params.versionId,
+      input: params.input,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw Object.assign(new Error(`Replicate API ${res.status}: ${body.slice(0, 200)}`), {
+      httpStatus: res.status,
+      apiBody: body,
+    });
+  }
+
+  let prediction = (await res.json()) as ReplicatePrediction;
+  const deadline = Date.now() + (params.pollTimeoutMs ?? DEFAULT_POLL_TIMEOUT_MS);
+  const pollInterval = params.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+
+  while (prediction.status === 'starting' || prediction.status === 'processing') {
+    if (Date.now() >= deadline) {
+      throw new Error('Replicate prediction timed out before completion.');
+    }
+    await sleep(pollInterval);
+    prediction = await getReplicatePrediction(prediction.id);
+  }
+
+  return prediction;
+}
+
 export interface ReplicatePrediction {
   id: string;
   status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
