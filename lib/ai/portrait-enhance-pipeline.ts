@@ -194,7 +194,7 @@ async function blendPatch(
 ): Promise<Buffer> {
   const resizedPatch = await sharp(enhancedPatch)
     .resize(region.width, region.height, { fit: 'fill' })
-    .ensureAlpha()
+    .removeAlpha()
     .toBuffer();
   const mask = await createFeatherMask(region.width, region.height, style);
   const maskedPatch = await sharp(resizedPatch)
