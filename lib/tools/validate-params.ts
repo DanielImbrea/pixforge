@@ -38,6 +38,8 @@ export interface ValidateToolParamsOptions {
   referenceFilePresent?: boolean;
   /** Client-side upload includes brush mask before server assigns maskAssetId. */
   maskFilePresent?: boolean;
+  /** Object-remove mask was confirmed before processing. */
+  maskSelectionLocked?: boolean;
 }
 
 export function validateToolParams(
@@ -135,6 +137,9 @@ export function validateToolParams(
     }
     if (!result.data.maskAssetId && !options.maskFilePresent) {
       return { valid: false, params: {}, errorKey: 'validationObjectRemoveMaskRequired' };
+    }
+    if (options.maskFilePresent && options.maskSelectionLocked === false) {
+      return { valid: false, params: {}, errorKey: 'validationObjectRemoveSelectionNotLocked' };
     }
     if (result.data.editMode === 'replace' && !result.data.inpaintPrompt.trim()) {
       return { valid: false, params: {}, errorKey: 'validationObjectRemoveReplacePromptRequired' };

@@ -131,7 +131,8 @@ export const aiProcessor: ToolProcessor = {
           message.includes('Failed to download face-api model') ||
           message.includes('FaceAPI detector is not initialized') ||
           message.includes('FaceAPI models are not initialized') ||
-          message.includes('TextEncoder is not a constructor')
+          message.includes('TextEncoder is not a constructor') ||
+          message.includes('environment is not defined')
         ) {
           console.error('[portrait-enhance] face detection unavailable', {
             jobId: job.id,

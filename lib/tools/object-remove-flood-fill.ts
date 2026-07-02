@@ -45,38 +45,4 @@ export function floodFillRegion(
   return selected;
 }
 
-export function applyFloodFillToCanvas(
-  maskCtx: CanvasRenderingContext2D,
-  overlayCtx: CanvasRenderingContext2D,
-  region: Uint8Array,
-  width: number,
-  height: number,
-  subtract = false
-) {
-  const maskData = maskCtx.getImageData(0, 0, width, height);
-  const overlayData = overlayCtx.getImageData(0, 0, width, height);
-
-  for (let i = 0; i < region.length; i++) {
-    if (!region[i]) continue;
-    const pi = i * 4;
-    if (subtract) {
-      maskData.data[pi] = 0;
-      maskData.data[pi + 1] = 0;
-      maskData.data[pi + 2] = 0;
-      maskData.data[pi + 3] = 255;
-      overlayData.data[pi + 3] = 0;
-    } else {
-      maskData.data[pi] = 255;
-      maskData.data[pi + 1] = 255;
-      maskData.data[pi + 2] = 255;
-      maskData.data[pi + 3] = 255;
-      overlayData.data[pi] = 239;
-      overlayData.data[pi + 1] = 68;
-      overlayData.data[pi + 2] = 68;
-      overlayData.data[pi + 3] = 115;
-    }
-  }
-
-  maskCtx.putImageData(maskData, 0, 0);
-  overlayCtx.putImageData(overlayData, 0, 0);
-}
+export { applyRegionToMask as applyFloodFillToCanvas } from '@/lib/tools/object-remove-mask';

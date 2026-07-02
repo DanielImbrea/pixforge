@@ -8,12 +8,20 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Paintbrush, Sparkles } from 'lucide-react';
+import { Eraser, Lock, Paintbrush, Sparkles, Undo2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
-  applyFloodFillToCanvas,
-  floodFillRegion,
-} from '@/lib/tools/object-remove-flood-fill';
+  prepareSamImage,
+  resetSamSession,
+  SamSegmentError,
+  segmentSamAtClick,
+  undoSamClick,
+} from '@/lib/image/sam-segment-browser';
+import {
+  countMaskPixels,
+  drawMaskOutline,
+  setMaskFromSam,
+} from '@/lib/tools/object-remove-mask';
 import {
   clampObjectRemoveBrush,
   OBJECT_REMOVE_BRUSH_MAX,
@@ -24,6 +32,7 @@ import {
 export interface ObjectRemoveEditorHandle {
   exportMaskFile: () => Promise<File | null>;
   hasMaskContent: () => boolean;
+  isSelectionLocked: () => boolean;
   clearMask: () => void;
 }
 
@@ -36,26 +45,29 @@ interface ObjectRemoveEditorProps {
   onBrushSizeChange: (size: number) => void;
   onSelectionToolChange: (tool: ObjectRemoveSelectionTool) => void;
   onMaskChange?: (hasMask: boolean) => void;
+  onSelectionLockedChange?: (locked: boolean) => void;
 }
 
 type BrushMode = 'paint' | 'erase';
+type SelectionPhase = 'editing' | 'locked';
 
-const CLICK_TOLERANCE = 36;
-
-function countMaskPixels(maskCtx: CanvasRenderingContext2D, width: number, height: number): number {
-  const data = maskCtx.getImageData(0, 0, width, height).data;
-  let count = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    if (data[i] > 32) count += 1;
-  }
-  return count;
+function toolPillClass(active: boolean, disabled = false) {
+  return `flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+    disabled
+      ? 'cursor-not-allowed border-border-default bg-background-secondary text-text-tertiary opacity-60'
+      : active
+        ? 'border-accent bg-accent/10 text-accent'
+        : 'border-border-default text-text-secondary hover:border-accent/40'
+  }`;
 }
 
-function toolPillClass(active: boolean) {
-  return `flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-    active
-      ? 'border-accent bg-accent/10 text-accent'
-      : 'border-border-default text-text-secondary hover:border-accent/40'
+function actionButtonClass(active = false, disabled = false) {
+  return `text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+    disabled
+      ? 'cursor-not-allowed border-border-default bg-background-secondary text-text-tertiary opacity-50'
+      : active
+        ? 'border-accent bg-accent/10 text-accent'
+        : 'border-border-default bg-background-primary text-text-secondary hover:border-accent/50 hover:text-text-primary'
   }`;
 }
 
@@ -70,6 +82,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       onBrushSizeChange,
       onSelectionToolChange,
       onMaskChange,
+      onSelectionLockedChange,
     },
     ref
   ) {
@@ -82,10 +95,17 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const [brushMode, setBrushMode] = useState<BrushMode>('paint');
     const [hasMask, setHasMask] = useState(false);
     const [imageReady, setImageReady] = useState(false);
+    const [samReady, setSamReady] = useState(false);
+    const [samLoading, setSamLoading] = useState(false);
+    const [samError, setSamError] = useState<string | null>(null);
+    const [segmenting, setSegmenting] = useState(false);
+    const [selectionPhase, setSelectionPhase] = useState<SelectionPhase>('editing');
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
     const [cursorInside, setCursorInside] = useState(false);
     const drawingRef = useRef(false);
     const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+
+    const isLocked = selectionPhase === 'locked';
 
     const resetMasks = useCallback(() => {
       const maskCanvas = maskCanvasRef.current;
@@ -104,9 +124,12 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       maskCtx.fillStyle = '#000000';
       maskCtx.fillRect(0, 0, imageWidth, imageHeight);
       overlayCtx.clearRect(0, 0, imageWidth, imageHeight);
+      resetSamSession();
       setHasMask(false);
+      setSelectionPhase('editing');
       onMaskChange?.(false);
-    }, [imageHeight, imageWidth, onMaskChange]);
+      onSelectionLockedChange?.(false);
+    }, [imageHeight, imageWidth, onMaskChange, onSelectionLockedChange]);
 
     useEffect(() => {
       resetMasks();
@@ -117,6 +140,9 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       if (!canvas) return;
 
       setImageReady(false);
+      setSamReady(false);
+      setSamError(null);
+
       const img = new Image();
       if (!imageUrl.startsWith('blob:')) {
         img.crossOrigin = 'anonymous';
@@ -131,6 +157,36 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       };
       img.src = imageUrl;
     }, [imageUrl, imageWidth, imageHeight]);
+
+    useEffect(() => {
+      if (!imageReady || selectionTool !== 'click') return;
+      const canvas = sourceCanvasRef.current;
+      if (!canvas) return;
+
+      let cancelled = false;
+      setSamLoading(true);
+      setSamError(null);
+
+      void (async () => {
+        try {
+          await prepareSamImage(canvas);
+          if (!cancelled) {
+            setSamReady(true);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setSamError(err instanceof Error ? err.message : 'Smart selection failed to load.');
+            setSamReady(false);
+          }
+        } finally {
+          if (!cancelled) setSamLoading(false);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [imageReady, selectionTool, imageUrl]);
 
     useEffect(() => {
       const el = stageRef.current;
@@ -149,7 +205,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
 
     const scale = displaySize.width > 0 ? imageWidth / displaySize.width : 1;
     const displayBrushSize = clampObjectRemoveBrush(brushSize) / scale;
-    const showBrushCursor = cursorInside && selectionTool === 'brush' && displayBrushSize > 0;
+    const showBrushCursor = cursorInside && selectionTool === 'brush' && displayBrushSize > 0 && !isLocked;
 
     const toImageCoords = useCallback(
       (clientX: number, clientY: number) => {
@@ -222,52 +278,82 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
 
         if (paint) {
           stroke(maskCtx, '#ffffff', 'source-over');
-          stroke(overlayCtx, 'rgba(239, 68, 68, 0.45)', 'source-over');
+          stroke(overlayCtx, 'rgba(239, 68, 68, 0.5)', 'source-over');
         } else {
           stroke(maskCtx, '#000000', 'source-over');
           stroke(overlayCtx, '#000000', 'destination-out');
+        }
+
+        if (maskCanvas && overlayCanvas) {
+          drawMaskOutline(maskCtx, overlayCtx, maskCanvas.width, maskCanvas.height);
         }
       },
       [brushMode, brushSize]
     );
 
-    const applyClickSelection = useCallback(
-      (point: { x: number; y: number }) => {
+    const applySmartClick = useCallback(
+      async (point: { x: number; y: number }, exclude: boolean) => {
         const sourceCanvas = sourceCanvasRef.current;
         const maskCanvas = maskCanvasRef.current;
         const overlayCanvas = overlayCanvasRef.current;
-        const sourceCtx = sourceCanvas?.getContext('2d', { willReadFrequently: true });
         const maskCtx = maskCanvas?.getContext('2d');
         const overlayCtx = overlayCanvas?.getContext('2d');
-        if (!sourceCtx || !maskCtx || !overlayCtx || !imageReady) return;
+        if (!sourceCanvas || !maskCtx || !overlayCtx || !imageReady || segmenting) return;
 
-        const imageData = sourceCtx.getImageData(0, 0, imageWidth, imageHeight);
-        const region = floodFillRegion(
-          imageData.data,
-          imageWidth,
-          imageHeight,
-          point.x,
-          point.y,
-          CLICK_TOLERANCE
-        );
+        setSegmenting(true);
+        setSamError(null);
 
-        let hits = 0;
-        for (let i = 0; i < region.length; i++) {
-          if (region[i]) hits += 1;
+        try {
+          const clickType = exclude || brushMode === 'erase' ? 'exclude' : 'include';
+          const samMask = await segmentSamAtClick(sourceCanvas, point, clickType);
+          if (!samMask) return;
+          setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight);
+        } catch (err) {
+          const message =
+            err instanceof SamSegmentError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : 'Smart selection failed.';
+          setSamError(message);
+        } finally {
+          setSegmenting(false);
+          refreshMaskState();
         }
-        if (hits === 0) return;
-
-        applyFloodFillToCanvas(
-          maskCtx,
-          overlayCtx,
-          region,
-          imageWidth,
-          imageHeight,
-          brushMode === 'erase'
-        );
       },
-      [brushMode, imageHeight, imageReady, imageWidth]
+      [brushMode, imageHeight, imageReady, imageWidth, refreshMaskState, segmenting]
     );
+
+    const handleUndoSmartClick = useCallback(async () => {
+      if (isLocked || selectionTool !== 'click') return;
+      const sourceCanvas = sourceCanvasRef.current;
+      const maskCanvas = maskCanvasRef.current;
+      const overlayCanvas = overlayCanvasRef.current;
+      const maskCtx = maskCanvas?.getContext('2d');
+      const overlayCtx = overlayCanvas?.getContext('2d');
+      if (!sourceCanvas || !maskCtx || !overlayCtx) return;
+
+      const samMask = await undoSamClick(sourceCanvas);
+      if (!samMask) {
+        maskCtx.fillStyle = '#000000';
+        maskCtx.fillRect(0, 0, imageWidth, imageHeight);
+        overlayCtx.clearRect(0, 0, imageWidth, imageHeight);
+      } else {
+        setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight);
+      }
+      refreshMaskState();
+    }, [imageHeight, imageWidth, isLocked, refreshMaskState, selectionTool]);
+
+    const confirmSelection = useCallback(() => {
+      if (!hasMask) return;
+      setSelectionPhase('locked');
+      onSelectionLockedChange?.(true);
+    }, [hasMask, onSelectionLockedChange]);
+
+    const unlockSelection = useCallback(() => {
+      setSelectionPhase('editing');
+      onSelectionLockedChange?.(false);
+    }, [onSelectionLockedChange]);
 
     const clearMask = useCallback(() => {
       resetMasks();
@@ -275,7 +361,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
 
     const exportMaskFile = useCallback(async (): Promise<File | null> => {
       const maskCanvas = maskCanvasRef.current;
-      if (!maskCanvas || !hasMask) return null;
+      if (!maskCanvas || !hasMask || !isLocked) return null;
 
       return new Promise((resolve) => {
         maskCanvas.toBlob((blob) => {
@@ -286,26 +372,28 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
           resolve(new File([blob], 'object-remove-mask.png', { type: 'image/png' }));
         }, 'image/png');
       });
-    }, [hasMask]);
+    }, [hasMask, isLocked]);
 
     useImperativeHandle(
       ref,
       () => ({
         exportMaskFile,
         hasMaskContent: () => hasMask,
+        isSelectionLocked: () => isLocked,
         clearMask,
       }),
-      [clearMask, exportMaskFile, hasMask]
+      [clearMask, exportMaskFile, hasMask, isLocked]
     );
 
     const handlePointerDown = (event: React.PointerEvent) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || isLocked) return;
       event.preventDefault();
       const point = toImageCoords(event.clientX, event.clientY);
 
       if (selectionTool === 'click') {
-        applyClickSelection(point);
-        refreshMaskState();
+        if (!samReady || samLoading) return;
+        const exclude = event.shiftKey || brushMode === 'erase';
+        void applySmartClick(point, exclude);
         return;
       }
 
@@ -319,7 +407,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const handlePointerMove = (event: React.PointerEvent) => {
       setCursorPos(toDisplayCoords(event.clientX, event.clientY));
 
-      if (selectionTool === 'click' || !drawingRef.current || !lastPointRef.current) return;
+      if (selectionTool === 'click' || !drawingRef.current || !lastPointRef.current || isLocked) return;
       const point = toImageCoords(event.clientX, event.clientY);
       drawStroke(lastPointRef.current, point);
       lastPointRef.current = point;
@@ -345,11 +433,14 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       handlePointerUp(event);
     };
 
-    const stageCursor =
-      selectionTool === 'click'
-        ? brushMode === 'erase'
-          ? 'crosshair'
-          : 'pointer'
+    const stageCursor = isLocked
+      ? 'default'
+      : selectionTool === 'click'
+        ? samLoading || segmenting
+          ? 'wait'
+          : brushMode === 'erase'
+            ? 'crosshair'
+            : 'pointer'
         : showBrushCursor
           ? 'none'
           : 'crosshair';
@@ -361,7 +452,8 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
           <div className="flex gap-2 overflow-x-auto pb-1">
             <button
               type="button"
-              className={toolPillClass(selectionTool === 'brush')}
+              className={toolPillClass(selectionTool === 'brush', isLocked)}
+              disabled={isLocked}
               onClick={() => {
                 onSelectionToolChange('brush');
                 setBrushMode('paint');
@@ -372,7 +464,8 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
             </button>
             <button
               type="button"
-              className={toolPillClass(selectionTool === 'click')}
+              className={toolPillClass(selectionTool === 'click', isLocked)}
+              disabled={isLocked}
               onClick={() => onSelectionToolChange('click')}
             >
               <Sparkles className="h-3.5 w-3.5" aria-hidden />
@@ -391,51 +484,99 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
                   min={OBJECT_REMOVE_BRUSH_MIN}
                   max={OBJECT_REMOVE_BRUSH_MAX}
                   value={brushSize}
+                  disabled={isLocked}
                   onChange={(e) => onBrushSizeChange(clampObjectRemoveBrush(Number(e.target.value)))}
-                  className="min-w-0 flex-1 accent-accent"
+                  className="min-w-0 flex-1 accent-accent disabled:opacity-50"
                 />
                 <input
                   type="number"
                   min={OBJECT_REMOVE_BRUSH_MIN}
                   max={OBJECT_REMOVE_BRUSH_MAX}
                   value={clampObjectRemoveBrush(brushSize)}
+                  disabled={isLocked}
                   onChange={(e) => onBrushSizeChange(clampObjectRemoveBrush(Number(e.target.value)))}
-                  className="w-14 rounded-md border border-border-default bg-background-primary px-2 py-1 text-center text-xs text-text-primary"
+                  className="w-14 rounded-md border border-border-default bg-background-primary px-2 py-1 text-center text-xs text-text-primary disabled:opacity-50"
                 />
               </div>
             </div>
           ) : null}
+
+          {selectionTool === 'click' && samLoading ? (
+            <p className="text-xs text-text-secondary">{t('objectRemoveSamLoading')}</p>
+          ) : null}
+          {samError ? <p className="text-xs text-danger">{samError}</p> : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className={`text-xs px-3 py-1.5 rounded-full border ${
-              brushMode === 'erase'
-                ? 'border-accent bg-accent/10 text-accent'
-                : 'border-border-default text-text-tertiary'
-            }`}
+            className={actionButtonClass(brushMode === 'erase', isLocked)}
+            disabled={isLocked}
             onClick={() => setBrushMode((m) => (m === 'erase' ? 'paint' : 'erase'))}
           >
+            <Eraser className="mr-1 inline h-3.5 w-3.5" aria-hidden />
             {t('objectRemoveEraser')}
           </button>
           <button
             type="button"
-            className="text-xs px-3 py-1.5 rounded-full border border-border-default text-text-tertiary"
+            className={actionButtonClass(false, !hasMask || isLocked)}
+            disabled={!hasMask || isLocked}
             onClick={clearMask}
-            disabled={!hasMask}
           >
             {t('objectRemoveClearMask')}
           </button>
+          {selectionTool === 'click' ? (
+            <button
+              type="button"
+              className={actionButtonClass(false, isLocked)}
+              disabled={isLocked}
+              onClick={() => void handleUndoSmartClick()}
+            >
+              <Undo2 className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+              {t('objectRemoveUndoClick')}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {isLocked ? (
+            <button
+              type="button"
+              className={actionButtonClass(false, false)}
+              onClick={unlockSelection}
+            >
+              {t('objectRemoveEditSelection')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`text-xs px-4 py-2 rounded-full border font-semibold transition-colors ${
+                hasMask
+                  ? 'border-accent bg-accent text-white hover:bg-accent/90'
+                  : 'cursor-not-allowed border-border-default bg-background-secondary text-text-tertiary opacity-50'
+              }`}
+              disabled={!hasMask}
+              onClick={confirmSelection}
+            >
+              <Lock className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
+              {t('objectRemoveConfirmSelection')}
+            </button>
+          )}
         </div>
 
         <p className="text-xs text-text-tertiary">
-          {selectionTool === 'click' ? t('objectRemoveClickHint') : t('objectRemoveEditorHint')}
+          {isLocked
+            ? t('objectRemoveLockedHint')
+            : selectionTool === 'click'
+              ? t('objectRemoveClickHint')
+              : t('objectRemoveEditorHint')}
         </p>
 
         <div
           ref={stageRef}
-          className="relative w-full overflow-hidden rounded-lg border border-border-default bg-background-secondary touch-none select-none"
+          className={`relative w-full overflow-hidden rounded-lg border bg-background-secondary touch-none select-none ${
+            isLocked ? 'border-accent/50' : 'border-border-default'
+          }`}
           style={{ aspectRatio: `${imageWidth} / ${imageHeight}`, cursor: stageCursor }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -455,6 +596,11 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
             className="absolute inset-0 h-full w-full object-contain pointer-events-none"
             style={{ width: '100%', height: '100%' }}
           />
+          {isLocked ? (
+            <div className="pointer-events-none absolute inset-x-0 top-0 bg-accent/90 px-3 py-1.5 text-center text-xs font-medium text-white">
+              {t('objectRemoveSelectionLocked')}
+            </div>
+          ) : null}
           {showBrushCursor && cursorPos ? (
             <div
               className="pointer-events-none absolute rounded-full border-2 border-white"

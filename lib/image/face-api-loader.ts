@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import util from 'node:util';
 import sharp from 'sharp';
 import type * as FaceApiTypes from '@vladmandic/face-api';
 
@@ -83,6 +84,36 @@ function prepareTfjsBrowserPlatform(): void {
   }
 }
 
+function installFaceApiServerEnv(api: FaceApiModule): void {
+  api.env.setEnv({
+    Canvas: NodeCanvas as unknown as typeof HTMLCanvasElement,
+    Image: NodeImage as unknown as typeof HTMLImageElement,
+    ImageData: globalThis.ImageData,
+    Video: class {} as typeof HTMLVideoElement,
+    CanvasRenderingContext2D: NodeCanvas as unknown as typeof CanvasRenderingContext2D,
+    createCanvasElement: () => new NodeCanvas() as unknown as HTMLCanvasElement,
+    createImageElement: () => new NodeImage() as unknown as HTMLImageElement,
+    createVideoElement: () => {
+      throw new Error('Video is not supported in server-side face detection.');
+    },
+    fetch: globalThis.fetch.bind(globalThis),
+    readFile: (filePath: string) => fs.readFile(filePath),
+  });
+
+  const tfEnv = (api.tf as unknown as { env(): { setPlatform(name: string, platform: Record<string, unknown>): void } }).env();
+  tfEnv.setPlatform('node', {
+    fetch: globalThis.fetch.bind(globalThis),
+    now: () => Date.now(),
+    encode: (text: string, encoding?: string) => new util.TextEncoder().encode(text),
+    decode: (bytes: Uint8Array, encoding?: string) => new util.TextDecoder(encoding).decode(bytes),
+    isTypedArray: (value: unknown) =>
+      value instanceof Float32Array ||
+      value instanceof Int32Array ||
+      value instanceof Uint8Array ||
+      value instanceof Uint8ClampedArray,
+  });
+}
+
 async function resolveLocalModelPath(): Promise<string | null> {
   for (const candidate of [VENDOR_MODEL_PATH, PUBLIC_MODEL_PATH, MODEL_RELATIVE_PATH]) {
     try {
@@ -163,11 +194,7 @@ async function loadFaceApiModule(): Promise<FaceApiModule> {
   const mod = await import('@vladmandic/face-api');
   faceapi = ((mod as { default?: FaceApiModule }).default ?? mod) as FaceApiModule;
 
-  faceapi.env.monkeyPatch({
-    Canvas: NodeCanvas as unknown as typeof HTMLCanvasElement,
-    Image: NodeImage as unknown as typeof HTMLImageElement,
-    readFile: (filePath: string) => fs.readFile(filePath),
-  } as unknown as Parameters<typeof faceapi.env.monkeyPatch>[0]);
+  installFaceApiServerEnv(faceapi);
 
   const tf = faceapi.tf as typeof faceapi.tf & {
     setBackend(name: string): Promise<boolean>;

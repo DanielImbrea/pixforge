@@ -272,6 +272,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [objectRemoveParams, setObjectRemoveParams] = useState(DEFAULT_OBJECT_REMOVE_PARAMS);
   const [portraitEnhanceParams, setPortraitEnhanceParams] = useState(DEFAULT_PORTRAIT_ENHANCE_PARAMS);
   const [hasObjectRemoveMask, setHasObjectRemoveMask] = useState(false);
+  const [hasObjectRemoveSelectionLocked, setHasObjectRemoveSelectionLocked] = useState(false);
   const objectRemoveEditorRef = useRef<ObjectRemoveEditorHandle>(null);
   const [cropParams, setCropParams] = useState<CropParams>(DEFAULT_CROP_PARAMS);
   const [blurFacesParams, setBlurFacesParams] = useState(DEFAULT_BLUR_FACES_PARAMS);
@@ -407,6 +408,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       setValidationErrorKey(null);
       setErrorMessage(null);
       setHasObjectRemoveMask(false);
+      setHasObjectRemoveSelectionLocked(false);
       void readImageDimensionsFromFile(file).then((dimensions) => {
         if (dimensions) {
           setOriginalImageMeta({
@@ -579,6 +581,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     const validation = validateToolParams(tool, rawParams, {
       referenceFilePresent: Boolean(referenceFile),
       maskFilePresent: hasObjectRemoveMask,
+      maskSelectionLocked: isObjectRemoveTool ? hasObjectRemoveSelectionLocked : undefined,
     });
 
     if (!validation.valid) {
@@ -598,6 +601,13 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       let maskFile: File | null = null;
 
       if (isObjectRemoveTool) {
+        if (!objectRemoveEditorRef.current?.isSelectionLocked()) {
+          setValidationErrorKey('validationObjectRemoveSelectionNotLocked');
+          setIsSubmitting(false);
+          setStage('configure');
+          stopProgressSimulation();
+          return;
+        }
         maskFile = (await objectRemoveEditorRef.current?.exportMaskFile()) ?? null;
         if (!maskFile) {
           setValidationErrorKey('validationObjectRemoveMaskRequired');
@@ -691,6 +701,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     objectRemoveParams,
     portraitEnhanceParams,
     hasObjectRemoveMask,
+    hasObjectRemoveSelectionLocked,
     isObjectRemoveTool,
     compressParams,
     cropParams,
@@ -726,6 +737,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     const validation = validateToolParams(tool, rawParams, {
       referenceFilePresent: Boolean(referenceFile),
       maskFilePresent: hasObjectRemoveMask,
+      maskSelectionLocked: isObjectRemoveTool ? hasObjectRemoveSelectionLocked : undefined,
     });
 
     if (!validation.valid) {
@@ -816,6 +828,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     objectRemoveParams,
     portraitEnhanceParams,
     hasObjectRemoveMask,
+    hasObjectRemoveSelectionLocked,
     isObjectRemoveTool,
     compressParams,
     cropParams,
@@ -915,6 +928,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setPortraitEnhanceModelLabel(null);
     setPortraitEnhanceStyle(null);
     setHasObjectRemoveMask(false);
+    setHasObjectRemoveSelectionLocked(false);
     setBlurFacesReasonKey(null);
     setBlurFacesModelLabel(null);
     setCompressionLevel(null);
@@ -987,6 +1001,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                   setObjectRemoveParams((current) => ({ ...current, selectionTool }))
                 }
                 onMaskChange={setHasObjectRemoveMask}
+                onSelectionLockedChange={setHasObjectRemoveSelectionLocked}
               />
             ) : isCropTool && selectedFile && filePreviewUrl && originalImageMeta ? (
               <CropEditor
@@ -1130,7 +1145,8 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 className="w-full"
                 disabled={
                   isSubmitting ||
-                  (batchMode ? batchFiles.length === 0 : !selectedFile)
+                  (batchMode ? batchFiles.length === 0 : !selectedFile) ||
+                  (isObjectRemoveTool && Boolean(selectedFile) && !hasObjectRemoveSelectionLocked)
                 }
                 onClick={() => void (batchMode ? handleBatchProcess() : handleProcess())}
               >
@@ -1153,11 +1169,16 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               ) : (
                 !batchMode &&
                 selectedFile && (
-                  <p className="text-center text-xs text-text-tertiary">
-                    {isUpscaleTool || isBackgroundTool || isFacesTool
-                      ? t('creditsAiToolHint', { cost: tool.creditsCost })
-                      : t('creditsPerImageHint', { cost: tool.creditsCost })}
-                  </p>
+                  <div className="space-y-1 text-center text-xs text-text-tertiary">
+                    {isObjectRemoveTool && !hasObjectRemoveSelectionLocked ? (
+                      <p className="text-text-secondary">{t('objectRemoveConfirmBeforeProcess')}</p>
+                    ) : null}
+                    <p>
+                      {isUpscaleTool || isBackgroundTool || isFacesTool
+                        ? t('creditsAiToolHint', { cost: tool.creditsCost })
+                        : t('creditsPerImageHint', { cost: tool.creditsCost })}
+                    </p>
+                  </div>
                 )
               )}
             </div>
