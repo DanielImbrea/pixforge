@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { resolveObjectRemoveInpaintPrompt } from '@/lib/tools/object-remove-params';
+import { resolveObjectRemoveInpaintSettings, type ObjectRemoveInpaintSettings } from '@/lib/tools/object-remove-inpaint-config';
 import { normalizeObjectRemoveInpaintInputs, finalizeObjectRemovePreview } from '@/lib/tools/object-remove-inpaint-normalize';
 import { getAiProvider, requireReplicateToken } from '@/lib/ai/config';
 import { fetchImageBuffer } from '@/lib/ai/fetch-image';
@@ -49,7 +49,7 @@ export async function applyMockObjectRemove(imageBuffer: Buffer, maskBuffer: Buf
 async function runReplicateInpaint(
   imageUrl: string,
   maskUrl: string,
-  prompt: string
+  inpaint: ObjectRemoveInpaintSettings
 ): Promise<Buffer> {
   const token = requireReplicateToken();
   const model = getObjectRemoveModel();
@@ -65,11 +65,11 @@ async function runReplicateInpaint(
       input: {
         image: imageUrl,
         mask: maskUrl,
-        prompt: prompt || 'seamless natural background, photorealistic',
-        output_format: 'jpg',
-        megapixels: 'match_input',
-        guidance: 30,
-        num_inference_steps: 28,
+        prompt: inpaint.prompt,
+        output_format: inpaint.outputFormat,
+        megapixels: inpaint.megapixels,
+        guidance: inpaint.guidance,
+        num_inference_steps: inpaint.numInferenceSteps,
       },
       token,
     });
@@ -137,7 +137,8 @@ export async function runObjectRemoveInpaint(params: {
     return finalizeInpaintOutput(mock, originalWidth, originalHeight);
   }
 
-  const prompt = resolveObjectRemoveInpaintPrompt(params.editMode ?? 'remove', params.prompt);
+  const editMode = params.editMode ?? 'remove';
+  const inpaint = resolveObjectRemoveInpaintSettings(editMode, params.prompt);
   let imageUrl = params.imageUrl;
   let maskUrl = params.maskUrl;
   let tempPaths: string[] = [];
@@ -153,7 +154,7 @@ export async function runObjectRemoveInpaint(params: {
   }
 
   try {
-    const result = await runReplicateInpaint(imageUrl, maskUrl, prompt);
+    const result = await runReplicateInpaint(imageUrl, maskUrl, inpaint);
     return finalizeInpaintOutput(result, originalWidth, originalHeight);
   } catch (err) {
     console.error('[object-remove] Replicate inpaint failed', err);

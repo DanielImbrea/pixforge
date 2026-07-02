@@ -1,4 +1,13 @@
 import sharp from 'sharp';
+import {
+  blurGreyMask,
+  dilateBinary,
+  type MaskMorphGrid,
+} from '@/lib/tools/object-remove-mask-morph';
+import {
+  OBJECT_REMOVE_INPAINT_MASK_DILATE_PX,
+  OBJECT_REMOVE_INPAINT_MASK_FEATHER_PX,
+} from '@/lib/tools/object-remove-inpaint-config';
 
 const FLUX_ALIGN = 32;
 const FLUX_MAX_SIDE = 1440;
@@ -31,6 +40,32 @@ async function validateMaskCoverage(maskBuffer: Buffer): Promise<void> {
   }
 }
 
+/** Expand + soften mask for Flux Fill (removes edges, shadows, seams). */
+async function prepareInpaintMask(maskBuffer: Buffer, width: number, height: number): Promise<Buffer> {
+  const { data } = await sharp(maskBuffer)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const binary = new Uint8Array(width * height);
+  for (let i = 0; i < binary.length; i++) {
+    binary[i] = data[i] > 128 ? 1 : 0;
+  }
+
+  let grid: MaskMorphGrid = { data: binary, width, height };
+  grid = dilateBinary(grid, OBJECT_REMOVE_INPAINT_MASK_DILATE_PX);
+
+  let grey = new Uint8Array(grid.data.length);
+  for (let i = 0; i < grid.data.length; i++) {
+    grey[i] = grid.data[i] ? 255 : 0;
+  }
+  const feathered = blurGreyMask(grey, width, height, OBJECT_REMOVE_INPAINT_MASK_FEATHER_PX);
+
+  return sharp(Buffer.from(feathered), { raw: { width, height, channels: 1 } })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
 /** Align image + mask for flux-fill-dev (same size, binary mask, multiples of 32). */
 export async function normalizeObjectRemoveInpaintInputs(
   imageBuffer: Buffer,
@@ -57,6 +92,8 @@ export async function normalizeObjectRemoveInpaintInputs(
     .threshold(128)
     .png({ compressionLevel: 9 })
     .toBuffer();
+
+  const maskForInpaint = await prepareInpaintMask(maskAlignedToImage, originalWidth, originalHeight);
 
   if (maskWidth !== originalWidth || maskHeight !== originalHeight) {
     console.warn('[object-remove] mask dimensions adjusted to match image', {
@@ -85,7 +122,7 @@ export async function normalizeObjectRemoveInpaintInputs(
       .resize(alignedWidth, alignedHeight, { fit: 'fill' })
       .jpeg({ quality: 95, mozjpeg: true })
       .toBuffer(),
-    sharp(maskAlignedToImage)
+    sharp(maskForInpaint)
       .resize(alignedWidth, alignedHeight, { fit: 'fill' })
       .png({ compressionLevel: 9 })
       .toBuffer(),

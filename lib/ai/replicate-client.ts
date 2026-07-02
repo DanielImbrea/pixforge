@@ -18,7 +18,7 @@ import type { BgRemovalRouting } from '@/lib/ai/bg-removal-routing';
 import { resolveBlurFacesPinnedVersion } from '@/lib/ai/blur-faces-config';
 import type { PortraitEnhanceRouting } from '@/lib/ai/portrait-enhance-routing';
 import type { BlurFacesRouting } from '@/lib/ai/blur-faces-routing';
-import { resolveObjectRemoveInpaintPrompt } from '@/lib/tools/object-remove-params';
+import { resolveObjectRemoveInpaintSettings } from '@/lib/tools/object-remove-inpaint-config';
 import type { ProcessResult } from '@/lib/tools/processor';
 
 const REPLICATE_API = 'https://api.replicate.com/v1';
@@ -179,18 +179,18 @@ function buildReplicateInput(
     }
     const editMode =
       params.editMode === 'replace' ? 'replace' : ('remove' as const);
-    const prompt = resolveObjectRemoveInpaintPrompt(
+    const inpaint = resolveObjectRemoveInpaintSettings(
       editMode,
       typeof params.inpaintPrompt === 'string' ? params.inpaintPrompt : ''
     );
     return {
       image: inputAssetUrl,
       mask: maskUrl,
-      prompt,
-      output_format: 'jpg',
-      megapixels: 'match_input',
-      guidance: 30,
-      num_inference_steps: 28,
+      prompt: inpaint.prompt,
+      output_format: inpaint.outputFormat,
+      megapixels: inpaint.megapixels,
+      guidance: inpaint.guidance,
+      num_inference_steps: inpaint.numInferenceSteps,
     };
   }
 

@@ -17,9 +17,10 @@ import {
   prepareSamImage,
   resetSamSession,
   SamSegmentError,
-  segmentSamAtClick,
+  segmentSamAtClickWithAssist,
   undoSamClick,
 } from '@/lib/image/sam-segment-browser';
+import { clickCentroidFromSamMask } from '@/lib/tools/object-remove-sam-postprocess';
 import { imageToDisplayCoords, pointerToImageCoords } from '@/lib/tools/object-remove-coords';
 import {
   countMaskPixels,
@@ -346,10 +347,15 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         const clickType = exclude || brushMode === 'erase' ? 'exclude' : 'include';
 
         try {
-          const samMask = await segmentSamAtClick(sourceCanvas, point, clickType);
+          const samMask = await segmentSamAtClickWithAssist(
+            sourceCanvas,
+            point,
+            clickType,
+            imageWidth,
+            imageHeight
+          );
           if (samMask) {
-            // SAM session returns the full mask for all clicks — replace, don't merge.
-            setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight);
+            setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight, point);
           }
         } catch (err) {
           const message =
@@ -392,7 +398,8 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         maskCtx.fillRect(0, 0, imageWidth, imageHeight);
         overlayCtx.clearRect(0, 0, imageWidth, imageHeight);
       } else {
-        setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight);
+        const centroid = clickCentroidFromSamMask(samMask);
+        setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight, centroid);
       }
       refreshMaskState();
     }, [imageHeight, imageWidth, isEditingDisabled, refreshMaskState, selectionTool]);

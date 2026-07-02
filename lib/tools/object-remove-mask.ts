@@ -1,3 +1,5 @@
+import { postprocessSamMask } from '@/lib/tools/object-remove-sam-postprocess';
+
 const MASK_FILL = { r: 255, g: 255, b: 255, a: 255 };
 const OVERLAY_FILL = { r: 239, g: 68, b: 68, a: 128 };
 const OUTLINE_COLOR = { r: 255, g: 255, b: 255, a: 220 };
@@ -67,8 +69,7 @@ export function resizeSamMaskToImage(
   const targetCtx = targetCanvas.getContext('2d');
   if (!targetCtx) return samMask;
 
-  targetCtx.imageSmoothingEnabled = true;
-  targetCtx.imageSmoothingQuality = 'high';
+  targetCtx.imageSmoothingEnabled = false;
   targetCtx.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
   return targetCtx.getImageData(0, 0, targetWidth, targetHeight);
 }
@@ -122,18 +123,26 @@ export function applySamMaskToCanvas(
   drawMaskOutline(maskCtx, overlayCtx, width, height);
 }
 
-/** Replace mask entirely from SAM output (used when undoing smart clicks). */
+/** Replace mask entirely from SAM output with premium post-processing. */
 export function setMaskFromSam(
   maskCtx: CanvasRenderingContext2D,
   overlayCtx: CanvasRenderingContext2D,
   samMask: ImageData,
   width: number,
-  height: number
+  height: number,
+  click: { x: number; y: number }
 ) {
+  const scaledMask =
+    samMask.width === width && samMask.height === height
+      ? samMask
+      : resizeSamMaskToImage(samMask, width, height);
+
+  const { mask: processed } = postprocessSamMask(scaledMask, click);
+
   maskCtx.fillStyle = '#000000';
   maskCtx.fillRect(0, 0, width, height);
   overlayCtx.clearRect(0, 0, width, height);
-  applySamMaskToCanvas(maskCtx, overlayCtx, samMask, width, height, false);
+  applySamMaskToCanvas(maskCtx, overlayCtx, processed, width, height, false);
 }
 
 /** Union or subtract a SAM mask into the existing brush/click selection. */

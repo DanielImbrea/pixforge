@@ -8,6 +8,7 @@ export {
   prepareSamImage,
   resetSamSession,
   segmentSamAtClick,
+  segmentSamAtClickWithAssist,
   undoSamClick,
   clearSamClicks,
   disposeSamWorker,

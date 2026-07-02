@@ -2,6 +2,9 @@
 
 import { SamSegmentError } from '@/lib/image/sam-segment-error';
 
+import { postprocessSamMask } from '@/lib/tools/object-remove-sam-postprocess';
+import { resizeSamMaskToImage } from '@/lib/tools/object-remove-mask';
+
 export type SamClickType = 'include' | 'exclude';
 
 type MinisamModule = typeof import('minisam');
@@ -147,6 +150,50 @@ export async function segmentSamAtClick(
   if (!mask) {
     throw new SamSegmentError('Smart selection did not produce a mask. Try another click.');
   }
+  return mask;
+}
+
+const ASSIST_OFFSETS = [
+  [20, 0],
+  [-20, 0],
+  [0, 20],
+  [0, -20],
+  [14, 14],
+  [-14, -14],
+  [14, -14],
+  [-14, 14],
+] as const;
+
+/**
+ * Segment at click; if quality is weak, add nearby include clicks automatically (Canva-like).
+ */
+export async function segmentSamAtClickWithAssist(
+  source: HTMLCanvasElement | HTMLImageElement,
+  point: { x: number; y: number },
+  clickType: SamClickType,
+  imageWidth: number,
+  imageHeight: number
+): Promise<ImageData | null> {
+  let mask = await segmentSamAtClick(source, point, clickType);
+  if (!mask || clickType === 'exclude') return mask;
+
+  const scaled = resizeSamMaskToImage(mask, imageWidth, imageHeight);
+  let { quality } = postprocessSamMask(scaled, point);
+  if (quality.acceptable) return mask;
+
+  for (const [dx, dy] of ASSIST_OFFSETS) {
+    const nx = Math.max(0, Math.min(imageWidth - 1, point.x + dx));
+    const ny = Math.max(0, Math.min(imageHeight - 1, point.y + dy));
+    mask = await segmentSamAtClick(source, { x: nx, y: ny }, 'include');
+    if (!mask) continue;
+    const retryScaled = resizeSamMaskToImage(mask, imageWidth, imageHeight);
+    const retry = postprocessSamMask(retryScaled, point);
+    if (retry.quality.score > quality.score) {
+      quality = retry.quality;
+    }
+    if (retry.quality.acceptable) break;
+  }
+
   return mask;
 }
 
