@@ -82,6 +82,13 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser();
     const pathname = request.nextUrl.pathname;
 
+    if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+      const suffix = pathname.slice('/admin'.length);
+      const redirect = NextResponse.redirect(new URL(`/${defaultLocale}/admin${suffix}`, request.url));
+      copyCookies(response, redirect);
+      return redirect;
+    }
+
     if (!user && isProtectedPath(pathname)) {
       const locale = getLocaleFromPath(pathname);
       const redirectUrl = new URL(`/${locale}/auth/login`, request.url);

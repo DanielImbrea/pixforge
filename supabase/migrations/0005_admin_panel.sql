@@ -29,3 +29,4 @@ alter table public.admin_audit_logs enable row level security;
 
 -- Grant first admin (run manually after deploy):
 -- update public.users set role = 'admin' where email = 'your@email.com';
+-- Or set ADMIN_EMAIL on Vercel to your login email (comma-separated for multiple).

@@ -17,27 +17,8 @@ interface SettingsPrivacySectionProps {
 export function SettingsPrivacySection({ locale }: SettingsPrivacySectionProps) {
   const t = useTranslations('settings');
   const router = useRouter();
-  const [loadingAction, setLoadingAction] = useState<'export' | 'delete' | null>(null);
+  const [loadingAction, setLoadingAction] = useState<'delete' | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const exportData = async () => {
-    setLoadingAction('export');
-    setMessage(null);
-    const res = await fetch('/api/account/export');
-    setLoadingAction(null);
-    if (!res.ok) {
-      setMessage({ type: 'error', text: t('actionFailed') });
-      return;
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `pixiqueai-export-${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setMessage({ type: 'success', text: t('exportDataSuccess') });
-  };
 
   const deleteAccount = async () => {
     if (!window.confirm(t('deleteAccountConfirm'))) return;
@@ -58,17 +39,6 @@ export function SettingsPrivacySection({ locale }: SettingsPrivacySectionProps) 
   return (
     <SettingsSection icon={ShieldAlert} title={t('privacyTitle')} description={t('privacyDescription')}>
       <SettingsRow label={t('retentionPolicyLabel')} description={t('retentionPolicyDescription')} />
-
-      <SettingsRow label={t('exportDataLabel')} description={t('exportDataDescription')}>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={loadingAction !== null}
-          onClick={() => void exportData()}
-        >
-          {loadingAction === 'export' ? t('working') : t('exportDataButton')}
-        </Button>
-      </SettingsRow>
 
       <div className="mt-4 rounded-lg border border-danger/30 bg-danger/5 p-4">
         <SettingsRow label={t('deleteAccountLabel')} description={t('deleteAccountDescription')} border={false}>
