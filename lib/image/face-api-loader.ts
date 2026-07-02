@@ -1,7 +1,6 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { TextDecoder, TextEncoder } from 'util';
 import sharp from 'sharp';
 import type * as FaceApiTypes from '@vladmandic/face-api';
 
@@ -72,23 +71,17 @@ class NodeImage {
   onload: (() => void) | null = null;
 }
 
-/** face-api reads TextEncoder at import time — set before dynamic import. */
-(function installNodeShimsSync() {
-  for (const [key, value] of [
-    ['TextEncoder', TextEncoder],
-    ['TextDecoder', TextDecoder],
-  ] as const) {
-    try {
-      Object.defineProperty(globalThis, key, {
-        value,
-        writable: true,
-        configurable: true,
-      });
-    } catch {
-      // Node 20+ already provides these globals.
-    }
+/**
+ * Bundled tfjs picks a broken Node platform when `process.versions.node` is set
+ * inside webpack server chunks (empty util shim → "TextEncoder is not a constructor").
+ * Hide the node version so tfjs registers the browser platform instead.
+ */
+function prepareTfjsBrowserPlatform(): void {
+  if (typeof process === 'undefined' || !process.versions) return;
+  if ('node' in process.versions) {
+    delete (process.versions as NodeJS.Dict<string>).node;
   }
-})();
+}
 
 async function resolveLocalModelPath(): Promise<string | null> {
   for (const candidate of [VENDOR_MODEL_PATH, PUBLIC_MODEL_PATH, MODEL_RELATIVE_PATH]) {
@@ -166,6 +159,7 @@ export function getFaceMatchThreshold(): number {
 async function loadFaceApiModule(): Promise<FaceApiModule> {
   if (faceapi) return faceapi;
 
+  prepareTfjsBrowserPlatform();
   const mod = await import('@vladmandic/face-api');
   faceapi = ((mod as { default?: FaceApiModule }).default ?? mod) as FaceApiModule;
 
