@@ -109,7 +109,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   await admin.from('image_jobs').update({ status: 'processing' }).eq('id', jobRow.id);
 
   const processor = getProcessor(tool);
-  const result = await processor.process({ job: jobForProcess, tool, inputAssetUrl });
+  let result;
+  try {
+    result = await processor.process({ job: jobForProcess, tool, inputAssetUrl });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Processing failed.';
+    console.error('[process] uncaught processor error', {
+      jobId: jobRow.id,
+      toolId: tool.id,
+      message,
+    });
+    await admin
+      .from('image_jobs')
+      .update({ status: 'failed', error_message: message })
+      .eq('id', jobRow.id);
+    await refundFailedJob(user, jobRow);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   if (tool.category === 'object_remove' && !(jobForProcess.params as Record<string, unknown>)?._maskAssetUrl) {
     await admin

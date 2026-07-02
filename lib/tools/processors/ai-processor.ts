@@ -1,6 +1,7 @@
 import { getAiProvider } from '@/lib/ai/config';
 import { resolveBlurFacesRoute } from '@/lib/ai/blur-faces-routing';
 import { resolveBgRemovalRoute } from '@/lib/ai/bg-removal-routing';
+import { mapReplicateError } from '@/lib/ai/replicate-errors';
 import { submitMockJob } from '@/lib/ai/mock-provider';
 import { enhancePortraitFaces } from '@/lib/ai/portrait-enhance-pipeline';
 import { submitReplicateJob } from '@/lib/ai/replicate-client';
@@ -92,29 +93,69 @@ export const aiProcessor: ToolProcessor = {
     }
 
     if (tool.category === 'portrait_enhance') {
-      const buffer = await fetchAsBuffer(inputAssetUrl);
-      const profile = await classifyImageContent(buffer);
-      const routing = resolvePortraitEnhanceRoute(profile, params);
       const provider = getAiProvider();
-      const enhanced = await enhancePortraitFaces({
-        inputBuffer: buffer,
-        userId: job.user_id,
-        routing,
-        provider: provider === 'replicate' ? 'replicate' : 'mock',
-      });
+      try {
+        const buffer = await fetchAsBuffer(inputAssetUrl);
+        const profile = await classifyImageContent(buffer);
+        const routing = resolvePortraitEnhanceRoute(profile, params);
+        const enhanced = await enhancePortraitFaces({
+          inputBuffer: buffer,
+          userId: job.user_id,
+          routing,
+          provider: provider === 'replicate' ? 'replicate' : 'mock',
+        });
 
-      return {
-        status: 'done',
-        outputBuffer: enhanced.buffer,
-        outputMimeType: enhanced.mimeType,
-        contentKind: profile.kind,
-        portraitEnhanceReasonKey: routing.reasonKey,
-        portraitEnhanceWarningKey: routing.warningKey,
-        portraitEnhanceModelLabel: routing.modelLabel,
-        portraitEnhanceStyle: routing.enhanceStyle,
-        portraitEnhanceRouting: routing,
-        inputSizeBytes: buffer.byteLength,
-      };
+        return {
+          status: 'done',
+          outputBuffer: enhanced.buffer,
+          outputMimeType: enhanced.mimeType,
+          contentKind: profile.kind,
+          portraitEnhanceReasonKey: routing.reasonKey,
+          portraitEnhanceWarningKey: routing.warningKey,
+          portraitEnhanceModelLabel: routing.modelLabel,
+          portraitEnhanceStyle: routing.enhanceStyle,
+          portraitEnhanceRouting: routing,
+          inputSizeBytes: buffer.byteLength,
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Portrait enhancement failed.';
+        if (message.includes('No faces were detected')) {
+          return {
+            status: 'failed',
+            error:
+              'No face was detected in this image. Use a clear modern portrait or selfie where the face is visible.',
+          };
+        }
+
+        if (
+          message.includes('Portrait enhancement failed (') ||
+          message.includes('Portrait enhancement did not complete') ||
+          message.includes('Portrait enhancement returned no image')
+        ) {
+          const mapped = mapReplicateError(err, {
+            jobId: job.id,
+            toolCategory: tool.category,
+            model: 'sczhou/codeformer',
+          });
+          console.error(mapped.logMessage, mapped.logContext);
+          return {
+            status: 'failed',
+            error: mapped.userMessage,
+            errorKey: mapped.errorKey,
+            errorDetail: mapped.errorDetail,
+          };
+        }
+
+        console.error('[portrait-enhance] pipeline failed', {
+          jobId: job.id,
+          message,
+        });
+        return {
+          status: 'failed',
+          error:
+            'Portrait enhancement could not start for this image. Please try another clear selfie or portrait.',
+        };
+      }
     }
 
     let workingJob = job;
