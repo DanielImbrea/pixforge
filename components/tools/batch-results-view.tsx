@@ -124,7 +124,7 @@ export function BatchResultsView({
                         className="shrink-0 whitespace-nowrap self-center"
                         onClick={() => onDownload(item.jobId)}
                       >
-                        {item.canDownloadHd ? t('downloadHd') : t('downloadFree')}
+                        {t('downloadModalDownload')}
                       </Button>
                     </div>
                   </div>

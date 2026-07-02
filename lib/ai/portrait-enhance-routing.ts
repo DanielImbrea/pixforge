@@ -1,51 +1,68 @@
 import type { ImageContentProfile } from '@/lib/image/classify-content';
-import type { PortraitEnhanceStyle } from '@/lib/tools/portrait-enhance-params';
+import {
+  normalizePortraitEnhanceParams,
+  type PortraitEnhanceIntensity,
+  type PortraitEnhanceMode,
+  type PortraitEnhanceParams,
+  type PortraitEnhancePreset,
+} from '@/lib/tools/portrait-enhance-params';
 
 export interface PortraitEnhanceRouting {
-  model: string;
-  modelLabel: string;
-  enhanceStyle: PortraitEnhanceStyle;
+  mode: PortraitEnhanceMode;
+  preset: PortraitEnhancePreset;
+  intensity: PortraitEnhanceIntensity;
+  /** Resolved at runtime per face — enhance (regional) or restore (CodeFormer). */
+  expectedMode: 'enhance' | 'restore';
+  restoreModel: string;
+  restoreModelLabel: string;
   codeformerFidelity: number;
-  faceUpsample: boolean;
-  backgroundEnhance: boolean;
   reasonKey: string;
   warningKey?: string;
+  /** @deprecated */
+  enhanceStyle?: 'natural' | 'glamour';
+  /** @deprecated */
+  model?: string;
+  /** @deprecated */
+  modelLabel?: string;
+  faceUpsample?: boolean;
+  backgroundEnhance?: boolean;
 }
 
-function getPortraitEnhanceModel(): string {
+function getRestoreModel(): string {
   return process.env.REPLICATE_PORTRAIT_ENHANCE_MODEL?.trim() || 'sczhou/codeformer';
 }
 
-function parseEnhanceStyle(value: unknown): PortraitEnhanceStyle {
-  if (value === 'glamour') return value;
-  return 'natural';
-}
-
-const FIDELITY_BY_STYLE: Record<PortraitEnhanceStyle, number> = {
-  natural: 0.86,
-  glamour: 0.78,
-};
-
-const REASON_BY_STYLE: Record<PortraitEnhanceStyle, string> = {
+const REASON_BY_PRESET: Record<PortraitEnhancePreset, string> = {
   natural: 'portraitEnhanceReasonNatural',
   glamour: 'portraitEnhanceReasonGlamour',
+  custom: 'portraitEnhanceReasonCustom',
 };
 
 export function resolvePortraitEnhanceRoute(
   profile: ImageContentProfile,
-  params: { enhanceStyle?: unknown } = {}
+  params: Partial<PortraitEnhanceParams> & { enhanceStyle?: 'natural' | 'glamour' } = {}
 ): PortraitEnhanceRouting {
-  const enhanceStyle = parseEnhanceStyle(params.enhanceStyle);
+  const normalized = normalizePortraitEnhanceParams(params);
   const warningKey = profile.kind !== 'photo' ? 'portraitEnhanceWarnNotPhoto' : undefined;
+  const restoreModel = getRestoreModel();
+
+  const expectedMode: 'enhance' | 'restore' =
+    normalized.mode === 'restore' ? 'restore' : normalized.mode === 'enhance' ? 'enhance' : 'enhance';
 
   return {
-    model: getPortraitEnhanceModel(),
-    modelLabel: 'CodeFormer portrait enhancer',
-    enhanceStyle,
-    codeformerFidelity: FIDELITY_BY_STYLE[enhanceStyle],
+    mode: normalized.mode,
+    preset: normalized.preset,
+    intensity: normalized.intensity,
+    expectedMode,
+    restoreModel,
+    restoreModelLabel: 'CodeFormer (restore only)',
+    codeformerFidelity: normalized.preset === 'glamour' ? 0.82 : 0.88,
+    reasonKey: REASON_BY_PRESET[normalized.preset],
+    warningKey,
+    enhanceStyle: normalized.preset === 'glamour' ? 'glamour' : 'natural',
+    model: restoreModel,
+    modelLabel: 'Regional portrait enhance',
     faceUpsample: false,
     backgroundEnhance: false,
-    reasonKey: REASON_BY_STYLE[enhanceStyle],
-    warningKey,
   };
 }

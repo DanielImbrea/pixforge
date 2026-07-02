@@ -34,17 +34,17 @@ export const portraitEnhanceTool: ToolDefinition = {
         intro:
           'Upload a modern portrait or selfie and let AI subtly improve facial detail, reduce noise, and refine clarity while keeping the same identity and natural skin texture.',
         howItWorks:
-          'AI detects faces in your photo, enhances only the face regions, and blends them back into the original image so the result looks like the same person photographed with a better camera.',
+          'We detect facial landmarks, apply subtle per-region adjustments (skin, eyes, lips, lighting), and blend them back at your chosen intensity. CodeFormer restoration runs only in Auto/Restore mode for blurry or compressed photos.',
         useCases: [
           'Profile photos for CV, LinkedIn, and social media',
           'Selfies and creator portraits',
           'Portraits taken in low light or with phone compression',
         ],
         aiExplanation: [
-          'Face-only enhancement — detects and enhances facial regions without changing the background',
-          'Identity preservation — keeps eye color, facial shape, lips, brows, age cues, and hairstyle intact',
-          'Two subtle styles — choose Natural or Glamour depending on how visible you want the enhancement to be',
-          'No fake beauty filter — improves facial clarity while preserving pores, lighting, and realistic texture',
+          'Regional enhancement — eyes, skin, lips, and lighting adjusted separately, not one global filter',
+          'Identity preserved — each effect is blended from your original pixels, not face reconstruction',
+          'Auto mode — restoration AI only when the face crop is blurry or low-resolution',
+          'Intensity sliders — control overall strength and each facial region from 0–100%',
         ],
         benefits: [
           'Premium portrait enhancement directly in your browser',

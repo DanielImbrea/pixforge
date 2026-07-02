@@ -1,28 +1,21 @@
-import sharp from 'sharp';
-import type { PortraitEnhanceStyle } from '@/lib/tools/portrait-enhance-params';
+import { runPortraitEnhancePipeline } from '@/lib/ai/portrait-enhance/pipeline';
+import { normalizePortraitEnhanceParams } from '@/lib/tools/portrait-enhance-params';
+import type { PortraitEnhanceParams } from '@/lib/tools/portrait-enhance-params';
 
 export async function applyMockPortraitEnhance(
-  buffer: Buffer,
-  style: PortraitEnhanceStyle
+  inputBuffer: Buffer,
+  params: Partial<PortraitEnhanceParams> & { enhanceStyle?: 'natural' | 'glamour' } = {}
 ): Promise<Buffer> {
-  const meta = await sharp(buffer).rotate().metadata();
-  let pipeline = sharp(buffer).rotate();
-
-  if (style === 'glamour') {
-    pipeline = pipeline
-      .modulate({ saturation: 1.1, brightness: 1.04 })
-      .sharpen({ sigma: 1.15, m1: 0.5, m2: 2.5 });
-  } else {
-    pipeline = pipeline
-      .sharpen({ sigma: 0.75, m1: 0.35, m2: 1.8 })
-      .modulate({ brightness: 1.015, saturation: 1.03 });
-  }
-
-  if (meta.format === 'png') {
-    return pipeline.png({ compressionLevel: 8 }).toBuffer();
-  }
-  if (meta.format === 'webp') {
-    return pipeline.webp({ quality: 92 }).toBuffer();
-  }
-  return pipeline.jpeg({ quality: 92, mozjpeg: true }).toBuffer();
+  const normalized = normalizePortraitEnhanceParams(params);
+  const result = await runPortraitEnhancePipeline({
+    inputBuffer,
+    userId: 'mock',
+    provider: 'mock',
+    mode: normalized.mode,
+    preset: normalized.preset,
+    intensity: normalized.intensity,
+    restoreModel: 'sczhou/codeformer',
+    codeformerFidelity: 0.88,
+  });
+  return result.buffer;
 }

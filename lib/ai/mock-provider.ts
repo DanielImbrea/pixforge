@@ -138,10 +138,12 @@ export async function submitMockJob(
         | PortraitEnhanceRouting
         | undefined;
       const inputBuffer = await fetchAsBuffer(inputAssetUrl);
-      const outputBuffer = await applyMockPortraitEnhance(
-        inputBuffer,
-        routing?.enhanceStyle ?? 'natural'
-      );
+      const outputBuffer = await applyMockPortraitEnhance(inputBuffer, {
+        mode: routing?.mode,
+        preset: routing?.preset,
+        intensity: routing?.intensity,
+        enhanceStyle: routing?.enhanceStyle,
+      });
       const meta = await (await import('sharp')).default(inputBuffer).rotate().metadata();
       const mimeType =
         meta.format === 'png'

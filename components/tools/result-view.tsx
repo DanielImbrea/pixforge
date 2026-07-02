@@ -329,12 +329,12 @@ export function ResultView({
       <div className="flex items-center gap-3">
         {canDownloadHd ? (
           <Button variant="primary" onClick={onDownload}>
-            {t('downloadHd')}
+            {t('downloadModalDownload')}
           </Button>
         ) : (
           <>
             <Button variant="secondary" onClick={onDownload}>
-              {t('downloadFree')}
+              {t('downloadModalDownload')}
             </Button>
             <Button variant="primary" onClick={onUpgradeClick}>
               {t('upgradeForHd')}

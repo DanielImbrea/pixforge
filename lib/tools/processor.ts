@@ -45,6 +45,7 @@ export interface ProcessResult {
   portraitEnhanceWarningKey?: string;
   portraitEnhanceModelLabel?: string;
   portraitEnhanceStyle?: string;
+  portraitEnhanceMode?: 'enhance' | 'restore';
   portraitEnhanceRouting?: import('@/lib/ai/portrait-enhance-routing').PortraitEnhanceRouting;
   providerJobId?: string;
   error?: string;

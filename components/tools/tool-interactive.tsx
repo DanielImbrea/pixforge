@@ -44,7 +44,10 @@ import {
 } from '@/lib/tools/resize-params';
 import { ToolConfigureLayout, ToolLayout } from './tool-layout';
 import { buildToolParams, validateToolParams } from '@/lib/tools/validate-params';
-import { buildDownloadFallbackFilename, triggerBrowserDownload, triggerBrowserDownloadPost } from '@/lib/utils/trigger-download';
+import { triggerBrowserDownloadPost } from '@/lib/utils/trigger-download';
+import { DownloadModal } from './download-modal';
+import type { DownloadModalContext } from '@/lib/tools/download-export/types';
+import { inferHasTransparency } from '@/lib/tools/download-export/settings';
 
 type JobResultPayload = {
   previewUrl: string;
@@ -277,6 +280,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const [objectRemoveErasing, setObjectRemoveErasing] = useState(false);
   const objectRemovePreviewUrlRef = useRef<string | null>(null);
   const objectRemoveEditorRef = useRef<ObjectRemoveEditorHandle>(null);
+  const autoOpenedDownloadJobRef = useRef<string | null>(null);
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [downloadContext, setDownloadContext] = useState<DownloadModalContext | null>(null);
   const [cropParams, setCropParams] = useState<CropParams>(DEFAULT_CROP_PARAMS);
   const [blurFacesParams, setBlurFacesParams] = useState(DEFAULT_BLUR_FACES_PARAMS);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -962,25 +968,119 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     t,
   ]);
 
+  const openDownloadModal = useCallback(
+    (params: {
+      jobId: string;
+      previewUrl: string;
+      outputWidth?: number | null;
+      outputHeight?: number | null;
+      outputSizeBytes?: number | null;
+      outputFormatLabel?: string | null;
+      fileNameBase?: string;
+    }) => {
+      const context: DownloadModalContext = {
+        jobId: params.jobId,
+        previewUrl: params.previewUrl,
+        toolCategory: tool.category,
+        plan: userPlan ?? 'free',
+        processedWidth: params.outputWidth ?? 0,
+        processedHeight: params.outputHeight ?? 0,
+        originalWidth: originalImageMeta?.width ?? null,
+        originalHeight: originalImageMeta?.height ?? null,
+        sourceSizeBytes: params.outputSizeBytes ?? null,
+        hasTransparency: inferHasTransparency(
+          tool.category,
+          params.outputFormatLabel ?? null
+        ),
+        fileNameBase: params.fileNameBase,
+      };
+      setDownloadContext(context);
+      setDownloadModalOpen(true);
+    },
+    [tool.category, userPlan, originalImageMeta]
+  );
+
   const handleDownload = useCallback(
-    async (targetJobId?: string, downloadFileName?: string) => {
+    (targetJobId?: string, downloadFileName?: string) => {
       const id = targetJobId || jobId;
       if (!id) return;
 
-      const fallback =
-        downloadFileName ||
-        (isResizeTool && outputWidth && outputHeight && selectedFile
-          ? buildResizeDownloadFilename(selectedFile.name, outputWidth, outputHeight)
-          : buildDownloadFallbackFilename('image/webp', id));
-
-      try {
-        await triggerBrowserDownload(`/api/assets/${id}/download`, fallback);
-      } catch {
-        // Keep the result visible; browser may block popups or network failed.
+      if (targetJobId) {
+        const item = batchResults.find((entry) => entry.jobId === targetJobId);
+        if (!item?.previewUrl) return;
+        openDownloadModal({
+          jobId: id,
+          previewUrl: item.previewUrl,
+          outputWidth: item.outputWidth,
+          outputHeight: item.outputHeight,
+          outputSizeBytes: item.outputSizeBytes,
+          fileNameBase:
+            downloadFileName ??
+            (isResizeTool && item.outputWidth && item.outputHeight
+              ? buildResizeDownloadFilename(item.fileName, item.outputWidth, item.outputHeight)
+              : item.fileName),
+        });
+        return;
       }
+
+      if (!previewUrl) return;
+      openDownloadModal({
+        jobId: id,
+        previewUrl,
+        outputWidth,
+        outputHeight,
+        outputSizeBytes,
+        outputFormatLabel,
+        fileNameBase:
+          downloadFileName ??
+          (isResizeTool && outputWidth && outputHeight && selectedFile
+            ? buildResizeDownloadFilename(selectedFile.name, outputWidth, outputHeight)
+            : selectedFile?.name),
+      });
     },
-    [jobId, isResizeTool, outputWidth, outputHeight, selectedFile]
+    [
+      jobId,
+      previewUrl,
+      outputWidth,
+      outputHeight,
+      outputSizeBytes,
+      outputFormatLabel,
+      selectedFile,
+      batchResults,
+      isResizeTool,
+      openDownloadModal,
+    ]
   );
+
+  useEffect(() => {
+    if (stage !== 'result' || batchMode || !jobId || !previewUrl) return;
+    if (autoOpenedDownloadJobRef.current === jobId) return;
+    autoOpenedDownloadJobRef.current = jobId;
+    openDownloadModal({
+      jobId,
+      previewUrl,
+      outputWidth,
+      outputHeight,
+      outputSizeBytes,
+      outputFormatLabel,
+      fileNameBase:
+        isResizeTool && outputWidth && outputHeight && selectedFile
+          ? buildResizeDownloadFilename(selectedFile.name, outputWidth, outputHeight)
+          : selectedFile?.name,
+    });
+  }, [
+    stage,
+    batchMode,
+    jobId,
+    previewUrl,
+    outputWidth,
+    outputHeight,
+    outputSizeBytes,
+    outputFormatLabel,
+    selectedFile,
+    isResizeTool,
+    openDownloadModal,
+  ]);
 
   const handleDownloadAll = useCallback(async () => {
     const doneItems = batchResults.filter((item) => item.status === 'done' && item.jobId);
@@ -1018,6 +1118,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
     setBatchMode(false);
     setStage('configure');
     setJobId(null);
+    autoOpenedDownloadJobRef.current = null;
+    setDownloadModalOpen(false);
+    setDownloadContext(null);
     setPreviewUrl(null);
     setOutputWidth(null);
     setOutputHeight(null);
@@ -1085,6 +1188,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       : undefined;
 
   return (
+    <>
     <ToolLayout
       stage={stage}
       className={isCropTool || isObjectRemoveTool ? 'max-w-5xl' : undefined}
@@ -1381,7 +1485,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
                 isResizeTool && item?.outputWidth && item?.outputHeight
                   ? buildResizeDownloadFilename(item.fileName, item.outputWidth, item.outputHeight)
                   : undefined;
-              void handleDownload(id, downloadFileName);
+              handleDownload(id, downloadFileName);
             }}
             onDownloadAll={() => void handleDownloadAll()}
             onReset={handleReset}
@@ -1436,7 +1540,7 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               }
               inputWidth={originalImageMeta?.width ?? null}
               inputHeight={originalImageMeta?.height ?? null}
-              onDownload={() => void handleDownload()}
+              onDownload={() => handleDownload()}
               onUpgradeClick={handleUpgradeClick}
               onReset={handleReset}
             />
@@ -1457,5 +1561,12 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
         </div>
       }
     />
+    <DownloadModal
+      open={downloadModalOpen}
+      context={downloadContext}
+      onClose={() => setDownloadModalOpen(false)}
+      onUpgradeClick={handleUpgradeClick}
+    />
+    </>
   );
 }

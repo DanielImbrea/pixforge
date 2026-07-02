@@ -324,7 +324,12 @@ export async function syncMockJobIfComplete(jobRow: ImageJobRow): Promise<void> 
       const routing = (jobRow.params as Record<string, unknown> | undefined)?._portraitEnhanceRouting as
         | PortraitEnhanceRouting
         | undefined;
-      const buffer = await applyMockPortraitEnhance(inputBuffer, routing?.enhanceStyle ?? 'natural');
+      const buffer = await applyMockPortraitEnhance(inputBuffer, {
+        mode: routing?.mode,
+        preset: routing?.preset,
+        intensity: routing?.intensity,
+        enhanceStyle: routing?.enhanceStyle,
+      });
       const sharp = (await import('sharp')).default;
       const meta = await sharp(inputBuffer).rotate().metadata();
       const mimeType =

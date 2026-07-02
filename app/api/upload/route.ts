@@ -39,7 +39,19 @@ function parseToolParams(tool: ToolDefinition, paramsRaw: FormDataEntryValue | n
       return { brushSize: 36, editMode: 'remove', selectionTool: 'brush', inpaintPrompt: '' };
     }
     if (tool.category === 'portrait_enhance') {
-      return { enhanceStyle: 'natural' };
+      return {
+        preset: 'natural',
+        mode: 'auto',
+        intensity: {
+          overall: 32,
+          skin: 22,
+          eyes: 28,
+          lips: 12,
+          teeth: 15,
+          underEye: 24,
+          lighting: 18,
+        },
+      };
     }
     if (tool.category === 'faces') {
       return { detectionMode: 'automatic', blurStrength: 'medium', customAction: 'blur' };

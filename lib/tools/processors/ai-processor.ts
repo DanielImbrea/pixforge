@@ -113,8 +113,11 @@ export const aiProcessor: ToolProcessor = {
           contentKind: profile.kind,
           portraitEnhanceReasonKey: routing.reasonKey,
           portraitEnhanceWarningKey: routing.warningKey,
-          portraitEnhanceModelLabel: routing.modelLabel,
-          portraitEnhanceStyle: routing.enhanceStyle,
+          portraitEnhanceModelLabel: enhanced.usedRestoreModel
+            ? routing.restoreModelLabel
+            : routing.modelLabel,
+          portraitEnhanceStyle: routing.preset === 'glamour' ? 'glamour' : 'natural',
+          portraitEnhanceMode: enhanced.resolvedMode,
           portraitEnhanceRouting: routing,
           inputSizeBytes: buffer.byteLength,
         };

@@ -61,9 +61,29 @@ export const objectRemoveParamsSchema = z.object({
   maskAssetId: z.string().uuid().optional(),
 });
 
-export const portraitEnhanceParamsSchema = z.object({
-  enhanceStyle: z.enum(['natural', 'glamour']).default('natural'),
-});
+export const portraitEnhanceParamsSchema = z
+  .object({
+    preset: z.enum(['natural', 'glamour', 'custom']).default('natural'),
+    mode: z.enum(['auto', 'enhance', 'restore']).default('auto'),
+    intensity: z
+      .object({
+        overall: z.number().min(0).max(100).default(32),
+        skin: z.number().min(0).max(100).default(22),
+        eyes: z.number().min(0).max(100).default(28),
+        lips: z.number().min(0).max(100).default(12),
+        teeth: z.number().min(0).max(100).default(15),
+        underEye: z.number().min(0).max(100).default(24),
+        lighting: z.number().min(0).max(100).default(18),
+      })
+      .default({}),
+    enhanceStyle: z.enum(['natural', 'glamour']).optional(),
+  })
+  .transform((data) => {
+    const preset =
+      data.preset ??
+      (data.enhanceStyle === 'glamour' ? 'glamour' : data.enhanceStyle === 'natural' ? 'natural' : 'natural');
+    return { ...data, preset };
+  });
 
 export const cropParamsSchema = z.object({
   left: z.number().int().min(0).max(10000),

@@ -238,7 +238,11 @@ export function buildToolParams(
     };
   }
   if (tool.category === 'portrait_enhance') {
-    return { enhanceStyle: portraitEnhanceParams.enhanceStyle };
+    return {
+      preset: portraitEnhanceParams.preset,
+      mode: portraitEnhanceParams.mode,
+      intensity: portraitEnhanceParams.intensity,
+    };
   }
   if (tool.category === 'faces') {
     return {
