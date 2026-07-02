@@ -11,8 +11,8 @@ interface PortraitEnhanceOptionsProps {
 
 const STYLE_OPTIONS: {
   value: PortraitEnhanceStyle;
-  labelKey: 'portraitEnhanceNatural' | 'portraitEnhanceGlamour' | 'portraitEnhanceRestore';
-  hintKey: 'portraitEnhanceNaturalHint' | 'portraitEnhanceGlamourHint' | 'portraitEnhanceRestoreHint';
+  labelKey: 'portraitEnhanceNatural' | 'portraitEnhanceGlamour';
+  hintKey: 'portraitEnhanceNaturalHint' | 'portraitEnhanceGlamourHint';
 }[] = [
   {
     value: 'natural',
@@ -23,11 +23,6 @@ const STYLE_OPTIONS: {
     value: 'glamour',
     labelKey: 'portraitEnhanceGlamour',
     hintKey: 'portraitEnhanceGlamourHint',
-  },
-  {
-    value: 'restore',
-    labelKey: 'portraitEnhanceRestore',
-    hintKey: 'portraitEnhanceRestoreHint',
   },
 ];
 

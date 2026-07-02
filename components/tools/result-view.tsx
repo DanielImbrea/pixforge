@@ -295,9 +295,7 @@ export function ResultView({
                     style:
                       portraitEnhanceStyle === 'glamour'
                         ? t('portraitEnhanceGlamour')
-                        : portraitEnhanceStyle === 'restore'
-                          ? t('portraitEnhanceRestore')
-                          : t('portraitEnhanceNatural'),
+                        : t('portraitEnhanceNatural'),
                   })}
                 </p>
               )}

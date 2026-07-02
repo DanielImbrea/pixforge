@@ -17,20 +17,18 @@ function getPortraitEnhanceModel(): string {
 }
 
 function parseEnhanceStyle(value: unknown): PortraitEnhanceStyle {
-  if (value === 'glamour' || value === 'restore') return value;
+  if (value === 'glamour') return value;
   return 'natural';
 }
 
 const FIDELITY_BY_STYLE: Record<PortraitEnhanceStyle, number> = {
-  natural: 0.78,
-  glamour: 0.68,
-  restore: 0.85,
+  natural: 0.86,
+  glamour: 0.78,
 };
 
 const REASON_BY_STYLE: Record<PortraitEnhanceStyle, string> = {
   natural: 'portraitEnhanceReasonNatural',
   glamour: 'portraitEnhanceReasonGlamour',
-  restore: 'portraitEnhanceReasonRestore',
 };
 
 export function resolvePortraitEnhanceRoute(
@@ -45,7 +43,7 @@ export function resolvePortraitEnhanceRoute(
     modelLabel: 'CodeFormer portrait enhancer',
     enhanceStyle,
     codeformerFidelity: FIDELITY_BY_STYLE[enhanceStyle],
-    faceUpsample: true,
+    faceUpsample: false,
     backgroundEnhance: false,
     reasonKey: REASON_BY_STYLE[enhanceStyle],
     warningKey,

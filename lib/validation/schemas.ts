@@ -62,7 +62,7 @@ export const objectRemoveParamsSchema = z.object({
 });
 
 export const portraitEnhanceParamsSchema = z.object({
-  enhanceStyle: z.enum(['natural', 'glamour', 'restore']).default('natural'),
+  enhanceStyle: z.enum(['natural', 'glamour']).default('natural'),
 });
 
 export const cropParamsSchema = z.object({

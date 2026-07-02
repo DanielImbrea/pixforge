@@ -1,4 +1,4 @@
-export type PortraitEnhanceStyle = 'natural' | 'glamour' | 'restore';
+export type PortraitEnhanceStyle = 'natural' | 'glamour';
 
 export interface PortraitEnhanceParams {
   enhanceStyle: PortraitEnhanceStyle;

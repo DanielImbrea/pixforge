@@ -27,29 +27,29 @@ export const portraitEnhanceTool: ToolDefinition = {
   seo: {
     translations: {
       en: {
-        title: 'AI Portrait Enhance – Face Restoration & Skin Retouch Online',
+        title: 'AI Portrait Enhance – Natural Face Detail & Skin Retouch Online',
         metaDescription:
-          'Enhance portrait photos with AI face restoration — sharpen eyes, smooth skin naturally, and recover detail from old or soft selfies. Three styles: natural, glamour, restore.',
+          'Enhance modern portraits and selfies with subtle AI detail recovery — sharper eyes, cleaner skin texture, and natural facial clarity without changing identity. Styles: natural and glamour.',
         h1: 'AI Portrait Enhance',
         intro:
-          'Upload a portrait or selfie and let AI automatically enhance facial detail, reduce image noise, and deliver natural-looking skin — no manual editing required.',
+          'Upload a modern portrait or selfie and let AI subtly improve facial detail, reduce noise, and refine clarity while keeping the same identity and natural skin texture.',
         howItWorks:
-          'AI automatically detects faces in your photo and applies your chosen enhancement style to restore detail, reduce imperfections, and keep the result as natural as possible.',
+          'AI detects faces in your photo, enhances only the face regions, and blends them back into the original image so the result looks like the same person photographed with a better camera.',
         useCases: [
           'Profile photos for CV, LinkedIn, and social media',
-          'Restoring old family photographs',
-          'Selfies and portraits taken in low light',
+          'Selfies and creator portraits',
+          'Portraits taken in low light or with phone compression',
         ],
         aiExplanation: [
-          'Face restoration — improves eye clarity, skin texture, and facial detail',
-          'Adaptive styles — choose Natural, Glamour, or Restore based on your goal',
-          'Smart optimization — keeps the background and overall photo balanced',
-          'No resizing — enhances your portrait at the original resolution',
+          'Face-only enhancement — detects and enhances facial regions without changing the background',
+          'Identity preservation — keeps eye color, facial shape, lips, brows, age cues, and hairstyle intact',
+          'Two subtle styles — choose Natural or Glamour depending on how visible you want the enhancement to be',
+          'No fake beauty filter — improves facial clarity while preserving pores, lighting, and realistic texture',
         ],
         benefits: [
-          'Automatic portrait enhancement directly in your browser',
-          'Natural results without manual editing',
-          'Works on selfies, individual portraits, and group photos',
+          'Premium portrait enhancement directly in your browser',
+          'Natural results without plastic skin or reshaped features',
+          'Works on selfies, individual portraits, and modern group photos',
           'Uses 10 credits per processed image',
           'Files are processed securely and deleted automatically within hours',
         ],
@@ -62,7 +62,7 @@ export const portraitEnhanceTool: ToolDefinition = {
           {
             question: 'Which style should I choose?',
             answer:
-              'Natural is ideal for profile photos and everyday portraits. Glamour delivers a brighter look and finer skin while staying natural. Restore is recommended for old, scanned, or damaged photos.',
+              'Natural is ideal for LinkedIn, CV, and everyday portraits. Glamour gives slightly smoother skin, brighter eyes, and a more polished look while staying realistic.',
           },
           {
             question: 'Does it work on group photos?',
@@ -76,41 +76,41 @@ export const portraitEnhanceTool: ToolDefinition = {
           {
             question: 'Will it change my face too much?',
             answer:
-              'Restore stays closest to the original look. Natural offers a subtle, balanced enhancement. Glamour applies a more visible improvement — pick the style that matches your intent.',
+              'No. The feature is designed to preserve identity first. Natural is almost invisible, while Glamour is a bit more polished but still avoids face reshaping or beauty-filter effects.',
           },
         ],
         keywords: [
           'ai portrait enhance',
-          'face restoration online',
+          'portrait detail enhancer',
           'portrait retouch ai',
           'enhance selfie',
           'codeformer online',
         ],
       },
       ro: {
-        title: 'Îmbunătățire portret AI – Restaurare față și retuș online',
+        title: 'Îmbunătățire portret AI – Detalii faciale naturale și retuș online',
         metaDescription:
-          'Îmbunătățește portretele cu AI — claritate pentru ochi și piele, aspect natural și recuperare de detalii pentru selfie-uri sau fotografii vechi. Stiluri: Natural, Glamour, Restaurare.',
+          'Îmbunătățește portrete moderne și selfie-uri cu AI — claritate mai bună pentru ochi, piele și detalii faciale, fără să schimbe identitatea. Stiluri: Natural și Glamour.',
         h1: 'Îmbunătățire portret AI',
         intro:
-          'Încarcă un portret sau un selfie, iar AI-ul va îmbunătăți automat detaliile feței, va reduce zgomotul de imagine și va reda un aspect natural al pielii — fără editare manuală.',
+          'Încarcă un portret modern sau un selfie, iar AI-ul va îmbunătăți discret detaliile feței, va reduce zgomotul și va rafina claritatea, păstrând aceeași identitate și textura naturală a pielii.',
         howItWorks:
-          'AI-ul detectează automat fețele din imagine și aplică stilul de îmbunătățire selectat pentru a reda detaliile, a reduce imperfecțiunile și a păstra un aspect cât mai natural.',
+          'AI-ul detectează fețele din imagine, îmbunătățește doar regiunile faciale și le îmbină înapoi în fotografia originală, astfel încât rezultatul să pară aceeași persoană fotografiată cu o cameră mai bună.',
         useCases: [
           'Fotografii de profil pentru CV, LinkedIn și rețele sociale',
-          'Restaurarea fotografiilor vechi de familie',
-          'Selfie-uri și portrete realizate în condiții de lumină slabă',
+          'Selfie-uri și portrete pentru creatori',
+          'Portrete făcute în lumină slabă sau comprimate de telefon',
         ],
         aiExplanation: [
-          'Restaurare facială — îmbunătățește claritatea ochilor, textura pielii și detaliile feței',
-          'Stiluri adaptate — alege între Natural, Glamour sau Restaurare, în funcție de rezultat',
-          'Optimizare inteligentă — păstrează fundalul și aspectul general al fotografiei echilibrate',
-          'Fără redimensionare — îmbunătățește portretul la rezoluția originală',
+          'Îmbunătățire doar pe față — detectează și procesează regiunile faciale fără să modifice fundalul',
+          'Păstrarea identității — nu schimbă culoarea ochilor, forma feței, buzele, sprâncenele, vârsta sau coafura',
+          'Două stiluri subtile — alege Natural sau Glamour în funcție de cât de vizibil vrei să fie efectul',
+          'Fără beauty filter fals — îmbunătățește claritatea feței, dar păstrează porii, lumina și textura realistă',
         ],
         benefits: [
-          'Îmbunătățire automată a portretelor direct din browser',
-          'Rezultate naturale, fără editare manuală',
-          'Potrivit pentru selfie-uri, portrete individuale și fotografii de grup',
+          'Îmbunătățire premium pentru portrete direct din browser',
+          'Rezultate naturale, fără piele de plastic sau trăsături deformate',
+          'Potrivit pentru selfie-uri, portrete individuale și poze moderne de grup',
           'Consumă 10 credite pentru fiecare imagine procesată',
           'Fișierele sunt procesate securizat și șterse automat după câteva ore',
         ],
@@ -123,7 +123,7 @@ export const portraitEnhanceTool: ToolDefinition = {
           {
             question: 'Ce stil să aleg?',
             answer:
-              'Natural este ideal pentru fotografii de profil și portrete de zi cu zi. Glamour oferă un aspect mai luminos și o piele mai fină, păstrând un rezultat natural. Restaurare este recomandat pentru fotografii vechi, scanate sau imagini cu detalii deteriorate.',
+              'Natural este ideal pentru LinkedIn, CV și portrete de zi cu zi. Glamour oferă o piele ușor mai fină, ochi puțin mai luminoși și un look mai finisat, dar tot realist.',
           },
           {
             question: 'Funcționează pe poze de grup?',
@@ -137,12 +137,12 @@ export const portraitEnhanceTool: ToolDefinition = {
           {
             question: 'Îmi va schimba prea mult fața?',
             answer:
-              'Restaurare păstrează cel mai fidel aspectul original. Natural oferă un echilibru discret. Glamour aplică o îmbunătățire mai vizibilă — alege stilul potrivit intenției tale.',
+              'Nu. Feature-ul este proiectat să păstreze identitatea pe primul loc. Natural este aproape invizibil, iar Glamour este puțin mai finisat, fără efect de beauty filter sau remodelare a feței.',
           },
         ],
         keywords: [
           'imbunatatire portret ai',
-          'restaurare fata online',
+          'detalii faciale naturale',
           'retus portret ai',
           'enhance selfie',
           'codeformer portret',

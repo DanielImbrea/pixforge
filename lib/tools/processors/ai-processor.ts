@@ -2,6 +2,7 @@ import { getAiProvider } from '@/lib/ai/config';
 import { resolveBlurFacesRoute } from '@/lib/ai/blur-faces-routing';
 import { resolveBgRemovalRoute } from '@/lib/ai/bg-removal-routing';
 import { submitMockJob } from '@/lib/ai/mock-provider';
+import { enhancePortraitFaces } from '@/lib/ai/portrait-enhance-pipeline';
 import { submitReplicateJob } from '@/lib/ai/replicate-client';
 import { resolvePortraitEnhanceRoute } from '@/lib/ai/portrait-enhance-routing';
 import { resolveUpscaleRoute, type UpscaleScaleInput } from '@/lib/ai/upscale-routing';
@@ -90,35 +91,42 @@ export const aiProcessor: ToolProcessor = {
       return processLocalBlurFaces(inputAssetUrl, params);
     }
 
+    if (tool.category === 'portrait_enhance') {
+      const buffer = await fetchAsBuffer(inputAssetUrl);
+      const profile = await classifyImageContent(buffer);
+      const routing = resolvePortraitEnhanceRoute(profile, params);
+      const provider = getAiProvider();
+      const enhanced = await enhancePortraitFaces({
+        inputBuffer: buffer,
+        userId: job.user_id,
+        routing,
+        provider: provider === 'replicate' ? 'replicate' : 'mock',
+      });
+
+      return {
+        status: 'done',
+        outputBuffer: enhanced.buffer,
+        outputMimeType: enhanced.mimeType,
+        contentKind: profile.kind,
+        portraitEnhanceReasonKey: routing.reasonKey,
+        portraitEnhanceWarningKey: routing.warningKey,
+        portraitEnhanceModelLabel: routing.modelLabel,
+        portraitEnhanceStyle: routing.enhanceStyle,
+        portraitEnhanceRouting: routing,
+        inputSizeBytes: buffer.byteLength,
+      };
+    }
+
     let workingJob = job;
     let toolMeta: Partial<ProcessResult> = {};
 
     if (
       tool.category === 'upscale' ||
       tool.category === 'background' ||
-      tool.category === 'background_replace' ||
-      tool.category === 'portrait_enhance'
+      tool.category === 'background_replace'
     ) {
       const buffer = await fetchAsBuffer(inputAssetUrl);
       const profile = await classifyImageContent(buffer);
-
-      if (tool.category === 'portrait_enhance') {
-        const routing = resolvePortraitEnhanceRoute(profile, params);
-
-        workingJob = {
-          ...job,
-          params: { ...params, _portraitEnhanceRouting: routing },
-        };
-
-        toolMeta = {
-          contentKind: profile.kind,
-          portraitEnhanceReasonKey: routing.reasonKey,
-          portraitEnhanceWarningKey: routing.warningKey,
-          portraitEnhanceModelLabel: routing.modelLabel,
-          portraitEnhanceStyle: routing.enhanceStyle,
-          portraitEnhanceRouting: routing,
-        };
-      }
 
       if (tool.category === 'upscale') {
         const dimensions = await readImageDimensions(buffer);
