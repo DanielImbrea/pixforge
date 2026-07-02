@@ -77,9 +77,13 @@ async function compositeOnPlate(cutout: Buffer, plate: Buffer, params: BgReplace
   if (shouldUseShadow(params)) {
     const shadow = await sharp(subject)
       .ensureAlpha()
-      .linear(0, 0)
+      .recomb([
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+      ])
       .blur(16)
-      .modulate({ brightness: 0.4 })
+      .modulate({ brightness: 0.55 })
       .png()
       .toBuffer();
 
@@ -88,7 +92,6 @@ async function compositeOnPlate(cutout: Buffer, plate: Buffer, params: BgReplace
       left,
       top: top + Math.round(Math.max(12, height * 0.018)),
       blend: 'multiply',
-      opacity: 0.22,
     });
   }
 
