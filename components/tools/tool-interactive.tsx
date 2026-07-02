@@ -22,6 +22,7 @@ import { BgRemovalOptions } from './bg-removal-options';
 import { BgReplaceOptions } from './bg-replace-options';
 import { ObjectRemoveEditor, type ObjectRemoveEditorHandle } from './object-remove-editor';
 import { ObjectRemoveOptions } from './object-remove-options';
+import { preloadSamModels } from '@/lib/image/sam-segment-browser';
 import { PortraitEnhanceOptions } from './portrait-enhance-options';
 import { BlurFacesOptions } from './blur-faces-options';
 import { CropEditor } from './crop-editor';
@@ -297,6 +298,11 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
   const isBgReplaceTool = tool.category === 'background_replace';
   const isObjectRemoveTool = tool.category === 'object_remove';
   const isPortraitEnhanceTool = tool.category === 'portrait_enhance';
+
+  useEffect(() => {
+    if (!isObjectRemoveTool) return;
+    void preloadSamModels().catch(() => undefined);
+  }, [isObjectRemoveTool]);
   const isCropTool = tool.category === 'crop';
   const isFacesTool = tool.category === 'faces';
   const supportsBatch = canBatch && !isCropTool && !isFacesTool && !isObjectRemoveTool;
@@ -630,6 +636,9 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       }
 
       const blob = await previewRes.blob();
+      if (!blob.type.startsWith('image/')) {
+        throw new Error(t('errorProcessingFailed'));
+      }
       revokeObjectRemovePreview();
       const url = URL.createObjectURL(blob);
       objectRemovePreviewUrlRef.current = url;

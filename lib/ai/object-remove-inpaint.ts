@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { resolveObjectRemoveInpaintPrompt } from '@/lib/tools/object-remove-params';
+import { normalizeObjectRemoveInpaintInputs, finalizeObjectRemovePreview } from '@/lib/tools/object-remove-inpaint-normalize';
 import { getAiProvider, requireReplicateToken } from '@/lib/ai/config';
 import { fetchImageBuffer } from '@/lib/ai/fetch-image';
 import { resolveReplicateVersion, extractReplicateOutputUrl, runReplicatePredictionAndWait } from '@/lib/ai/replicate-client';
@@ -66,6 +67,9 @@ async function runReplicateInpaint(
         mask: maskUrl,
         prompt: prompt || 'seamless natural background, photorealistic',
         output_format: 'jpg',
+        megapixels: 'match_input',
+        guidance: 30,
+        num_inference_steps: 28,
       },
       token,
     });
@@ -88,6 +92,14 @@ async function runReplicateInpaint(
 
   const { buffer } = await fetchImageBuffer(url);
   return buffer;
+}
+
+async function finalizeInpaintOutput(
+  outputBuffer: Buffer,
+  originalWidth: number,
+  originalHeight: number
+): Promise<Buffer> {
+  return finalizeObjectRemovePreview(outputBuffer, originalWidth, originalHeight);
 }
 
 async function uploadTempForInpaint(
@@ -117,8 +129,12 @@ export async function runObjectRemoveInpaint(params: {
   editMode?: 'remove' | 'replace';
   prompt?: string;
 }): Promise<Buffer> {
+  const normalized = await normalizeObjectRemoveInpaintInputs(params.imageBuffer, params.maskBuffer);
+  const { originalWidth, originalHeight } = normalized;
+
   if (getAiProvider() === 'mock') {
-    return applyMockObjectRemove(params.imageBuffer, params.maskBuffer);
+    const mock = await applyMockObjectRemove(normalized.imageBuffer, normalized.maskBuffer);
+    return finalizeInpaintOutput(mock, originalWidth, originalHeight);
   }
 
   const prompt = resolveObjectRemoveInpaintPrompt(params.editMode ?? 'remove', params.prompt);
@@ -130,17 +146,18 @@ export async function runObjectRemoveInpaint(params: {
     if (!params.userId) {
       throw new Error('Signed image and mask URLs are required for object removal.');
     }
-    const temp = await uploadTempForInpaint(params.imageBuffer, params.maskBuffer, params.userId);
+    const temp = await uploadTempForInpaint(normalized.imageBuffer, normalized.maskBuffer, params.userId);
     imageUrl = temp.imageUrl;
     maskUrl = temp.maskUrl;
     tempPaths = temp.paths;
   }
 
   try {
-    return await runReplicateInpaint(imageUrl, maskUrl, prompt);
+    const result = await runReplicateInpaint(imageUrl, maskUrl, prompt);
+    return finalizeInpaintOutput(result, originalWidth, originalHeight);
   } catch (err) {
-    console.warn('[object-remove] Replicate inpaint failed, using mock fallback', err);
-    return applyMockObjectRemove(params.imageBuffer, params.maskBuffer);
+    console.error('[object-remove] Replicate inpaint failed', err);
+    throw err instanceof Error ? err : new Error('Object removal failed.');
   } finally {
     if (tempPaths.length > 0) {
       await cleanupTempPaths(tempPaths);

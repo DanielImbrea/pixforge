@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { runObjectRemoveInpaint } from '@/lib/ai/object-remove-inpaint';
 import { objectRemoveParamsSchema } from '@/lib/validation/schemas';
 import { validateUploadBuffer, ValidationError } from '@/lib/validation/upload';
+import { ObjectRemoveMaskError } from '@/lib/tools/object-remove-inpaint-normalize';
 import { checkRateLimit, getClientIp, maybeCleanupRateLimitStore } from '@/lib/security/rate-limit';
 import { getToolById } from '@/lib/tools/registry';
 import type { UserRow } from '@/types';
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (err) {
-    if (err instanceof ValidationError) {
+    if (err instanceof ValidationError || err instanceof ObjectRemoveMaskError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
     const message = err instanceof Error ? err.message : 'Object removal preview failed.';

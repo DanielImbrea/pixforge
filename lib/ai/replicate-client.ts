@@ -188,6 +188,9 @@ function buildReplicateInput(
       mask: maskUrl,
       prompt,
       output_format: 'jpg',
+      megapixels: 'match_input',
+      guidance: 30,
+      num_inference_steps: 28,
     };
   }
 

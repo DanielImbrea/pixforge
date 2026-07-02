@@ -5,7 +5,7 @@ const withNextIntl = createNextIntlPlugin('./i18n.ts');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ['sharp'],
-  webpack: (config, { isServer }) => {
+  webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@vladmandic/face-api': '@vladmandic/face-api/dist/face-api.esm.js',

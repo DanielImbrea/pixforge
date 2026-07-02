@@ -451,6 +451,7 @@
     "objectRemoveClickHint": "Click once on an object to select it automatically. Hold Shift or use the eraser to exclude areas. Refine with the brush, then press Erase or Delete.",
     "objectRemoveClickFallbackHint": "Click to select — smart selection loads in the background; basic click selection works immediately.",
     "objectRemoveSamLoading": "Loading smart selection model…",
+    "objectRemoveSamReady": "Smart selection ready — click an object to select it.",
     "objectRemoveUndoClick": "Undo click",
     "objectRemoveErase": "Erase",
     "objectRemoveErasing": "Erasing…",

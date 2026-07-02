@@ -44,6 +44,34 @@ export function applyRegionToMask(
   drawMaskOutline(maskCtx, overlayCtx, width, height);
 }
 
+/** Resize a miniSAM mask (often 256×256) to the editor/image resolution. */
+export function resizeSamMaskToImage(
+  samMask: ImageData,
+  targetWidth: number,
+  targetHeight: number
+): ImageData {
+  if (samMask.width === targetWidth && samMask.height === targetHeight) {
+    return samMask;
+  }
+
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = samMask.width;
+  sourceCanvas.height = samMask.height;
+  const sourceCtx = sourceCanvas.getContext('2d');
+  if (!sourceCtx) return samMask;
+  sourceCtx.putImageData(samMask, 0, 0);
+
+  const targetCanvas = document.createElement('canvas');
+  targetCanvas.width = targetWidth;
+  targetCanvas.height = targetHeight;
+  const targetCtx = targetCanvas.getContext('2d');
+  if (!targetCtx) return samMask;
+
+  targetCtx.imageSmoothingEnabled = false;
+  targetCtx.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
+  return targetCtx.getImageData(0, 0, targetWidth, targetHeight);
+}
+
 /** Apply miniSAM mask (alpha channel = foreground) to mask canvases. */
 export function applySamMaskToCanvas(
   maskCtx: CanvasRenderingContext2D,
@@ -53,14 +81,19 @@ export function applySamMaskToCanvas(
   height: number,
   subtract = false
 ) {
+  const scaledMask =
+    samMask.width === width && samMask.height === height
+      ? samMask
+      : resizeSamMaskToImage(samMask, width, height);
+
   const maskData = maskCtx.getImageData(0, 0, width, height);
   const overlayData = overlayCtx.getImageData(0, 0, width, height);
-  const sam = samMask.data;
+  const sam = scaledMask.data;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const mi = (y * width + x) * 4;
-      const si = (y * samMask.width + x) * 4;
+      const si = (y * width + x) * 4;
       const selected = sam[si + 3] > 128;
       if (!selected) continue;
 

@@ -4,6 +4,7 @@ import { resolveBgRemovalRoute } from '@/lib/ai/bg-removal-routing';
 import { mapReplicateError } from '@/lib/ai/replicate-errors';
 import { submitMockJob } from '@/lib/ai/mock-provider';
 import { enhancePortraitFaces } from '@/lib/ai/portrait-enhance-pipeline';
+import { runObjectRemoveInpaint } from '@/lib/ai/object-remove-inpaint';
 import { submitReplicateJob } from '@/lib/ai/replicate-client';
 import { resolvePortraitEnhanceRoute } from '@/lib/ai/portrait-enhance-routing';
 import { resolveUpscaleRoute, type UpscaleScaleInput } from '@/lib/ai/upscale-routing';
@@ -175,6 +176,49 @@ export const aiProcessor: ToolProcessor = {
           error:
             'Portrait enhancement could not start for this image. Please try another clear selfie or portrait.',
           errorDetail: message,
+        };
+      }
+    }
+
+    if (tool.category === 'object_remove') {
+      const maskUrl = params._maskAssetUrl as string | undefined;
+      if (!maskUrl) {
+        return { status: 'failed', error: 'Mask is required for object removal.' };
+      }
+
+      try {
+        const [imageBuffer, maskBuffer] = await Promise.all([
+          fetchAsBuffer(inputAssetUrl),
+          fetchAsBuffer(maskUrl),
+        ]);
+        const editMode = params.editMode === 'replace' ? 'replace' : 'remove';
+        const inpaintPrompt = typeof params.inpaintPrompt === 'string' ? params.inpaintPrompt : '';
+        const outputBuffer = await runObjectRemoveInpaint({
+          imageBuffer,
+          maskBuffer,
+          userId: job.user_id,
+          editMode,
+          prompt: inpaintPrompt,
+        });
+
+        return {
+          status: 'done',
+          outputBuffer,
+          outputMimeType: 'image/jpeg',
+          inputSizeBytes: imageBuffer.byteLength,
+        };
+      } catch (err) {
+        const mapped = mapReplicateError(err, {
+          jobId: job.id,
+          toolCategory: tool.category,
+          model: process.env.REPLICATE_OBJECT_REMOVE_MODEL || 'black-forest-labs/flux-fill-dev',
+        });
+        console.error(mapped.logMessage, mapped.logContext);
+        return {
+          status: 'failed',
+          error: mapped.userMessage,
+          errorKey: mapped.errorKey,
+          errorDetail: mapped.errorDetail,
         };
       }
     }

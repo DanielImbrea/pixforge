@@ -46,3 +46,18 @@ export function pointerToImageCoords(
     y: Math.max(0, Math.min(imageHeight - 1, localY * scaleY)),
   };
 }
+
+export function imageToDisplayCoords(
+  imageX: number,
+  imageY: number,
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number
+): { x: number; y: number } {
+  const fit = getImageFitRect(containerWidth, containerHeight, imageWidth, imageHeight);
+  return {
+    x: fit.x + (imageX / imageWidth) * fit.width,
+    y: fit.y + (imageY / imageHeight) * fit.height,
+  };
+}

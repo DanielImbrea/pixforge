@@ -11,13 +11,16 @@ import {
 import { Eraser, Loader2, Paintbrush, Sparkles, Undo2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
+  clearSamClicks,
+  isSamEmbeddingReady,
+  preloadSamModels,
   prepareSamImage,
   resetSamSession,
   SamSegmentError,
   segmentSamAtClick,
   undoSamClick,
 } from '@/lib/image/sam-segment-browser';
-import { pointerToImageCoords } from '@/lib/tools/object-remove-coords';
+import { imageToDisplayCoords, pointerToImageCoords } from '@/lib/tools/object-remove-coords';
 import {
   applyFloodFillToCanvas,
   floodFillRegion,
@@ -102,6 +105,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const maskCanvasRef = useRef<HTMLCanvasElement>(null);
     const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
     const samPrepareStartedRef = useRef(false);
+    const [samEmbeddingReady, setSamEmbeddingReady] = useState(false);
     const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
     const [brushMode, setBrushMode] = useState<BrushMode>('paint');
     const [hasMask, setHasMask] = useState(false);
@@ -110,6 +114,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const [samLoading, setSamLoading] = useState(false);
     const [samError, setSamError] = useState<string | null>(null);
     const [segmenting, setSegmenting] = useState(false);
+    const [pendingClick, setPendingClick] = useState<{ x: number; y: number } | null>(null);
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
     const [cursorInside, setCursorInside] = useState(false);
     const drawingRef = useRef(false);
@@ -118,7 +123,24 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const isPreviewing = Boolean(previewImageUrl);
     const isEditingDisabled = isPreviewing || isErasing;
 
-    const resetMasks = useCallback(() => {
+    const resetMaskCanvases = useCallback(() => {
+      const maskCanvas = maskCanvasRef.current;
+      const overlayCanvas = overlayCanvasRef.current;
+      if (!maskCanvas || !overlayCanvas) return;
+
+      const maskCtx = maskCanvas.getContext('2d');
+      const overlayCtx = overlayCanvas.getContext('2d');
+      if (!maskCtx || !overlayCtx) return;
+
+      maskCtx.fillStyle = '#000000';
+      maskCtx.fillRect(0, 0, imageWidth, imageHeight);
+      overlayCtx.clearRect(0, 0, imageWidth, imageHeight);
+      clearSamClicks();
+      setHasMask(false);
+      onMaskChange?.(false);
+    }, [imageHeight, imageWidth, onMaskChange]);
+
+    const resetForNewImage = useCallback(() => {
       const maskCanvas = maskCanvasRef.current;
       const overlayCanvas = overlayCanvasRef.current;
       if (!maskCanvas || !overlayCanvas) return;
@@ -128,24 +150,20 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       overlayCanvas.width = imageWidth;
       overlayCanvas.height = imageHeight;
 
-      const maskCtx = maskCanvas.getContext('2d');
-      const overlayCtx = overlayCanvas.getContext('2d');
-      if (!maskCtx || !overlayCtx) return;
-
-      maskCtx.fillStyle = '#000000';
-      maskCtx.fillRect(0, 0, imageWidth, imageHeight);
-      overlayCtx.clearRect(0, 0, imageWidth, imageHeight);
       resetSamSession();
       samPrepareStartedRef.current = false;
-      setSamReady(false);
+      setSamEmbeddingReady(false);
       setSamError(null);
-      setHasMask(false);
-      onMaskChange?.(false);
-    }, [imageHeight, imageWidth, onMaskChange]);
+      resetMaskCanvases();
+    }, [imageHeight, imageWidth, resetMaskCanvases]);
 
     useEffect(() => {
-      resetMasks();
-    }, [imageUrl, resetMasks]);
+      resetForNewImage();
+    }, [imageUrl, resetForNewImage]);
+
+    useEffect(() => {
+      void preloadSamModels().catch(() => undefined);
+    }, []);
 
     useEffect(() => {
       const canvas = sourceCanvasRef.current;
@@ -186,6 +204,17 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const scale =
       displaySize.width > 0 && imageWidth > 0 ? imageWidth / displaySize.width : 1;
     const displayBrushSize = clampObjectRemoveBrush(brushSize) / scale;
+    const pendingClickDisplay =
+      pendingClick && displaySize.width > 0
+        ? imageToDisplayCoords(
+            pendingClick.x,
+            pendingClick.y,
+            displaySize.width,
+            displaySize.height,
+            imageWidth,
+            imageHeight
+          )
+        : null;
     const showBrushCursor =
       cursorInside && selectionTool === 'brush' && displayBrushSize > 0 && !isEditingDisabled;
 
@@ -216,8 +245,8 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       onMaskChange?.(painted);
     }, [onMaskChange]);
 
-    const ensureSamPrepare = useCallback(() => {
-      if (samPrepareStartedRef.current || samReady || samLoading || !imageReady) return;
+    const runSamPrepare = useCallback(() => {
+      if (samPrepareStartedRef.current || !imageReady) return;
       const canvas = sourceCanvasRef.current;
       if (!canvas) return;
 
@@ -227,18 +256,26 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
 
       void (async () => {
         try {
+          await preloadSamModels();
           await prepareSamImage(canvas);
-          setSamReady(true);
+          setSamEmbeddingReady(true);
         } catch (err) {
           setSamError(
             err instanceof Error ? err.message : 'Smart selection failed to load.'
           );
-          setSamReady(false);
+          setSamEmbeddingReady(false);
+          samPrepareStartedRef.current = false;
         } finally {
           setSamLoading(false);
         }
       })();
-    }, [imageReady, samLoading, samReady]);
+    }, [imageReady]);
+
+    useEffect(() => {
+      if (imageReady) {
+        runSamPrepare();
+      }
+    }, [imageReady, runSamPrepare]);
 
     const applyFloodFillClick = useCallback(
       (point: { x: number; y: number }, subtract: boolean) => {
@@ -328,20 +365,22 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         const overlayCtx = overlayCanvas?.getContext('2d');
         if (!sourceCanvas || !maskCtx || !overlayCtx || !imageReady || segmenting) return;
 
-        ensureSamPrepare();
         setSegmenting(true);
         setSamError(null);
+        setPendingClick(point);
 
         const subtract = exclude || brushMode === 'erase';
 
         try {
-          if (samReady) {
+          if (samEmbeddingReady || isSamEmbeddingReady()) {
             const clickType = subtract ? 'exclude' : 'include';
             const samMask = await segmentSamAtClick(sourceCanvas, point, clickType);
-            if (!samMask) return;
-            mergeSamMaskIntoCanvas(maskCtx, overlayCtx, samMask, imageWidth, imageHeight, subtract);
+            if (samMask) {
+              mergeSamMaskIntoCanvas(maskCtx, overlayCtx, samMask, imageWidth, imageHeight, subtract);
+            }
           } else {
             applyFloodFillClick(point, subtract);
+            runSamPrepare();
           }
         } catch (err) {
           try {
@@ -357,18 +396,19 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
           }
         } finally {
           setSegmenting(false);
+          setPendingClick(null);
           refreshMaskState();
         }
       },
       [
         applyFloodFillClick,
         brushMode,
-        ensureSamPrepare,
         imageHeight,
         imageReady,
         imageWidth,
         refreshMaskState,
-        samReady,
+        runSamPrepare,
+        samEmbeddingReady,
         segmenting,
       ]
     );
@@ -394,8 +434,8 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     }, [imageHeight, imageWidth, isEditingDisabled, refreshMaskState, selectionTool]);
 
     const clearMask = useCallback(() => {
-      resetMasks();
-    }, [resetMasks]);
+      resetMaskCanvases();
+    }, [resetMaskCanvases]);
 
     const exportMaskFile = useCallback(async (): Promise<File | null> => {
       const maskCanvas = maskCanvasRef.current;
@@ -558,7 +598,10 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
               {selectionTool === 'click' && samLoading ? (
                 <p className="text-xs text-text-secondary">{t('objectRemoveSamLoading')}</p>
               ) : null}
-              {selectionTool === 'click' && !samReady && !samLoading ? (
+              {selectionTool === 'click' && samEmbeddingReady ? (
+                <p className="text-xs text-text-tertiary">{t('objectRemoveSamReady')}</p>
+              ) : null}
+              {selectionTool === 'click' && !samEmbeddingReady && !samLoading ? (
                 <p className="text-xs text-text-tertiary">{t('objectRemoveClickFallbackHint')}</p>
               ) : null}
               {samError ? <p className="text-xs text-danger">{samError}</p> : null}
@@ -617,7 +660,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
             <img
               src={previewImageUrl!}
               alt=""
-              className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+              className="absolute inset-0 h-full w-full object-contain pointer-events-none bg-white"
               draggable={false}
             />
           ) : (
@@ -646,6 +689,12 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
                 top: cursorPos.y - displayBrushSize / 2,
                 boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.85)',
               }}
+            />
+          ) : null}
+          {pendingClickDisplay ? (
+            <div
+              className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-accent ring-2 ring-white"
+              style={{ left: pendingClickDisplay.x, top: pendingClickDisplay.y }}
             />
           ) : null}
           {isErasing ? (
