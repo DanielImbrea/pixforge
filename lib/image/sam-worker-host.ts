@@ -114,6 +114,7 @@ export function resetSamSession(): void {
   samImage = null;
   activeSession?.dispose();
   activeSession = null;
+  clearSamHoverCache();
   if (minisamModule) {
     minisamModule.clearEmbeddingCache();
     minisamModule.clearAllSessions();
@@ -122,6 +123,78 @@ export function resetSamSession(): void {
 
 export function clearSamClicks(): void {
   activeSession?.reset();
+}
+
+let hoverGeneration = 0;
+let hoverSegmentCache: {
+  cellKey: string;
+  rawMask: ImageData;
+} | null = null;
+
+export function cancelSamHoverSegment(): number {
+  hoverGeneration += 1;
+  return hoverGeneration;
+}
+
+export function clearSamHoverCache(): void {
+  hoverSegmentCache = null;
+  cancelSamHoverSegment();
+}
+
+/** Record a confirmed click on the main session (for undo) without re-segmenting. */
+export function commitSamClickForUndo(
+  point: { x: number; y: number },
+  clickType: SamClickType = 'include'
+): void {
+  if (!samImage || !embeddingReady || !minisamModule) return;
+  if (!activeSession) {
+    activeSession = minisamModule.createSession(samImage);
+  }
+  activeSession.addClick(Math.round(point.x), Math.round(point.y), clickType);
+}
+
+/**
+ * Stateless hover segment — does not mutate the committed click session.
+ * Uses cell cache + generation token for cancel / skip redraw.
+ */
+export async function segmentSamAtHover(
+  point: { x: number; y: number },
+  imageWidth: number,
+  imageHeight: number,
+  generation: number
+): Promise<{ processed: ImageData; point: { x: number; y: number } } | null> {
+  if (!samImage || !embeddingReady) return null;
+
+  const { hoverCellKey } = await import('@/lib/tools/object-remove-hover-preview');
+  const cellKey = hoverCellKey(point.x, point.y);
+
+  if (hoverSegmentCache?.cellKey === cellKey) {
+    const scaled = resizeSamMaskToImage(hoverSegmentCache.rawMask, imageWidth, imageHeight);
+    const { mask: processed } = postprocessSamMask(scaled, point);
+    return { processed, point };
+  }
+
+  await preloadSamModels();
+  const mod = await loadMinisam();
+  await yieldToMainThread();
+
+  if (generation !== hoverGeneration) return null;
+
+  const rawMask = await withTimeout(
+    mod.segment({
+      image: samImage,
+      clicks: [{ x: Math.round(point.x), y: Math.round(point.y), clickType: 1 }],
+    }),
+    SAM_SEGMENT_TIMEOUT_MS,
+    'Smart selection preview timed out.'
+  );
+
+  if (generation !== hoverGeneration) return null;
+
+  hoverSegmentCache = { cellKey, rawMask };
+  const scaled = resizeSamMaskToImage(rawMask, imageWidth, imageHeight);
+  const { mask: processed } = postprocessSamMask(scaled, point);
+  return { processed, point };
 }
 
 export async function segmentSamAtClick(

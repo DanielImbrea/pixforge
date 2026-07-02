@@ -11,20 +11,31 @@ import {
 import { Eraser, Loader2, Paintbrush, Sparkles, Undo2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
+  cancelSamHoverSegment,
   clearSamClicks,
+  commitSamClickForUndo,
   isSamEmbeddingReady,
   preloadSamModels,
   prepareSamImage,
   resetSamSession,
   SamSegmentError,
   segmentSamAtClickWithAssist,
+  segmentSamAtHover,
   undoSamClick,
 } from '@/lib/image/sam-segment-browser';
 import { clickCentroidFromSamMask } from '@/lib/tools/object-remove-sam-postprocess';
 import { imageToDisplayCoords, pointerToImageCoords } from '@/lib/tools/object-remove-coords';
 import {
+  HOVER_DEBOUNCE_MS,
+  HOVER_MASK_OVERLAP_SKIP,
+  maskAlphaOverlapRatio,
+} from '@/lib/tools/object-remove-hover-preview';
+import {
+  applyProcessedMaskToSelection,
   countMaskPixels,
+  drawHoverPreviewOverlay,
   drawMaskOutline,
+  mergeSamMaskIntoCanvas,
   setMaskFromSam,
 } from '@/lib/tools/object-remove-mask';
 import {
@@ -100,7 +111,11 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
     const maskCanvasRef = useRef<HTMLCanvasElement>(null);
     const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+    const hoverCanvasRef = useRef<HTMLCanvasElement>(null);
     const samPrepareStartedRef = useRef(false);
+    const hoverDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hoverPreviewMaskRef = useRef<ImageData | null>(null);
+    const hoverPreviewPointRef = useRef<{ x: number; y: number } | null>(null);
     const [samEmbeddingReady, setSamEmbeddingReady] = useState(false);
     const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
     const [brushMode, setBrushMode] = useState<BrushMode>('paint');
@@ -119,6 +134,21 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const isPreviewing = Boolean(previewImageUrl);
     const isEditingDisabled = isPreviewing || isErasing;
 
+    const clearHoverPreview = useCallback(() => {
+      if (hoverDebounceRef.current) {
+        clearTimeout(hoverDebounceRef.current);
+        hoverDebounceRef.current = null;
+      }
+      cancelSamHoverSegment();
+      hoverPreviewMaskRef.current = null;
+      hoverPreviewPointRef.current = null;
+      const hoverCanvas = hoverCanvasRef.current;
+      const hoverCtx = hoverCanvas?.getContext('2d');
+      if (hoverCtx && hoverCanvas) {
+        hoverCtx.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
+      }
+    }, []);
+
     const resetMaskCanvases = useCallback(() => {
       const maskCanvas = maskCanvasRef.current;
       const overlayCanvas = overlayCanvasRef.current;
@@ -131,10 +161,11 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       maskCtx.fillStyle = '#000000';
       maskCtx.fillRect(0, 0, imageWidth, imageHeight);
       overlayCtx.clearRect(0, 0, imageWidth, imageHeight);
+      clearHoverPreview();
       clearSamClicks();
       setHasMask(false);
       onMaskChange?.(false);
-    }, [imageHeight, imageWidth, onMaskChange]);
+    }, [clearHoverPreview, imageHeight, imageWidth, onMaskChange]);
 
     const resetForNewImage = useCallback(() => {
       const maskCanvas = maskCanvasRef.current;
@@ -145,6 +176,11 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       maskCanvas.height = imageHeight;
       overlayCanvas.width = imageWidth;
       overlayCanvas.height = imageHeight;
+      const hoverCanvas = hoverCanvasRef.current;
+      if (hoverCanvas) {
+        hoverCanvas.width = imageWidth;
+        hoverCanvas.height = imageHeight;
+      }
 
       resetSamSession();
       samPrepareStartedRef.current = false;
@@ -271,6 +307,119 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       }
     }, [imageReady, runSamPrepare]);
 
+    useEffect(() => {
+      if (selectionTool === 'brush') {
+        clearHoverPreview();
+      }
+    }, [clearHoverPreview, selectionTool]);
+
+    const scheduleHoverPreview = useCallback(
+      (point: { x: number; y: number }) => {
+        if (
+          selectionTool !== 'click' ||
+          isEditingDisabled ||
+          !samEmbeddingReady ||
+          segmenting
+        ) {
+          return;
+        }
+
+        if (hoverDebounceRef.current) {
+          clearTimeout(hoverDebounceRef.current);
+        }
+
+        hoverDebounceRef.current = setTimeout(() => {
+          hoverDebounceRef.current = null;
+          const generation = cancelSamHoverSegment();
+          const hoverCanvas = hoverCanvasRef.current;
+          const hoverCtx = hoverCanvas?.getContext('2d');
+          if (!hoverCtx || !hoverCanvas) return;
+
+          void (async () => {
+            try {
+              const result = await segmentSamAtHover(
+                point,
+                imageWidth,
+                imageHeight,
+                generation
+              );
+              if (!result) return;
+
+              const { processed, point: hoverPoint } = result;
+              const previous = hoverPreviewMaskRef.current;
+              if (
+                previous &&
+                maskAlphaOverlapRatio(previous, processed) >= HOVER_MASK_OVERLAP_SKIP
+              ) {
+                hoverPreviewPointRef.current = hoverPoint;
+                return;
+              }
+
+              drawHoverPreviewOverlay(hoverCtx, processed, imageWidth, imageHeight);
+              hoverPreviewMaskRef.current = processed;
+              hoverPreviewPointRef.current = hoverPoint;
+            } catch {
+              // Hover preview is best-effort; ignore transient failures.
+            }
+          })();
+        }, HOVER_DEBOUNCE_MS);
+      },
+      [
+        imageHeight,
+        imageWidth,
+        isEditingDisabled,
+        samEmbeddingReady,
+        segmenting,
+        selectionTool,
+      ]
+    );
+
+    const confirmHoverSelection = useCallback(
+      (point: { x: number; y: number }, exclude: boolean) => {
+        const maskCanvas = maskCanvasRef.current;
+        const overlayCanvas = overlayCanvasRef.current;
+        const maskCtx = maskCanvas?.getContext('2d');
+        const overlayCtx = overlayCanvas?.getContext('2d');
+        if (!maskCanvas || !maskCtx || !overlayCtx) return false;
+
+        const processed = hoverPreviewMaskRef.current;
+        if (!processed) return false;
+
+        const hadMask = countMaskPixels(maskCtx, imageWidth, imageHeight) > 0;
+        clearHoverPreview();
+
+        if (exclude) {
+          mergeSamMaskIntoCanvas(
+            maskCtx,
+            overlayCtx,
+            processed,
+            imageWidth,
+            imageHeight,
+            true
+          );
+          commitSamClickForUndo(point, 'exclude');
+        } else if (hadMask) {
+          mergeSamMaskIntoCanvas(
+            maskCtx,
+            overlayCtx,
+            processed,
+            imageWidth,
+            imageHeight,
+            false
+          );
+          commitSamClickForUndo(point, 'include');
+        } else {
+          clearSamClicks();
+          applyProcessedMaskToSelection(maskCtx, overlayCtx, processed, imageWidth, imageHeight);
+          commitSamClickForUndo(point, 'include');
+        }
+
+        refreshMaskState();
+        return true;
+      },
+      [clearHoverPreview, imageHeight, imageWidth, refreshMaskState]
+    );
+
     const drawStroke = useCallback(
       (from: { x: number; y: number }, to: { x: number; y: number }) => {
         const maskCanvas = maskCanvasRef.current;
@@ -335,6 +484,8 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         const overlayCtx = overlayCanvas?.getContext('2d');
         if (!sourceCanvas || !maskCtx || !overlayCtx || !imageReady || segmenting) return;
 
+        clearHoverPreview();
+
         if (!samEmbeddingReady && !isSamEmbeddingReady()) {
           setSamError(t('objectRemoveSamNotReady'));
           return;
@@ -355,7 +506,18 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
             imageHeight
           );
           if (samMask) {
-            setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight, point);
+            if (exclude || countMaskPixels(maskCtx, imageWidth, imageHeight) > 0) {
+              mergeSamMaskIntoCanvas(
+                maskCtx,
+                overlayCtx,
+                samMask,
+                imageWidth,
+                imageHeight,
+                exclude
+              );
+            } else {
+              setMaskFromSam(maskCtx, overlayCtx, samMask, imageWidth, imageHeight, point);
+            }
           }
         } catch (err) {
           const message =
@@ -373,6 +535,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
       },
       [
         brushMode,
+        clearHoverPreview,
         imageHeight,
         imageReady,
         imageWidth,
@@ -503,10 +666,14 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
 
       if (selectionTool === 'click') {
         const exclude = event.shiftKey || brushMode === 'erase';
+        if (hoverPreviewMaskRef.current && confirmHoverSelection(point, exclude)) {
+          return;
+        }
         void applySmartClick(point, exclude);
         return;
       }
 
+      clearHoverPreview();
       drawingRef.current = true;
       lastPointRef.current = point;
       drawStroke(point, point);
@@ -517,7 +684,13 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const handlePointerMove = (event: React.PointerEvent) => {
       setCursorPos(toDisplayCoords(event.clientX, event.clientY));
 
-      if (selectionTool === 'click' || !drawingRef.current || !lastPointRef.current || isEditingDisabled) {
+      if (selectionTool === 'click' && !isEditingDisabled) {
+        const point = toImageCoords(event.clientX, event.clientY);
+        scheduleHoverPreview(point);
+        return;
+      }
+
+      if (!drawingRef.current || !lastPointRef.current || isEditingDisabled) {
         return;
       }
       const point = toImageCoords(event.clientX, event.clientY);
@@ -542,6 +715,7 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
     const handlePointerLeave = (event: React.PointerEvent) => {
       setCursorInside(false);
       setCursorPos(null);
+      clearHoverPreview();
       handlePointerUp(event);
     };
 
@@ -556,6 +730,10 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
         : showBrushCursor
           ? 'none'
           : 'crosshair';
+
+    useEffect(() => {
+      return () => clearHoverPreview();
+    }, [clearHoverPreview]);
 
     return (
       <div className="flex flex-col gap-4">
@@ -691,6 +869,11 @@ export const ObjectRemoveEditor = forwardRef<ObjectRemoveEditorHandle, ObjectRem
                 alt=""
                 className="absolute inset-0 h-full w-full object-contain pointer-events-none"
                 draggable={false}
+              />
+              <canvas
+                ref={hoverCanvasRef}
+                className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+                style={{ width: '100%', height: '100%' }}
               />
               <canvas
                 ref={overlayCanvasRef}

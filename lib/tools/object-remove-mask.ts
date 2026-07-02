@@ -1,4 +1,8 @@
 import { postprocessSamMask } from '@/lib/tools/object-remove-sam-postprocess';
+import {
+  HOVER_PREVIEW_FILL,
+  HOVER_PREVIEW_OUTLINE,
+} from '@/lib/tools/object-remove-hover-preview';
 
 const MASK_FILL = { r: 255, g: 255, b: 255, a: 255 };
 const OVERLAY_FILL = { r: 239, g: 68, b: 68, a: 128 };
@@ -143,6 +147,70 @@ export function setMaskFromSam(
   maskCtx.fillRect(0, 0, width, height);
   overlayCtx.clearRect(0, 0, width, height);
   applySamMaskToCanvas(maskCtx, overlayCtx, processed, width, height, false);
+}
+
+/** Apply an already post-processed mask as the committed selection (hover confirm). */
+export function applyProcessedMaskToSelection(
+  maskCtx: CanvasRenderingContext2D,
+  overlayCtx: CanvasRenderingContext2D,
+  processedMask: ImageData,
+  width: number,
+  height: number
+) {
+  maskCtx.fillStyle = '#000000';
+  maskCtx.fillRect(0, 0, width, height);
+  overlayCtx.clearRect(0, 0, width, height);
+  applySamMaskToCanvas(maskCtx, overlayCtx, processedMask, width, height, false);
+}
+
+/** Purple fill + cyan outline for Smart Select hover preview (separate canvas). */
+export function drawHoverPreviewOverlay(
+  overlayCtx: CanvasRenderingContext2D,
+  processedMask: ImageData,
+  width: number,
+  height: number
+) {
+  overlayCtx.clearRect(0, 0, width, height);
+  const scaled =
+    processedMask.width === width && processedMask.height === height
+      ? processedMask
+      : resizeSamMaskToImage(processedMask, width, height);
+
+  const overlayData = overlayCtx.createImageData(width, height);
+  const sam = scaled.data;
+  const od = overlayData.data;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const si = (y * width + x) * 4;
+      if (sam[si + 3] <= 128) continue;
+
+      const oi = si;
+      od[oi] = HOVER_PREVIEW_FILL.r;
+      od[oi + 1] = HOVER_PREVIEW_FILL.g;
+      od[oi + 2] = HOVER_PREVIEW_FILL.b;
+      od[oi + 3] = HOVER_PREVIEW_FILL.a;
+
+      const edge =
+        x === 0 ||
+        y === 0 ||
+        x === width - 1 ||
+        y === height - 1 ||
+        (x > 0 && sam[si - 4 + 3] <= 128) ||
+        (x < width - 1 && sam[si + 4 + 3] <= 128) ||
+        (y > 0 && sam[si - width * 4 + 3] <= 128) ||
+        (y < height - 1 && sam[si + width * 4 + 3] <= 128);
+
+      if (edge) {
+        od[oi] = HOVER_PREVIEW_OUTLINE.r;
+        od[oi + 1] = HOVER_PREVIEW_OUTLINE.g;
+        od[oi + 2] = HOVER_PREVIEW_OUTLINE.b;
+        od[oi + 3] = HOVER_PREVIEW_OUTLINE.a;
+      }
+    }
+  }
+
+  overlayCtx.putImageData(overlayData, 0, 0);
 }
 
 /** Union or subtract a SAM mask into the existing brush/click selection. */
