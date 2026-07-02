@@ -142,7 +142,14 @@ export function ResultView({
   const savedPercent = computeSavedPercent(resolvedInputBytes ?? 0, outputSizeBytes ?? 0);
   const alreadyOptimized = formatReasonKey === 'formatReasonAlreadyOptimized';
   const showUpscaleCompare = Boolean(
-    beforePreviewUrl && (upscaleReasonKey || blurFacesReasonKey || portraitEnhanceReasonKey)
+    beforePreviewUrl &&
+      (
+        upscaleReasonKey ||
+        bgRemovalReasonKey ||
+        bgReplaceBackgroundLabel ||
+        blurFacesReasonKey ||
+        portraitEnhanceReasonKey
+      )
   );
 
   return (

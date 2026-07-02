@@ -4,11 +4,12 @@ import type { ToolCategory, ToolType } from '@/types';
 export interface PostProcessOptions {
   jobId?: string;
   toolCategory?: ToolCategory;
+  preserveMaxQuality?: boolean;
 }
 
 /**
  * Post-AI delivery optimization (Sharp, €0):
- * - Upscale → WebP (smaller, web-ready)
+ * - Upscale / portrait / bg replace → preserve max quality for paid exports
  * - Background removal → optimized PNG (transparency preserved)
  * Sharp-only tools skip this — their processor already picks the right format.
  */
@@ -26,6 +27,7 @@ export async function postProcessOutput(
   const started = Date.now();
 
   let result: { buffer: Buffer; mimeType: string };
+  const preserveMaxQuality = Boolean(options.preserveMaxQuality);
 
   if (toolCategory === 'background') {
     const optimized = await sharp(buffer)
@@ -34,6 +36,8 @@ export async function postProcessOutput(
       .toBuffer();
     result = { buffer: optimized, mimeType: 'image/png' };
   } else if (toolCategory === 'faces') {
+    result = { buffer, mimeType };
+  } else if (preserveMaxQuality) {
     result = { buffer, mimeType };
   } else {
     const optimized = await sharp(buffer).webp({ quality: 88, effort: 4 }).toBuffer();

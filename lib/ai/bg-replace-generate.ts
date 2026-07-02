@@ -57,10 +57,10 @@ async function runReplicateFluxPlate(
     body: JSON.stringify({
       version: versionId,
       input: {
-        prompt: `${prompt}, high quality background plate, no people, no text, no watermark`,
+        prompt: `${prompt}, premium commercial background plate, realistic studio-grade lighting, clean depth separation, natural color harmony, no people, no text, no watermark, no logo, no extra product, no framing border`,
         aspect_ratio: aspectRatioForSize(width, height),
         output_format: 'jpg',
-        output_quality: 85,
+        output_quality: 92,
       },
     }),
   });

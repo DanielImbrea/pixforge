@@ -1230,7 +1230,13 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
               compressionLevel={compressionLevel}
               sizeCompareOutputLabel={isResizeTool ? 'result' : 'compressed'}
               beforePreviewUrl={
-                isUpscaleTool || isFacesTool || isPortraitEnhanceTool ? filePreviewUrl : null
+                isUpscaleTool ||
+                isBackgroundTool ||
+                isBgReplaceTool ||
+                isFacesTool ||
+                isPortraitEnhanceTool
+                  ? filePreviewUrl
+                  : null
               }
               inputWidth={originalImageMeta?.width ?? null}
               inputHeight={originalImageMeta?.height ?? null}

@@ -22,9 +22,9 @@ function parseEnhanceStyle(value: unknown): PortraitEnhanceStyle {
 }
 
 const FIDELITY_BY_STYLE: Record<PortraitEnhanceStyle, number> = {
-  natural: 0.55,
-  glamour: 0.35,
-  restore: 0.78,
+  natural: 0.78,
+  glamour: 0.68,
+  restore: 0.85,
 };
 
 const REASON_BY_STYLE: Record<PortraitEnhanceStyle, string> = {
@@ -46,7 +46,7 @@ export function resolvePortraitEnhanceRoute(
     enhanceStyle,
     codeformerFidelity: FIDELITY_BY_STYLE[enhanceStyle],
     faceUpsample: true,
-    backgroundEnhance: enhanceStyle !== 'restore',
+    backgroundEnhance: false,
     reasonKey: REASON_BY_STYLE[enhanceStyle],
     warningKey,
   };

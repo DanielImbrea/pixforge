@@ -67,7 +67,11 @@ export async function finalizeJobOutput(opts: FinalizeJobOutputInput): Promise<F
     opts.outputMimeType,
     opts.toolType,
     opts.toolCategory,
-    { jobId: opts.jobId, toolCategory: opts.toolCategory }
+    {
+      jobId: opts.jobId,
+      toolCategory: opts.toolCategory,
+      preserveMaxQuality: !opts.isFreePlan,
+    }
   );
   const outputMeta = await readImageDimensions(optimizedBuffer);
 

@@ -43,10 +43,10 @@ export const PLAN_LIMITS: Record<PlanTier, PlanConfig> = {
     periodType: 'monthly',
     maxUploadMB: 10,
     watermark: false,
-    hdDownloads: false,
+    hdDownloads: true,
     batchProcessing: false,
     commercialLicense: false,
-    maxResizeQuality: 90,
+    maxResizeQuality: 100,
   },
   starter: {
     tier: 'starter',
