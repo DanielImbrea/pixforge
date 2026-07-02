@@ -2,21 +2,25 @@ import type { ToolCategory } from '@/types';
 import type {
   DownloadExportSettings,
   ExportFormat,
-  ExportScalePercent,
   ExportSizeMode,
 } from '@/lib/tools/download-export/types';
 import {
-  clampScaleForPlan,
+  EXPORT_SCALE_DEFAULT,
+  EXPORT_SCALE_MAX,
+  EXPORT_SCALE_MIN,
+} from '@/lib/tools/download-export/types';
+import {
+  clampScaleMultiplierForPlan,
   getExportPlanEntitlements,
   isFormatAllowed,
 } from '@/lib/tools/download-export/plan-entitlements';
 import type { PlanTier } from '@/types';
 
-const STORAGE_KEY = 'pixique-download-settings-v1';
+const STORAGE_KEY = 'pixique-download-settings-v2';
 
 export const DEFAULT_EXPORT_SETTINGS: DownloadExportSettings = {
   format: 'png',
-  scalePercent: 100,
+  scaleMultiplier: EXPORT_SCALE_DEFAULT,
   compress: false,
   compressLevel: 'balanced',
   limitFileSize: false,
@@ -25,24 +29,32 @@ export const DEFAULT_EXPORT_SETTINGS: DownloadExportSettings = {
   rememberSettings: true,
 };
 
-export function getExportSizeMode(category: ToolCategory): ExportSizeMode {
-  return category === 'resize' ? 'fixed' : 'scalable';
+/** All tools scale from the processed result dimensions (1x = processed output). */
+export function getExportSizeMode(_category: ToolCategory): ExportSizeMode {
+  return 'scalable';
 }
 
 export function computeExportDimensions(
   processedWidth: number,
   processedHeight: number,
-  scalePercent: ExportScalePercent,
+  scaleMultiplier: number,
   sizeMode: ExportSizeMode
 ): { width: number; height: number } {
   if (sizeMode === 'fixed') {
     return { width: processedWidth, height: processedHeight };
   }
-  const factor = scalePercent / 100;
+  const factor = Math.min(EXPORT_SCALE_MAX, Math.max(EXPORT_SCALE_MIN, scaleMultiplier));
   return {
     width: Math.max(1, Math.round(processedWidth * factor)),
     height: Math.max(1, Math.round(processedHeight * factor)),
   };
+}
+
+export function formatScaleMultiplierLabel(multiplier: number): string {
+  const rounded = Math.round(multiplier * 1000) / 1000;
+  if (rounded === 1) return '1x';
+  if (rounded % 1 === 0) return `${rounded}x`;
+  return `${rounded}x`;
 }
 
 export function inferHasTransparency(
@@ -58,13 +70,32 @@ export function suggestFormatForTool(
   category: ToolCategory,
   hasTransparency: boolean
 ): ExportFormat {
-  if (category === 'background' || (hasTransparency && category !== 'object_remove')) {
-    return 'png';
+  switch (category) {
+    case 'background':
+    case 'portrait_enhance':
+    case 'upscale':
+      return 'png';
+    case 'resize':
+    case 'compress':
+      return 'jpeg';
+    case 'convert':
+      return 'webp';
+    case 'object_remove':
+      return hasTransparency ? 'png' : 'jpeg';
+    default:
+      if (hasTransparency) return 'png';
+      return 'jpeg';
   }
-  if (category === 'compress' || category === 'convert') {
-    return 'webp';
+}
+
+function migrateLegacySettings(
+  parsed: Partial<DownloadExportSettings> & { scalePercent?: number }
+): Partial<DownloadExportSettings> {
+  if (typeof parsed.scaleMultiplier === 'number') return parsed;
+  if (typeof parsed.scalePercent === 'number') {
+    return { ...parsed, scaleMultiplier: parsed.scalePercent / 100 };
   }
-  return 'jpeg';
+  return parsed;
 }
 
 export function loadSavedExportSettings(): Partial<DownloadExportSettings> | null {
@@ -72,7 +103,9 @@ export function loadSavedExportSettings(): Partial<DownloadExportSettings> | nul
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<DownloadExportSettings>;
+    const parsed = migrateLegacySettings(
+      JSON.parse(raw) as Partial<DownloadExportSettings> & { scalePercent?: number }
+    );
     if (!parsed.rememberSettings) return null;
     return parsed;
   } catch {
@@ -110,10 +143,17 @@ export function resolveInitialExportSettings(params: {
     merged.format = getExportPlanEntitlements(params.plan).formats[0] ?? suggested;
   }
 
-  merged.scalePercent = clampScaleForPlan(params.plan, merged.scalePercent);
+  merged.scaleMultiplier = clampScaleMultiplierForPlan(params.plan, merged.scaleMultiplier);
 
   if (!params.hasTransparency) {
     merged.transparentBackground = false;
+  }
+
+  if (!getExportPlanEntitlements(params.plan).compressFile) {
+    merged.compress = false;
+  }
+  if (!getExportPlanEntitlements(params.plan).limitFileSize) {
+    merged.limitFileSize = false;
   }
 
   return merged;
@@ -121,14 +161,14 @@ export function resolveInitialExportSettings(params: {
 
 export function estimateExportSizeBytes(
   sourceSizeBytes: number | null | undefined,
-  scalePercent: ExportScalePercent,
+  scaleMultiplier: number,
   format: ExportFormat,
   compress: boolean,
   sizeMode: ExportSizeMode
 ): number | null {
   if (!sourceSizeBytes || sourceSizeBytes <= 0) return null;
 
-  const pixelFactor = sizeMode === 'fixed' ? 1 : (scalePercent / 100) ** 2;
+  const pixelFactor = sizeMode === 'fixed' ? 1 : scaleMultiplier ** 2;
   const formatFactor: Record<ExportFormat, number> = {
     png: 1,
     jpeg: 0.38,
@@ -140,18 +180,11 @@ export function estimateExportSizeBytes(
   return Math.max(2048, Math.round(estimate));
 }
 
-export function formatExportSummaryLabel(
-  format: ExportFormat,
-  width: number,
-  height: number,
-  estimatedBytes: number | null
-): string {
-  const formatLabel = format === 'jpeg' ? 'JPG' : format.toUpperCase();
-  const dims = `${width.toLocaleString()} × ${height.toLocaleString()}`;
-  if (!estimatedBytes) return `${formatLabel} • ${dims}`;
+export function formatEstimatedSize(estimatedBytes: number | null): string {
+  if (!estimatedBytes) return '—';
   const sizeMb = estimatedBytes / (1024 * 1024);
-  const sizeLabel = sizeMb >= 1 ? `~${sizeMb.toFixed(1)} MB` : `~${Math.round(estimatedBytes / 1024)} KB`;
-  return `${formatLabel} • ${dims} • ${sizeLabel}`;
+  if (sizeMb >= 1) return `~${sizeMb.toFixed(1)} MB`;
+  return `~${Math.round(estimatedBytes / 1024)} KB`;
 }
 
 export function buildExportFilename(

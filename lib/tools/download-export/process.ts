@@ -17,14 +17,18 @@ export interface ProcessExportOptions {
   stripMetadata?: boolean;
 }
 
-function compressQuality(level: ExportCompressLevel, format: ExportFormat, w: number, h: number): number {
+function compressQuality(
+  compress: boolean,
+  format: ExportFormat,
+  w: number,
+  h: number
+): number {
   const baseJpeg = dynamicJpegPhotoQuality(w, h);
   const baseWebp = dynamicWebpPhotoQuality(w, h);
-  const factor =
-    level === 'high' ? 1 : level === 'balanced' ? 0.82 : 0.65;
+  const factor = compress ? 0.82 : 1;
   if (format === 'webp') return Math.max(40, Math.round(baseWebp * factor));
   if (format === 'jpeg') return Math.max(45, Math.round(baseJpeg * factor));
-  return 9;
+  return compress ? 9 : 6;
 }
 
 async function encodeBuffer(
@@ -68,7 +72,7 @@ export async function processExportImage(
   }
 
   const quality = compressQuality(
-    options.compress ? options.compressLevel : 'high',
+    options.compress,
     options.format,
     options.width,
     options.height

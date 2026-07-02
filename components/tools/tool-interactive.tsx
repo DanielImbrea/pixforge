@@ -1582,7 +1582,6 @@ export function ToolInteractive({ tool, userPlan }: ToolInteractiveProps) {
       open={downloadModalOpen}
       context={downloadContext}
       onClose={() => setDownloadModalOpen(false)}
-      onUpgradeClick={handleUpgradeClick}
     />
     </>
   );

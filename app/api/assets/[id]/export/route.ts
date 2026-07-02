@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { resolveJobDownload } from '@/lib/tools/resolve-job-download';
 import { exportAssetRequestSchema } from '@/lib/validation/export-schemas';
 import {
-  clampScaleForPlan,
+  clampScaleMultiplierForPlan,
   getExportPlanEntitlements,
   isFormatAllowed,
 } from '@/lib/tools/download-export/plan-entitlements';
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'This format is not available on your plan.' }, { status: 403 });
   }
 
-  const scalePercent = clampScaleForPlan(user.plan, parsed.data.scalePercent);
+  const scaleMultiplier = clampScaleMultiplierForPlan(user.plan, parsed.data.scaleMultiplier);
   const compress = parsed.data.compress && entitlements.compressFile;
   const limitFileSize = parsed.data.limitFileSize && entitlements.limitFileSize;
   const transparentBackground =
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { width: exportW, height: exportH } = computeExportDimensions(
       processedWidth,
       processedHeight,
-      scalePercent,
+      scaleMultiplier,
       sizeMode
     );
 

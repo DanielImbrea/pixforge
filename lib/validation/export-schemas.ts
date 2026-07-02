@@ -1,12 +1,17 @@
 import { z } from 'zod';
+import { EXPORT_SCALE_MAX, EXPORT_SCALE_MIN } from '@/lib/tools/download-export/types';
 
 export const exportAssetRequestSchema = z.object({
   format: z.enum(['png', 'jpeg', 'webp']),
-  scalePercent: z.union([z.literal(25), z.literal(50), z.literal(75), z.literal(100)]).default(100),
+  scaleMultiplier: z
+    .number()
+    .min(EXPORT_SCALE_MIN)
+    .max(EXPORT_SCALE_MAX)
+    .default(1),
   compress: z.boolean().default(false),
-  compressLevel: z.enum(['high', 'balanced', 'smallest']).default('balanced'),
+  compressLevel: z.literal('balanced').default('balanced'),
   limitFileSize: z.boolean().default(false),
-  maxFileSizeKb: z.number().int().min(100).max(10240).default(1024),
+  maxFileSizeKb: z.number().int().min(50).max(10240).default(1024),
   transparentBackground: z.boolean().default(true),
   stripMetadata: z.boolean().default(true),
   fileName: z.string().max(120).optional(),

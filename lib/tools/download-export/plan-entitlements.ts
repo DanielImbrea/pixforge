@@ -1,31 +1,35 @@
 import type { PlanTier } from '@/types';
-import type { ExportFormat, ExportPlanEntitlements, ExportScalePercent } from '@/lib/tools/download-export/types';
+import type {
+  ExportFormat,
+  ExportPlanEntitlements,
+} from '@/lib/tools/download-export/types';
+import { EXPORT_SCALE_MAX, EXPORT_SCALE_MIN } from '@/lib/tools/download-export/types';
 
 const BASE: Record<PlanTier, ExportPlanEntitlements> = {
   free: {
     formats: ['png', 'jpeg'],
-    maxScalePercent: 75,
+    canUseScaleSlider: false,
     transparentBackground: false,
     compressFile: false,
     limitFileSize: false,
   },
   basic: {
     formats: ['png', 'jpeg', 'webp'],
-    maxScalePercent: 100,
+    canUseScaleSlider: true,
     transparentBackground: false,
     compressFile: false,
     limitFileSize: false,
   },
   starter: {
     formats: ['png', 'jpeg', 'webp'],
-    maxScalePercent: 100,
-    transparentBackground: false,
-    compressFile: false,
-    limitFileSize: false,
+    canUseScaleSlider: true,
+    transparentBackground: true,
+    compressFile: true,
+    limitFileSize: true,
   },
   pro: {
     formats: ['png', 'jpeg', 'webp'],
-    maxScalePercent: 100,
+    canUseScaleSlider: true,
     transparentBackground: true,
     compressFile: true,
     limitFileSize: true,
@@ -40,18 +44,21 @@ export function isFormatAllowed(plan: PlanTier, format: ExportFormat): boolean {
   return getExportPlanEntitlements(plan).formats.includes(format);
 }
 
-export function clampScaleForPlan(plan: PlanTier, scale: ExportScalePercent): ExportScalePercent {
-  const max = getExportPlanEntitlements(plan).maxScalePercent;
-  if (scale <= 25) return 25;
-  if (scale <= 50) return max >= 50 ? 50 : max;
-  if (scale <= 75) return max >= 75 ? 75 : max;
-  return max;
+export function clampScaleMultiplierForPlan(plan: PlanTier, multiplier: number): number {
+  const ent = getExportPlanEntitlements(plan);
+  if (!ent.canUseScaleSlider) return 1;
+  return Math.min(EXPORT_SCALE_MAX, Math.max(EXPORT_SCALE_MIN, multiplier));
 }
 
-export function isProOnlyFeature(
+export function isPremiumExportFeature(
   plan: PlanTier,
-  feature: 'transparentBackground' | 'compressFile' | 'limitFileSize'
+  feature: 'scaleSlider' | 'transparentBackground' | 'compressFile' | 'limitFileSize'
 ): boolean {
   const ent = getExportPlanEntitlements(plan);
+  if (feature === 'scaleSlider') return !ent.canUseScaleSlider;
   return !ent[feature];
+}
+
+export function hasStarterOrProExportFeatures(plan: PlanTier): boolean {
+  return plan === 'starter' || plan === 'pro';
 }
